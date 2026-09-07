@@ -154,9 +154,15 @@ MODULOS = [
          toca='sin gancho propio (varas.py --index lo invoca continuidad --cierre); ficheros mem/propiocepcion.json',
          hooks=[]),
     dict(id='ojo', script='ojo.py', defecto=True,
-         linea='Un fotograma de la webcam, solo cuando se pide (OpenCV opcional).',
-         toca='sin gancho — nunca se dispara solo; uso manual; ficheros mem/ojo.log',
-         hooks=[], aviso='necesita OpenCV (cv2); sin él, «sin cv2: no hay ojo».'),
+         linea='El ojo, con verbos: mirar (webcam), texto/fotocopia/tarjeta/manual (OCR, delega en '
+               'lectura_visual.py), despiece/prompt3d (2,5D, delega en volumen.py), gestos (control por '
+               'mano, delega en gestos.py) — todo a petición, ninguno por gancho.',
+         toca='sin gancho — nunca se dispara solo; uso manual; ficheros mem/ojo.log (verbos mirar/texto/'
+              'fotocopia/tarjeta/manual); despiece/prompt3d/gestos no tocan mem',
+         hooks=[], aviso='OpenCV (cv2) para mirar/fotocopia/despiece/prompt3d (numpy también para '
+                          'despiece/prompt3d), tesseract opcional para el OCR de texto/fotocopia/tarjeta/'
+                          'manual, mediapipe para gestos — cada verbo dice exactamente qué instalar si '
+                          'falta y sale con código 2; nunca se instala nada desde aquí.'),
     dict(id='imagen', script='imagen.py', defecto=True,
          linea='Crear una imagen por cascada de proveedores, pintarla localmente por pinceladas (varios '
                'estilos), animarla en vídeo, renderizar una escena 3D, o buscar una imagen ya hecha o un '
@@ -193,6 +199,16 @@ MODULOS = [
                'chromium en Linux/macOS) — dependencia OPCIONAL del sistema, no de pip; sin uno, «sin dato: '
                'no hay navegador sin cabeza» y código 2 (la página HTML se escribe de todas formas). Es un '
                'visor y editor de vistas, no un modelador: no repara mallas, no simplifica, no exporta.'),
+    dict(id='gestos', script='gestos.py', defecto=True,
+         linea='La mano manda en el holograma: MediaPipe + vocabulario PROPIO del paquete (número de '
+               'dedos aísla capas del despiece, pellizco desliza la explosión, pose de la palma orbita la '
+               'cámara, mano abierta y quieta captura PNG, dos manos escalan).',
+         toca='sin gancho — uso manual (`ojo.py gestos` delega aquí); sirve HTTP SOLO en 127.0.0.1; no '
+              'toca mem ni resuelve un proyecto de Claude Code',
+         hooks=[],
+         aviso='necesita mediapipe (y opencv-python para leer la cámara); sin ellos, dice exactamente qué '
+               'instalar y sale con código 2 — nunca instala nada. Se queda corriendo (servidor + bucle de '
+               'cámara) hasta que se interrumpe: no es un comando que termina solo.'),
     dict(id='parentesis', script='parentesis.py', defecto=True,
          linea='Marca un tramo o una sesión entera para que no entre en la memoria futura; puede recortar el '
                'transcript local ya cerrado.',
@@ -233,9 +249,16 @@ MODULOS = [
          toca='sin gancho — uso manual (<carpeta> [--salida] [--json], --buscar <nombre>); '
               'ficheros mem/mapas/<carpeta>.txt(.json)',
          hooks=[]),
+    dict(id='auditar', script='auditar.py', defecto=True,
+         linea='Las cinco comprobaciones sobre un paquete antes de instalarlo: procedencia, comandos, '
+               'permisos, qué sale de la máquina, y dominios para lectura manual.',
+         toca='sin gancho — uso manual (`python auditar.py <ruta> [--json] [--markdown f.md]`, o vía la '
+              'skill esceptico con --paquete); NUNCA ejecuta el código auditado (solo lee texto y, si hay '
+              '.git, su historial LOCAL); no toca mem',
+         hooks=[]),
     dict(id='esceptico', script=None, defecto=True, especial='skill', carpeta_skill='esceptico',
          linea='La ley «ningún plan sin escéptico» como comando: lanza un revisor con model Opus a tumbar un '
-               'plan antes de ejecutarlo.',
+               'plan antes de ejecutarlo, o (--paquete) a leer por encima del informe de auditar.py.',
          toca='copia skills/esceptico/ a <skills-dir>/esceptico/ (por defecto ~/.claude/skills/esceptico/, '
               'ver --skills-dir); no es Python, no toca settings.json ni mem',
          hooks=[]),

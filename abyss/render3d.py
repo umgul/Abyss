@@ -5,11 +5,27 @@ Uso:
     python render3d.py <modelo.glb|.gltf|.obj|.stl|escena.json> [--html [salida.html]]
                         [--png [salida.png]] [--explosion 0.5] [--camara x,y,z] [--mirar x,y,z]
                         [--fondo #rrggbb] [--luz calida|fria|neutra] [--ancho 1600] [--alto 900]
+                        [--holograma]
 
 `--html` es el modo normal (SIEMPRE se escribe la página, con o sin la bandera; ésta solo
 sirve para elegir la ruta — a diferencia de `pintor.py`, aquí la página no es un extra
 opcional: es el propio resultado que pide T3.1). Sin ruta explícita:
 `<carpeta_de_la_entrada>/<base>_render3d.html`.
+
+`--holograma` (T4.4): la MISMA escena, la MISMA cámara, en cuatro cuadrantes cuadrados
+alrededor del centro de la pantalla (arriba/abajo/izquierda/derecha), cada uno con la
+imagen espejada horizontalmente y girada 0°/180°/90°/-90° respectivamente — lo que pide
+una pirámide de metacrilato apoyada en el centro de la pantalla (Pepper's ghost): cada cara
+de la pirámide refleja el cuadrante que tiene delante hacia el centro, y la reflexión
+espeja la imagen, de ahí el espejado. Es una CONVENCIÓN de composición 2D declarada aquí,
+no verificada contra una pirámide física de verdad (no hay una en la máquina de
+desarrollo): si la orientación no coincide con la tuya, cambia el signo de los ángulos, es
+el único ajuste que hace falta. El fondo se fuerza a negro puro (`#000000`, ignora
+`--fondo`) porque el efecto exige negro de verdad, no un gris oscuro. Sin dependencias
+nuevas: los cuatro cuadrantes son cuatro copias 2D (`CanvasRenderingContext2D.drawImage`)
+del MISMO fotograma que ya pinta el `<canvas>` WebGL de siempre (que se queda montado pero
+oculto, como fuente); no se crean más contextos WebGL ni se vuelve a recorrer la escena
+cuatro veces.
 
 `--png [salida.png]`: además de la página, la abre en un navegador sin cabeza (Chrome o
 Edge; se busca en las rutas habituales de Windows — `msedge.exe`/`chrome.exe` — y en el
@@ -782,13 +798,65 @@ function calcularDirecciones(piezasObjs, centroV) {
 
   const controles = new OrbitaMinima(camera, renderer.domElement, objetivo);
 
+  // T4.4 --holograma: cuatro cuadrantes 2D espejados sobre negro (Pepper's ghost). El
+  // <canvas> WebGL de siempre sigue existiendo y pintando (es la FUENTE, con `drawImage`);
+  // solo se oculta como tal. Ver la convención de ángulos/espejado en el docstring de
+  // `renderizar()` — sin dependencias nuevas: dos llamadas de Canvas2D de toda la vida.
+  function iniciarHolograma() {
+    const cont = document.getElementById('holograma');
+    cont.style.display = 'block';
+    canvas.style.display = 'none';
+    const cuadrantes = [
+      { el: document.getElementById('cuadArriba'), angulo: 180 },
+      { el: document.getElementById('cuadAbajo'), angulo: 0 },
+      { el: document.getElementById('cuadIzquierda'), angulo: 90 },
+      { el: document.getElementById('cuadDerecha'), angulo: -90 },
+    ];
+    function colocar() {
+      const lado = Math.max(1, Math.floor(Math.min(window.innerWidth, window.innerHeight) * 0.5));
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const posiciones = {
+        cuadArriba: [(vw - lado) / 2, vh / 2 - lado],
+        cuadAbajo: [(vw - lado) / 2, vh / 2],
+        cuadIzquierda: [vw / 2 - lado, (vh - lado) / 2],
+        cuadDerecha: [vw / 2, (vh - lado) / 2],
+      };
+      for (const c of cuadrantes) {
+        c.el.width = lado; c.el.height = lado;
+        const pos = posiciones[c.el.id];
+        c.el.style.left = pos[0] + 'px'; c.el.style.top = pos[1] + 'px';
+      }
+    }
+    window.addEventListener('resize', colocar);
+    colocar();
+    return function dibujarHolograma() {
+      const sw = canvas.width, sh = canvas.height;
+      if (!sw || !sh) return;
+      for (const c of cuadrantes) {
+        const ctx = c.el.getContext('2d');
+        const lado = c.el.width;
+        ctx.save();
+        ctx.clearRect(0, 0, lado, lado);
+        ctx.translate(lado / 2, lado / 2);
+        ctx.rotate(c.angulo * Math.PI / 180);
+        ctx.scale(-1, 1);  // espejado: la reflexión de la pirámide invierte la imagen
+        const escala = Math.max(lado / sw, lado / sh);
+        ctx.drawImage(canvas, -sw * escala / 2, -sh * escala / 2, sw * escala, sh * escala);
+        ctx.restore();
+      }
+    };
+  }
+  const dibujarHolograma = ESCENA.holograma ? iniciarHolograma() : null;
+
   refrescarExplosion();
   renderer.render(escena3d, camera);  // síncrono, antes de animar(): ya hay un fotograma pintado
+  if (dibujarHolograma) dibujarHolograma();
 
   function animar() {
     requestAnimationFrame(animar);
     controles.update();
     renderer.render(escena3d, camera);
+    if (dibujarHolograma) dibujarHolograma();
   }
   animar();
 })();
@@ -810,6 +878,8 @@ canvas{display:block}
 #panel .fila{display:flex;align-items:center;gap:6px;margin:2px 0}
 #panel button{background:#3a3a44;color:#eee;border:0;border-radius:6px;padding:7px 10px;margin-top:10px;cursor:pointer;width:100%;font:inherit}
 #panel button:hover{background:#4a4a56}
+#holograma{position:fixed;inset:0;background:#000;display:none}
+#holograma canvas{position:absolute;background:#000}
 </style>
 </head>
 <body>
@@ -826,6 +896,14 @@ canvas{display:block}
   <label>recorte Z</label>
   <div class="fila"><input id="chkZ" type="checkbox"><input id="sldZ" type="range" style="flex:1"></div>
   <button id="btnCapturar" type="button">Capturar PNG</button>
+</div>
+<!-- T4.4 --holograma: cuatro cuadrantes 2D (drawImage del <canvas> WebGL de siempre,
+     que sigue existiendo pero oculto) — ver ESCENA.holograma en __MAIN_JS__. -->
+<div id="holograma">
+  <canvas id="cuadArriba"></canvas>
+  <canvas id="cuadAbajo"></canvas>
+  <canvas id="cuadIzquierda"></canvas>
+  <canvas id="cuadDerecha"></canvas>
 </div>
 <script>
 /* three.js r160 (0.160.0), licencia MIT: abyss/vendor/LICENSE-three.txt */
@@ -940,7 +1018,8 @@ def _capturar_png(ruta_html, ruta_png, ancho, alto, avisar=print, navegador=None
 # ───────────────────────────────── API pública ─────────────────────────────────
 
 def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900,
-               camara=None, mirar=None, fondo=None, luz="neutra", avisar=print, navegador=None):
+               camara=None, mirar=None, fondo=None, luz="neutra", holograma=False,
+               avisar=print, navegador=None):
     """Lee `entrada` (glb/gltf/obj/stl/escena.json), escribe SIEMPRE una página HTML
     autocontenida (`html`: ruta exacta si es una cadena; si no — `None` o `True`, para la
     bandera `--html` sin valor — `<carpeta_de_entrada>/<base>_render3d.html`) y, si `png`
@@ -949,7 +1028,9 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
 
     `camara`/`mirar`: `"x,y,z"` o `[x,y,z]`; si no se dan, se usa la `camara` de
     `escena.json` (si la trae) y si tampoco, un encuadre automático a 3/4 sobre el centro
-    de toda la escena. `fondo`: `"#rrggbb"` (por defecto `#15151a`). `luz`: calida/fria/neutra.
+    de toda la escena. `fondo`: `"#rrggbb"` (por defecto `#15151a`; ignorado, forzado a
+    `#000000`, si `holograma=True` — ver docstring del módulo). `luz`: calida/fria/neutra.
+    `holograma`: cuatro cuadrantes espejados sobre negro (Pepper's ghost, T4.4).
 
     Devuelve un dict con `html`, `png` (o `None`), `piezas`, `grupos`, `centro`, `radio`, y
     -si hubo `--png`- `segundos_png`/`intentos_png`/`bytes_png` (y `aviso` si el PNG final
@@ -973,7 +1054,7 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
     pos_cam = _vec(camara) or (camara_json or {}).get("pos")
     mirar_v = _vec(mirar) or (camara_json or {}).get("mirar")
     fov = (camara_json or {}).get("fov", 50)
-    fondo_final = fondo or "#15151a"
+    fondo_final = "#000000" if holograma else (fondo or "#15151a")
     luz_final = luz if luz in ("calida", "fria", "neutra") else "neutra"
 
     base = os.path.splitext(os.path.basename(ruta_entrada))[0]
@@ -982,7 +1063,7 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
 
     escena_embebida = {
         "ancho": int(ancho), "alto": int(alto), "fondo": fondo_final, "luz": luz_final,
-        "centro": centro, "radio": radio,
+        "centro": centro, "radio": radio, "holograma": bool(holograma),
         "camara": {"pos": pos_cam, "mirar": mirar_v, "fov": fov} if (pos_cam or mirar_v) else None,
         "piezas": [_pieza_embebible(p) for p in piezas],
         "nombre_base": base,
@@ -1018,11 +1099,13 @@ def _cli(argv):
         return 1
     entrada = argv[0]
     opts = {"html": None, "png": None, "explosion": 0.0, "ancho": 1600, "alto": 900,
-            "camara": None, "mirar": None, "fondo": None, "luz": "neutra"}
+            "camara": None, "mirar": None, "fondo": None, "luz": "neutra", "holograma": False}
     i = 1
     while i < len(argv):
         a = argv[i]
-        if a == "--html":
+        if a == "--holograma":
+            opts["holograma"] = True
+        elif a == "--html":
             if i + 1 < len(argv) and not argv[i + 1].startswith("--"):
                 i += 1
                 opts["html"] = argv[i]

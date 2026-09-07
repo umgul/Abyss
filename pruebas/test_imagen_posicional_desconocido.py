@@ -89,10 +89,13 @@ class ImagenCrearRechazaArgumentosSinReconocer(unittest.TestCase):
 
 class OjoIndiceCamaraNoNumericoNoRevienta(unittest.TestCase):
     def test_indice_no_numerico_da_mensaje_claro_y_codigo_1(self):
-        # mismo patrón, mismo tipo, en abyss/ojo.py:39 (`idx = int(argv[1])`)
+        # mismo patrón, mismo tipo, en abyss/ojo.py (`idx = int(resto[1])`, verbo
+        # `mirar`). Desde T4.6 `ojo.py` despacha por verbo (ESPECIFICACION_TANDA4.md
+        # §T4.6): hay que anteponer `mirar`, si no el primer positional ("foto.jpg")
+        # se lee como verbo y sale "verbo desconocido" antes de llegar a este chequeo.
         proj = ay.nuevo_proyecto()
         env = ay.entorno(proj)
-        r = ay.ejecutar(ay.script('ojo.py'), ['foto.jpg', 'noesunnumero'], env, timeout=15)
+        r = ay.ejecutar(ay.script('ojo.py'), ['mirar', 'foto.jpg', 'noesunnumero'], env, timeout=15)
         self.assertEqual(r.returncode, 1, f'stdout={r.stdout!r} stderr={r.stderr!r}')
         self.assertNotIn('Traceback', r.stderr)
         self.assertIn('noesunnumero', r.stdout, 'el mensaje debe nombrar el valor que no entendió')

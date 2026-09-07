@@ -186,7 +186,13 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     `ganchos_settings_ejemplo.json` — las fichas personales del autor no se
     publican, a propósito) y "las siete leyes del SGICP propio" (MEDIDO:
     `docs/leyes.md` tiene SEIS leyes numeradas, más una sección de resumen final
-    que no es una séptima ley)."""
+    que no es una séptima ley).
+
+    T4.2 (7-sep) añadió `docs/AUDITORIA_DE_ABYSS.md` (el primer informe de
+    `auditar.py`, corrido sobre el propio paquete) a la lista blanca: sigue sin
+    haber fichas de diseño personales, pero la lista de lo permitido en `docs/`
+    tenía que crecer con ese fichero o quedaba una lista blanca desactualizada
+    tumbando la suite entera."""
 
     def test_no_promete_fichas_originales_ni_siete_leyes(self):
         texto = (RAIZ / 'ESPECIFICACION.md').read_text(encoding='utf-8')
@@ -197,8 +203,10 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     def test_docs_no_lleva_fichas_de_diseno_originales(self):
         docs = RAIZ / 'docs'
         nombres = sorted(p.name for p in docs.iterdir() if p.is_file())
-        self.assertEqual(nombres, ['ganchos_settings_ejemplo.json', 'leyes.md'],
-                          'docs/ no debe llevar más que el leyes.md destilado y el ejemplo de ganchos')
+        permitidos = ['AUDITORIA_DE_ABYSS.md', 'ganchos_settings_ejemplo.json', 'leyes.md']
+        self.assertEqual(nombres, permitidos,
+                          'docs/ no debe llevar más que la lista blanca declarada: el leyes.md '
+                          'destilado, el ejemplo de ganchos y el informe de auditoría de T4.2')
 
     def test_leyes_md_tiene_exactamente_seis_leyes_numeradas(self):
         texto = (RAIZ / 'docs' / 'leyes.md').read_text(encoding='utf-8')
@@ -257,6 +265,47 @@ class ReadmesDicenElCasoCrlfDelLimiteHonesto(unittest.TestCase):
         for nombre in ('README.md', 'README.en.md'):
             texto = (RAIZ / nombre).read_text(encoding='utf-8')
             self.assertIn('CRLF', texto, f'{nombre} debe nombrar el caso CRLF en su límite honesto')
+
+
+class ReadmeNoVendeLosVerbosDeLaManoComoHechos(unittest.TestCase):
+    """Fallo "engaña" medido 7-sep (T4.5): README.md describía los cinco verbos de
+    `gestos.py` como si ya movieran algo en pantalla («número de dedos aísla capas
+    del despiece, pellizco desliza la explosión, pose de la palma orbita la
+    cámara, mano abierta y quieta un segundo captura PNG, dos manos escalan») —
+    MEDIDO falso: `gestos.py` solo publica campos en un JSON por HTTP (cero
+    `imwrite`/`.save(` en el fichero) y `render3d.py` no sondea ese `/estado` en
+    ninguna parte (cero `fetch`/`8799`/`/estado` referidos a él). El propio
+    `gestos.py` lo declara en su docstring («esa reactividad ... NO está hecha
+    aquí»); ese límite no llegaba al README, que es lo que lee quien instala."""
+
+    def test_no_repite_la_lista_de_verbos_como_hechos(self):
+        texto = (RAIZ / 'README.md').read_text(encoding='utf-8')
+        frase_vieja = (
+            'número de dedos aísla capas del despiece, pellizco desliza la '
+            'explosión (normalizado por percentiles de la propia sesión), pose '
+            'de la palma orbita la cámara, mano abierta y quieta un segundo '
+            'captura PNG, dos manos escalan'
+        )
+        self.assertNotIn(frase_vieja, texto,
+                          'README.md no debe describir los verbos de gestos.py como efectos ya hechos')
+
+    def test_tabla_dice_que_sirve_estado_y_nada_lo_consume(self):
+        texto = _colapsar((RAIZ / 'README.md').read_text(encoding='utf-8'))
+        self.assertIn('sirve por HTTP local, SOLO en `127.0.0.1`, el estado de la mano', texto)
+        self.assertIn('Nada consume ese estado todavía', texto)
+        self.assertIn('la página de `render3d.py` no lee `/estado` ni reacciona', texto)
+        self.assertIn('ningún PNG se captura', texto)
+
+    def test_limites_honestos_declara_que_nada_lo_consume(self):
+        texto = _colapsar((RAIZ / 'README.md').read_text(encoding='utf-8'))
+        self.assertIn('la página que genera `render3d.py` no lee `/estado` ni reacciona a él', texto)
+        self.assertIn('ningún gesto llega a capturar un PNG', texto)
+
+    def test_sentidos_ya_no_dice_que_la_mano_maneja_la_escena_sin_matiz(self):
+        texto = _colapsar((RAIZ / 'README.md').read_text(encoding='utf-8'))
+        self.assertNotIn('la mano maneja la escena vía MediaPipe con vocabulario propio, sirve HTTP',
+                          texto)
+        self.assertIn('pero nada lo consume', texto)
 
 
 if __name__ == '__main__':

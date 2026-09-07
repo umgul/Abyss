@@ -20,7 +20,7 @@ paréntesis promete que no viaja a memoria futura.
           turno con la lista, para que reescriba. Una sola vez por turno
           (stop_hook_active=True ⇒ deja pasar, apunta «reincidente»).
         - 1 número suelto sin fuente → solo aviso (puede ser aritmética mía);
-          ≥2 números, o cualquier ruta o cita, → bloqueo.
+          ≥2 números, o cualquier ruta, cita, dominio o comando, → bloqueo.
         - Las comillas «…» se registran en DOS tipos (§2.1b): `cita` si hay un verbo
           de atribución cerca («dijo», «escribió», «según»…: alguien las habría dicho
           así de verdad) y `parafrasis` si no (uso estilístico de «» en una paráfrasis
@@ -28,6 +28,25 @@ paréntesis promete que no viaja a memoria futura.
         - ESTADOS: frases mías en 1ª persona sobre mi estado («me siento», «me alegra»,
           «tengo ganas»…) sin medida ni marca de conjetura. NO bloquean (un «me alegro»
           es acto de habla); se cuentan como «estados sin vara» en la presión.
+        - DOMINIO y COMANDO (T4.1, motivo: el incidente que un usuario sufrió con un
+          comando que le dio su propia IA apuntando a un dominio copia): MISMA ley de
+          procedencia que numero/ruta/cita, aplicada a lo que puede llevarme a otra
+          máquina. `dominio`: cualquier host o URL de mi respuesta que no aparece en la
+          evidencia; se comparan HOSTS NORMALIZADOS (minúsculas, sin `www.`, sin puerto
+          ni ruta — `normaliza_host()`), no la URL entera. `comando`: cualquier línea
+          con forma de instalación o ejecución remota (`curl`/`wget`/`iwr`/`irm` con
+          tubería a `bash`/`sh`/`iex`; `pip install`, `npm i`, `winget`, `choco`,
+          `Invoke-Expression`, `powershell -enc`) cuya fuente no esté en el turno. A
+          diferencia de `numero` (que ignora los bloques ```código``` porque «suelen ser
+          copias»), estos DOS tipos SÍ miran dentro de ellos: un `curl … | bash` suele
+          venir precisamente ahí, y saltárselo dejaría sin vara justo el sitio que
+          motiva esta pieza. `--descargo` y `--precision` valen igual para los dos.
+          **Límite declarado**: esto comprueba DE DÓNDE salió un dominio, no si es de
+          fiar. Un dominio devuelto por una búsqueda tiene procedencia y puede seguir
+          siendo una copia. Contra eso solo vale leerlo carácter a carácter, y eso lo
+          hace quien lee, no el guion. (Límite también en la lista de TLD de
+          `RE_DOMINIO_DESNUDO`: tan incompleta como `EXT` para rutas — un TLD nuevo sin
+          esquema `http(s)://` no se reconoce.)
     python vigia.py --presion <sid>: cazas de esa sesión contra mi distribución.
     python vigia.py --descargo <sid> "<caza>" "<motivo>": una caza era legítima
         (cálculo enseñado, cita exacta…). El propio texto de bloqueo dice cómo usarlo
@@ -45,7 +64,12 @@ paréntesis promete que no viaja a memoria futura.
 Límites, dichos secos: no juzga afirmaciones sin número ni cita (ahí no llega);
 un número que YO calculé a partir de otros sale cazado (correcto: enseñar el cálculo);
 la evidencia es texto plano, así que un número presente por casualidad en cualquier
-salida se da por cubierto (falso negativo). Es una vara, no un juez.
+salida se da por cubierto (falso negativo). Un dominio o un host mencionado sin
+esquema `http(s)://` solo se reconoce si su TLD está en la lista declarada de
+`RE_DOMINIO_DESNUDO` (falso negativo con TLD raros); y comprueba de dónde SALIÓ el
+dominio, nunca si es de fiar — un dominio con procedencia (llegó por una herramienta)
+puede seguir siendo una copia, y eso solo lo descarta quien lee carácter a carácter,
+no este guion. Es una vara, no un juez.
 
 El código vive donde lo instale `rutas.CODE`; los datos (confabulaciones.jsonl…) viven
 en `mem`, resuelto por `rutas.resolver()` — nunca `dirname(__file__)` como carpeta de
@@ -102,6 +126,52 @@ RE_ESTADO = re.compile(
     r'disfrut[oé]|sufr[oí]|me importa|echo de menos)\b', re.I)
 MARCAS = ('[medida', 'medida:', 'conjetura', 'no lo sé', 'no puedo medir', 'proxy', 'percentil',
           'sin vara', 'no tengo vara', 'no lo puedo afirmar', 'acto de habla')
+
+# --- T4.1: dominio y comando (misma ley de procedencia que numero/ruta/cita) ---
+RE_URL = re.compile(r'\b(?:https?|ftp)://[^\s\'"<>\)\]]+', re.I)
+# Lista de TLD declarada — tan incompleta como `EXT` para rutas (§ límite arriba):
+# un dominio SIN esquema (`http(s)://`) solo se reconoce si termina en uno de estos.
+TLDS = ('com', 'net', 'org', 'io', 'dev', 'sh', 'co', 'app', 'xyz', 'info', 'biz', 'me', 'ai',
+        'es', 'mx', 'uk', 'de', 'fr', 'ru', 'cn', 'jp', 'kr', 'in', 'br', 'it', 'nl', 'se', 'pl',
+        'top', 'click', 'link', 'gg', 'to', 'tv', 'cc', 'pw', 'icu', 'site', 'online', 'store',
+        'tech', 'cloud', 'run', 'page', 'host', 'systems', 'zone', 'world', 'space', 'club',
+        'fun', 'live', 'news', 'wiki', 'blog', 'cf', 'ga', 'ml', 'tk', 'edu', 'gov', 'int')
+RE_DOMINIO_DESNUDO = re.compile(
+    r'(?<![\w@./\\-])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:' + '|'.join(TLDS) + r'))\b', re.I)
+# Instalación o ejecución remota (T4.1, motivo: comando dado por una IA hacia un dominio
+# copia): tuberías curl/wget/iwr/irm hacia un intérprete, o gestores de paquetes/registro.
+RE_COMANDO = re.compile(
+    r'(?:\b(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:bash|sh|zsh)\b'
+    r'|\b(?:iwr|invoke-webrequest|irm|invoke-restmethod)\b[^\n|]*\|\s*(?:iex|invoke-expression)\b'
+    r'|\bpip3?\s+install\b|\bnpm\s+i(?:nstall)?\b|\byarn\s+(?:global\s+)?add\b'
+    r'|\bwinget\s+install\b|\bchoco(?:latey)?\s+install\b|\bInvoke-Expression\b'
+    r'|\bpowershell(?:\.exe)?\s+-enc(?:odedcommand)?\b)', re.I)
+
+
+def normaliza_host(h):
+    """Host en minúsculas, sin `www.`, sin usuario/contraseña, sin puerto ni ruta —
+    para comparar PROCEDENCIA por host, no por URL entera (T4.1): tanto
+    `https://Copia.EJEMPLO.com:8443/instalar.sh` como `copia.ejemplo.com` cuentan
+    como el mismo dominio, y solo uno de los dos necesita haber salido de la
+    evidencia para que el otro no se cace."""
+    h = h.strip().lower().split('/', 1)[0].split('?', 1)[0].split('#', 1)[0]
+    h = h.rsplit('@', 1)[-1].split(':', 1)[0]
+    return h[4:] if h.startswith('www.') else h
+
+
+def _dominios_en(texto):
+    """{host normalizado: primer texto tal cual apareció} de toda URL con esquema
+    (http/https/ftp) o dominio "desnudo" con un TLD de la lista declarada (`TLDS`).
+    Se aplica igual sobre la respuesta y sobre la evidencia (misma vara para las
+    dos partes, como exige la ley de procedencia)."""
+    out = {}
+    for m in RE_URL.finditer(texto):
+        raw = m.group(0)
+        out.setdefault(normaliza_host(raw.split('://', 1)[1]), raw)
+    for m in RE_DOMINIO_DESNUDO.finditer(texto):
+        raw = m.group(1)
+        out.setdefault(normaliza_host(raw), raw)
+    return out
 
 
 def _texto_bloque(b):
@@ -214,7 +284,8 @@ def _tipo_cita(respuesta, inicio, fin):
 def cazar(evidencia, respuesta):
     """Devuelve dict con listas: numeros, rutas, citas (atribuidas a alguien, tipo
     `cita`) y parafrasis (comillas «» sin atribución cerca, tipo `parafrasis`,
-    §2.1b) sin fuente; estados sin vara."""
+    §2.1b) sin fuente; dominios y comandos (T4.1, misma ley de procedencia — ver
+    docstring del módulo); estados sin vara."""
     ev = evidencia; ev_num = normaliza_num(ev); ev_low = re.sub(r'\s+', ' ', ev.lower())
     sin_codigo = re.sub(r'```.*?```', ' ', respuesta, flags=re.S)  # los bloques de código suelen ser copias
     numeros = []
@@ -238,8 +309,20 @@ def cazar(evidencia, respuesta):
             continue
         entrada = c[:60]
         (citas if _tipo_cita(respuesta, m.start(), m.end()) == 'cita' else parafrasis).append(entrada)
+    # T4.1: dominio y comando SÍ miran dentro de los bloques ```código``` (usan
+    # `respuesta`, no `sin_codigo`) — un `curl … | bash` suele venir precisamente
+    # ahí, y `numero` los ignora por un motivo que no aplica aquí («suelen ser
+    # copias»): una copia de un comando de instalación es justo lo que se quiere cazar.
+    hosts_ev = set(_dominios_en(ev))
+    dominios = [raw for h, raw in _dominios_en(respuesta).items() if h not in hosts_ev]
+    comandos = []
+    for linea in respuesta.splitlines():
+        l = linea.strip()
+        if l and RE_COMANDO.search(l) and re.sub(r'\s+', ' ', l).lower() not in ev_low:
+            comandos.append(l[:200])
     return {'numeros': sorted(set(numeros)), 'rutas': sorted(set(rutas)), 'citas': citas,
-            'parafrasis': parafrasis, 'estados': estados_sin_vara(respuesta)}
+            'parafrasis': parafrasis, 'dominios': sorted(set(dominios)),
+            'comandos': sorted(set(comandos)), 'estados': estados_sin_vara(respuesta)}
 
 
 def apuntar(sid, cazas, reincidente):
@@ -261,22 +344,26 @@ def registros():
     return out
 
 
+_CAMPOS_DUROS = ('numeros', 'rutas', 'citas', 'parafrasis', 'dominios', 'comandos')
+
+
 def _duras(r):
     """Cuántas cazas duras (no estados) lleva un registro: números + rutas + citas +
-    parafrasis. Un `--descargo` no tiene ninguna de estas claves, cuenta 0."""
-    return len(r.get('numeros', [])) + len(r.get('rutas', [])) + len(r.get('citas', [])) + len(r.get('parafrasis', []))
+    parafrasis + dominios + comandos (T4.1). Un `--descargo` no tiene ninguna de
+    estas claves, cuenta 0."""
+    return sum(len(r.get(campo, [])) for campo in _CAMPOS_DUROS)
 
 
 def _caza_existe(sid, caza):
     """True si `confabulaciones.jsonl` tiene, para esta `sid`, un registro de caza
-    (no un `--descargo`) cuyo numeros/rutas/citas/parafrasis contenga el texto de
-    `caza` (fallo "engaña" del revisor 3: sin esto, `--descargo` apuntaba
-    cualquier sid y cualquier texto inventados, y `--precision` los contaba como
-    si midieran algo)."""
+    (no un `--descargo`) cuyo numeros/rutas/citas/parafrasis/dominios/comandos
+    contenga el texto de `caza` (fallo "engaña" del revisor 3: sin esto, `--descargo`
+    apuntaba cualquier sid y cualquier texto inventados, y `--precision` los contaba
+    como si midieran algo)."""
     for r in registros():
         if r.get('id') != sid or 'descargo' in r:
             continue
-        for campo in ('numeros', 'rutas', 'citas', 'parafrasis'):
+        for campo in _CAMPOS_DUROS:
             for c in r.get(campo, []):
                 if caza == c or caza in c or c in caza:
                     return True
@@ -399,8 +486,8 @@ if __name__ == '__main__':
     if not fin.strip():
         sys.exit(0)
     cz = cazar(ev, fin)
-    grave = bool(cz['rutas'] or cz['citas'] or cz['parafrasis'] or len(cz['numeros']) >= 2)
-    if not (cz['numeros'] or cz['rutas'] or cz['citas'] or cz['parafrasis'] or cz['estados']):
+    grave = bool(cz['rutas'] or cz['citas'] or cz['parafrasis'] or cz['dominios'] or cz['comandos'] or len(cz['numeros']) >= 2)
+    if not (cz['numeros'] or cz['rutas'] or cz['citas'] or cz['parafrasis'] or cz['dominios'] or cz['comandos'] or cz['estados']):
         sys.exit(0)
     reinc = bool(inp.get('stop_hook_active'))
     apuntar(sid, cz, reinc)
@@ -410,6 +497,8 @@ if __name__ == '__main__':
         if cz['rutas']: partes.append('rutas que no existen ni salieron de nada: ' + ', '.join(cz['rutas'][:5]))
         if cz['citas']: partes.append('citas «…» atribuidas que nadie dijo así: ' + ' | '.join(cz['citas'][:3]))
         if cz['parafrasis']: partes.append('comillas «…» de paráfrasis/traducción sin ese texto exacto en la evidencia: ' + ' | '.join(cz['parafrasis'][:3]))
+        if cz['dominios']: partes.append('dominios/URL que no salieron de ninguna herramienta ni del usuario (comprueba SOLO procedencia, no si son de fiar — léelos carácter a carácter): ' + ', '.join(cz['dominios'][:5]))
+        if cz['comandos']: partes.append('líneas de instalación/ejecución remota sin fuente en el turno: ' + ' | '.join(cz['comandos'][:3]))
         m, med, pct, est, desc, n = presion(sid)
         presion_txt = f'{m} cazas · sin vara todavía (n={n})' if med is None else f'{m} cazas (mediana mía {med})'
         razon = ('[vigía] Tu última respuesta contiene cosas que no salieron de ninguna herramienta ni del usuario: '

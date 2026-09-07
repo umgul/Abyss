@@ -59,14 +59,27 @@ mapa.
 - [`esceptico`](skills/esceptico/SKILL.md) — la ley "ningún plan sin
   escéptico" como comando: lanza un revisor con model Opus a buscar lo que
   tumba un plan antes de ejecutarlo, con veredicto por gravedad y evidencia.
+  `--paquete <ruta>` corre `auditar.py` sobre un paquete y le da el informe a
+  ese mismo Opus para que lea por encima lo que el automatismo no ve.
+- `auditar.py` — las cinco comprobaciones sobre un paquete ANTES de
+  instalarlo (procedencia, comandos, permisos, qué sale de la máquina,
+  dominio), con evidencia fichero:línea; nunca ejecuta el código auditado.
+  Sin *skill* propia — se usa directo o desde `esceptico --paquete`.
 
 **Sentidos**
 - [`exterocepcion`](skills/exterocepcion/SKILL.md) — lugar (por IP y por lo
   dicho), meteo del lugar, y canal de entrada del último mensaje.
 - [`noticias`](skills/noticias/SKILL.md) — portada y titulares por tema al
   arrancar, con una lista de temas automáticos autocurada.
-- [`ojo`](skills/ojo/SKILL.md) — un fotograma de la webcam, solo a petición
-  explícita.
+- [`ojo`](skills/ojo/SKILL.md) — ocho verbos, todos a petición explícita,
+  ninguno por gancho: `mirar` (un fotograma de la webcam), `texto`/
+  `fotocopia`/`tarjeta`/`manual` (OCR por el motor de Windows o `tesseract`,
+  delega en `lectura_visual.py`), `despiece`/`prompt3d` (despiece por capas
+  2,5D y prompt de diseño 3D medido de la foto, delega en `volumen.py`), y
+  `gestos` (MediaPipe + vocabulario propio: sirve por HTTP, solo en
+  `127.0.0.1`, el estado de la mano ya traducido — capa aislada, apertura de
+  explosión, órbita, escala, gesto de captura — pero nada lo consume
+  todavía, delega en `gestos.py`).
 - [`cuerpo`](skills/cuerpo/SKILL.md) — el cuerpo de la máquina (cpu, ram,
   disco, vram, temperatura de GPU, batería) con su propia normal por
   cuantiles; nunca ordena nada, solo mide.
@@ -255,12 +268,16 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 | `exterocepcion.py` | Lugar (por IP y por lo dicho), meteo del lugar, y canal de entrada del último mensaje. | Ninguno propio — librería de `continuidad.py` | `lugar.json` · `meteo.json` |
 | `modelo.py` | Detecta si se responde fuera del modelo preferido y marca los turnos a revisar al volver. | Ninguno propio — no existe un evento «PostModelSwitch»/«PreModelSwitch» en Claude Code; librería de `continuidad.py --despertar` | `modelo_preferido.json` · `.modelo_revisado/` |
 | `noticias.py` | Portada y titulares por tema al arrancar; temas automáticos autocurados. | Ninguno propio — librería de `continuidad.py --arranque` | `noticias.json` · `temas_auto.json` · `temas_log.jsonl` · `temas_noticias.json` (editable a mano) · `temas_veto.json` |
-| `ojo.py` | Un fotograma de la webcam, solo a petición explícita en ese turno. | Ninguno — nunca por gancho | El `.jpg` donde se indique + `ojo.log` |
+| `ojo.py` | Ocho verbos, un solo punto de entrada, ninguno por gancho: `mirar` (un fotograma de la webcam, autónomo) y, delegando enteros en su módulo, `texto`/`fotocopia`/`tarjeta`/`manual` (→ `lectura_visual.py`), `despiece`/`prompt3d` (→ `volumen.py`) y `gestos` (→ `gestos.py`). | Ninguno — nunca por gancho | `ojo.log` (verbos `mirar`/`texto`/`fotocopia`/`tarjeta`/`manual`) + el fichero que pida cada verbo; `despiece`/`prompt3d`/`gestos` no tocan `memory/` |
+| `lectura_visual.py` | OCR de una imagen por el motor de Windows (WinRT, sin instalar nada) o `tesseract` (segunda vía, PATH): `texto` (texto plano, opcionalmente al portapapeles), `fotocopia` (endereza/corrige iluminación una foto o un fotograma de cámara, PNG o PDF de varias páginas — el escáner WIA es una fuente OPCIONAL más, nunca el camino), `tarjeta` (patrones + heurística de posición → `.vcf` y `.png`), `manual` (ordena varias fotos, sin resumir). Usado por `ojo.py`. | Ninguno | `lectura_visual.log`; el fichero de salida que pida cada verbo (junto a la entrada, o en `memory/` si viene de `--camara`/`--escaner`) |
+| `volumen.py` | `despiece`: separa el objeto del fondo (GrabCut) y lo reparte en capas 2,5D por nitidez+luminancia, para el deslizador de explosión de `render3d.py`. `prompt3d`: mide paleta (k-medias), proporción, horizonte y formas (circularidad de contorno) y escribe un prompt de diseño ES/EN para three.js. Usado por `ojo.py`. | Ninguno | Nada en `memory/`: no resuelve proyecto (guion de fichero a fichero, como `render3d.py`) — escribe donde se le pida |
+| `gestos.py` | MediaPipe (21 puntos por mano) + vocabulario PROPIO del paquete: sirve por HTTP local, SOLO en `127.0.0.1`, el estado de la mano ya traducido a ese vocabulario (capa aislada por número de dedos, apertura de explosión por el pellizco, órbita por la pose de la palma, escala por la distancia entre dos manos, gesto de captura completado al abrir la mano y quedarse quieta 1 s), normalizado por percentiles de la propia sesión. Nada consume ese estado todavía: la página de `render3d.py` no lee `/estado` ni reacciona, y ningún PNG se captura — es trabajo pendiente, declarado, no hecho. Usado por `ojo.py gestos`. | Ninguno | Nada en `memory/`: no resuelve proyecto (vive/sirve mientras corre, como `taller.py`) |
+| `auditar.py` | Las cinco comprobaciones de un paquete ANTES de instalarlo: procedencia (manifiestos + `.git` local), comandos (ganchos que corren en cada mensaje o herramienta, sin declarar), permisos (qué escribe fuera de su carpeta), qué sale de la máquina (hosts del código sin nombrar en el README — la que ningún antivirus hace), y dominio (reunidos para lectura manual, sin veredicto). NUNCA ejecuta el código auditado. Usado directo o por `esceptico --paquete`. | Ninguno — uso manual | Nada en `memory/`: no resuelve proyecto (audita un paquete de terceros, no mide este hilo) |
 | `huella.py` | Registra ficheros escritos, procesos y puertos que un hilo abre fuera de su carpeta; `--informe`/`--limpiar` dicen qué sigue vivo y lo cierran si se pide. `--limpiar --si` solo borra ficheros bajo el directorio temporal del sistema o bajo una subcarpeta que ESTE paquete genera en `mem` (`huella/`, `mapas/`, `pdf/`) — nunca `MEMORY.md`, una ficha `*.md`, ni nada suelto en la raíz de `mem`, aunque un `Write` de la sesión haya pasado por ahí. **Módulo apagado por defecto** (coste de `PostToolUse`). | `SessionStart` (`--arranque`) · `PostToolUse` (`--herramienta`) · `Stop` (`--fin`) | `huella/<sesión>.jsonl` (incluye el TEXTO de cada comando de Bash/PowerShell, recortado a 200 caracteres — si sueles pasar claves por línea de comandos, quedarán ahí en local) · `huella/<sesión>.snapshot.json` · `huella/_costes.json` |
 | `cuerpo.py` | El cuerpo de la máquina (cpu, ram, disco, vram, temperatura de GPU, batería) con su propia normal por cuantiles; `UserPromptSubmit` calla si todo está dentro de lo suyo. Los seis canales se muestran en `SessionStart`; en `UserPromptSubmit` se vigilan cinco — la batería no, porque su propia oscilación normal (cargando/descargando) la sacaría de su p5 cada vez que se desenchufa el cargador. | `SessionStart` (`--arranque`) · `UserPromptSubmit` (`--despertar`) | `cuerpo.jsonl` |
 | `lector_pdf.py` | Indexa un PDF por página y sección (PyMuPDF o pypdf), busca por TF-IDF y lee solo la sección o el rango de páginas que toca. | Ninguno — uso manual | `pdf/<sha1 del fichero>.json` |
 | `mapa_codigo.py` | El índice greppable de un repo Python con `ast`: módulos, clases, funciones e imports con su línea; mide la proporción mapa/código. | Ninguno — uso manual | `mapas/<carpeta>.txt` (y `.json` con `--json`) |
-| `esceptico` (skill) | La ley "ningún plan sin escéptico": lanza un `Task` con model Opus a tumbar un plan contra el código real; veredicto por gravedad (cae/grieta/fleco) con evidencia. No es Python: se COPIA a `~/.claude/skills/esceptico/` (o `--skills-dir`), con marca en su frontmatter. | Ninguno — se invoca con `/esceptico <plan>` | `<plan>_veredicto_esceptico.md`, junto al propio plan (nunca en `memory/`) |
+| `esceptico` (skill) | La ley "ningún plan sin escéptico": lanza un `Task` con model Opus a tumbar un plan contra el código real; veredicto por gravedad (cae/grieta/fleco) con evidencia. `--paquete <ruta>` corre `auditar.py` primero y le da el informe a ese mismo Opus para que lea por encima lo que el regex no ve. No es Python: se COPIA a `~/.claude/skills/esceptico/` (o `--skills-dir`), con marca en su frontmatter. | Ninguno — se invoca con `/esceptico <plan>` o `/esceptico --paquete <ruta>` | `<plan>_veredicto_esceptico.md`, junto al propio plan (nunca en `memory/`); `--paquete` no escribe nada propio (el JSON de `auditar.py` va en la respuesta, o en `--markdown` si se pide) |
 | `infografia.py` | De un CSV o JSON a un SVG limpio (barras, barras horizontales, líneas, tabla), biblioteca estándar. No resuelve proyecto: no escribe en `memory/`. | Ninguno — uso manual | Nada en `memory/`: solo el `.svg` pedido |
 | `imagen.py` | `crear`: cascada de proveedores — tu propio servidor local (única vía que no saca el prompt de la máquina) → proveedores con clave, en el orden de `imagen_config.json` (Pollinations, Cloudflare Workers AI, Together, Hugging Face) → AI Horde anónimo. `pintar`: foto → cuadro de pinceladas, 100% local en varios estilos (delega en `pintor.py`). `video`: anima esas pinceladas a `.mp4` (delega en `video_pintura.py`). `buscar`: encuentra una imagen ya hecha con licencia libre (Openverse/Wikimedia Commons) — no monta ni compone. `render`: escena/modelo 3D → página con three.js, con `--pintar` encadena hacia `pintor.pintar` (delega en `render3d.py`). `mundo`: motivos del mundo real — museos, Street View, webcams (delega en `mundo.py`). `vias`: qué proveedores están configurados y si responden. | Ninguno — solo a petición | `imagenes/*.png` (y, con `buscar`/`mundo --descargar`, su `.txt` de atribución) · `imagen.log` (vía, bytes, ruta, prompt recortado en `crear`; entrada/salida en `render` y `render --pintar`) · `imagen_config.json` (claves de cada proveedor, todas opcionales) |
 | `pintor.py` | Motor de pinceladas (Hertzmann simplificado) en varios estilos (óleo, impresionista, acuarela, pastel, carbón, tinta: mismo motor, otro dict de parámetros) que usa `imagen.py pintar`; también CLI suelta. | Ninguno | Nada propio: escribe donde le diga quien lo invoca |
@@ -299,8 +316,12 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
   `--png` lanza un navegador sin cabeza LOCAL contra el propio HTML por
   `file://` — no sube ni descarga nada. Con `--pintar`, el PNG resultante se
   pinta en local, igual que `pintar`.
-- **`ojo.py`**: el fotograma se queda en disco local; nada sale por red desde
-  aquí.
+- **`ojo.py`**: ningún verbo sale por red. `mirar` deja el fotograma en disco
+  local; `texto`/`fotocopia`/`tarjeta`/`manual` hacen OCR local (motor de
+  Windows o `tesseract`, los dos en la propia máquina); `despiece`/`prompt3d`
+  son cálculo local (GrabCut, k-medias) sobre el fichero de entrada; `gestos`
+  sirve su estado por HTTP SOLO en `127.0.0.1` — nadie fuera de la máquina
+  puede leerlo.
 - **`lienzo.py`**: nada sale de la máquina salvo `borrar --metodo taller`, que
   manda imagen y máscara a la URL que TÚ configures en `imagen_config.json`
   (`taller_url`) — por defecto vacía, así que sin configurarla ese método
@@ -311,9 +332,13 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 - **`huella.py`**, **`cuerpo.py`**, **`lector_pdf.py`**, **`mapa_codigo.py`**,
   **`infografia.py`**, **`parentesis.py`**: ninguna llamada de red — todo
   local, dentro de `memory/` o del fichero de salida que se les pida.
-- **`esceptico`**: no añade una llamada de red propia; el plan y el código que
-  el sub-agente lea viajan al mismo servicio de modelo que el resto de la
-  sesión, por el mecanismo normal de `Task`.
+- **`auditar.py`**: ninguna llamada de red — solo lee ficheros de texto y, si
+  hay `.git`, invoca `git log` LOCAL sobre el propio repo del paquete (nunca
+  contra un remoto); nunca ejecuta el código que audita.
+- **`esceptico`**: no añade una llamada de red propia; el plan (o, con
+  `--paquete`, el informe de `auditar.py` y lo que el sub-agente decida leer
+  del paquete) viaja al mismo servicio de modelo que el resto de la sesión,
+  por el mecanismo normal de `Task`.
 - `continuidad.py` no hace red POR SÍ MISMO, pero en `--arranque` y `--despertar`
   invoca a `exterocepcion.py`/`noticias.py` como librerías (con un presupuesto de
   tiempo compartido, ver "Límites honestos"), así que el proceso del gancho SÍ
@@ -399,6 +424,31 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 - **`esceptico`** depende de que el entorno deje fijar `model: opus` para el
   sub-agente; si no puede, la propia skill debe decirlo en la respuesta en vez
   de callarlo (mismo principio que el aviso `[modelo]` del resto del paquete).
+  Con `--paquete`, `auditar.py` es texto y regex, no un parser ni un sandbox
+  (una URL solo mencionada en un comentario cuenta igual que una llamada
+  real) y el Opus que lee por encima tampoco ejecuta el paquete: lo que un
+  README miente y ningún fichero desmiente puede seguir sin detectarse.
+- **`ojo.py fotocopia`/`tarjeta`/`manual`** no reconstruyen lo que el motor
+  de OCR no lee (campo vacío, nunca un valor inventado); `fotocopia --escaner`
+  y `--camara` nunca se ejercen contra hardware real en la batería de
+  pruebas del paquete — solo el cableado se prueba forzado. `manual` no
+  resume: entrega el texto limpio y ordenado, resumirlo es cosa de quien lo
+  pida, con el texto delante.
+- **`ojo.py despiece`/`prompt3d`** no son reconstrucción 3D ni reconocimiento
+  de objetos: miden geometría y color de la silueta 2D de una sola foto
+  (heurística de composición fotográfica, nunca una medida de profundidad
+  real) y dicen qué forma/color midieron, nunca qué es el objeto.
+- **`ojo.py gestos`** hereda el `1,7` de la razón dedo-extendido de un post
+  ajeno (técnica, no vocabulario) sin remedirlo todavía en esta máquina; el
+  pellizco y la escala normalizan por percentiles de la PROPIA sesión y
+  dicen «sin vara todavía» bajo 30 muestras en vez de fingir un corte. Se
+  queda corriendo (servidor + bucle de cámara) hasta que se interrumpe: no
+  es un verbo que "termina y devuelve un resultado" como los demás. Y nada
+  consume ese estado todavía: la página que genera `render3d.py` no lee
+  `/estado` ni reacciona a él, y ningún gesto llega a capturar un PNG —
+  `gestos.py` sirve el JSON correcto y probado, con el vocabulario ya
+  resuelto en cada campo, pero conectarlo a la página es trabajo pendiente,
+  declarado, no prometido como hecho.
 
 ## Dependencias
 
@@ -412,11 +462,27 @@ instalan solo si se quita el `#` de su línea):
   `ModuleNotFoundError` al importar, no con un dict de error silencioso.
 - **imageio-ffmpeg** (trae su propio binario de ffmpeg) — para
   `video_pintura.py` (y `imagen.py video`).
-- **opencv-python** (`cv2`), opcional — para `ojo.py` (sin ella, "sin cv2: no
-  hay ojo") y para `lienzo.py` (reducción de ruido, arañazos, `borrar` y las
-  zonas conexas y el filtro de moda de `numeros` — sin ella, cada uno de esos
-  pasos usa un equivalente en Python puro: más lento, o directamente se salta
-  con aviso, nunca falla en silencio).
+- **opencv-python** (`cv2`), opcional — para `ojo.py mirar` (sin ella, "sin
+  cv2: no hay ojo"), para `ojo.py fotocopia/despiece/prompt3d` (delegados en
+  `lectura_visual.py`/`volumen.py`, que necesitan además `numpy`), para
+  `gestos.py` (junto con `mediapipe`, ver abajo), y para `lienzo.py`
+  (reducción de ruido, arañazos, `borrar` y las zonas conexas y el filtro de
+  moda de `numeros` — sin ella, cada uno de esos pasos usa un equivalente en
+  Python puro: más lento, o directamente se salta con aviso, nunca falla en
+  silencio).
+- **Motor OCR de Windows** (WinRT, `Windows.Media.Ocr`), del propio sistema —
+  para `ojo.py texto/fotocopia/tarjeta/manual` (`lectura_visual.py`). Viene
+  YA instalado en cualquier Windows con el paquete de idioma del perfil
+  puesto: **no hace falta `pip install` nada**. `tesseract`, si está en el
+  PATH, es la segunda vía en Windows y la única fuera de él. Sin ninguna de
+  las dos, «sin dato: no hay motor OCR» y código 2.
+- **`mediapipe`**, opcional y solo para `ojo.py gestos`/`gestos.py` (control
+  de la escena por gestos de la mano) — junto con `opencv-python` para leer
+  la cámara. Sin ella, el mensaje dice exactamente qué instalar y sale con
+  código 2; nunca se instala nada por su cuenta.
+- **Escáner WIA**, del propio sistema y opcional — una fuente MÁS de
+  `ojo.py fotocopia --escaner` (nunca el camino: sin uno conectado, «sin
+  escáner: uso la cámara o un fichero» y sigue por la vía normal, sin error).
 - **PyMuPDF (`fitz`) o pypdf**, opcional — para `lector_pdf.py`. `fitz` da
   secciones por tamaño de letra real; sin ninguna de las dos, «sin dato: pip
   install pymupdf».
