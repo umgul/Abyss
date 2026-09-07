@@ -364,8 +364,11 @@ def horizonte(img):
                               minLineLength=max(10, ancho // 3), maxLineGap=max(2, ancho // 30))
     if lineas is None:
         return None
+    # `cv2.HoughLinesP` devuelve (N,1,4) en unas versiones de OpenCV y (N,4) en otras
+    # (medido: opencv-contrib-python 5.0.0 da (N,4) en esta máquina) — se normaliza con
+    # `reshape` antes de desempaquetar en vez de asumir una forma fija.
     mejor_y, mejor_long = None, 0.0
-    for x1, y1, x2, y2 in lineas[:, 0]:
+    for x1, y1, x2, y2 in np.asarray(lineas).reshape(-1, 4):
         dx, dy = float(x2 - x1), float(y2 - y1)
         longitud = math.hypot(dx, dy)
         angulo = abs(math.degrees(math.atan2(dy, dx)))
@@ -538,6 +541,12 @@ def _cli(argv):
             r = prompt3d(imagen, salida=_valor('--salida'), escena=_valor('--escena'))
     except (FileNotFoundError, ValueError) as e:
         print(f'sin dato: {e}')
+        return 2
+    except Exception as e:
+        # cualquier otro fallo (p. ej. una versión de OpenCV con otra forma de salida en
+        # alguna llamada que no se haya normalizado) sale como "sin dato", nunca como
+        # traza cruda — igual que el resto de guiones del paquete.
+        print(f'sin dato: {type(e).__name__} {e}')
         return 2
     print(json.dumps(r, ensure_ascii=False))
     return 0

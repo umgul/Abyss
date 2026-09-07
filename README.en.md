@@ -106,6 +106,16 @@ map.
   its line.
 - [`infografia`](skills/infografia/SKILL.md) — turns a CSV or JSON into a
   clean SVG (bars, lines, table), standard library only.
+- `presenta.py` — no *skill* of its own (same case as `auditar.py`):
+  generates, by actually invoking the pieces above, the short video that
+  shows them off (`--salida <path.mp4> --idioma es|en --segundos N --ancho
+  N`). Every block is a REAL demonstration made on the spot — memory
+  (`varas.py --index`), honesty (`vigia.py --probar`), audit (`auditar.py`
+  on the package itself), senses (`cuerpo.py` + `exterocepcion.py`), the
+  painter and its four styles, a real-world subject, the eye (OCR and
+  photocopy), and a 3D scene with its hologram — never an old screenshot: if
+  a piece is missing on this machine, its block gets skipped and the video
+  itself says so at the end ("made with what was here").
 
 Underneath all of them, `abyss/rutas.py` is the one piece that decides where
 the code lives and where the data lives — no other piece computes that path on
@@ -283,7 +293,7 @@ another's.
 | `mapa_codigo.py` | A greppable index of a Python repo via `ast`: modules, classes, functions, and imports with their line; measures the map-to-code ratio. | None — manual use | `mapas/<folder>.txt` (and `.json` with `--json`) |
 | `esceptico` (skill) | The "no plan without a skeptic" law: launches a `Task` with the Opus model to break a plan against the real code; verdict by severity (falls/crack/loose end) with evidence. `--paquete <path>` runs `auditar.py` first and hands the report to that same Opus to read past what the regex can't see. Not Python: it gets COPIED to `~/.claude/skills/esceptico/` (or `--skills-dir`), marked in its frontmatter. | None — invoked with `/esceptico <plan>` or `/esceptico --paquete <path>` | `<plan>_veredicto_esceptico.md`, next to the plan itself (never in `memory/`); `--paquete` writes nothing of its own (the `auditar.py` JSON goes in the reply, or in `--markdown` if asked) |
 | `infografia.py` | Turns a CSV or JSON into a clean SVG (bars, horizontal bars, lines, table), standard library only. Doesn't resolve a project: writes nothing to `memory/`. | None — manual use | Nothing in `memory/`: only the requested `.svg` |
-| `imagen.py` | `crear`: provider cascade — your own local server (the only path that keeps the prompt off the machine) → providers with a key, in the order set in `imagen_config.json` (Pollinations, Cloudflare Workers AI, Together, Hugging Face) → anonymous AI Horde. `pintar`: photo → fully local brush-stroke canvas in several styles (delegates to `pintor.py`). `video`: animates those brush strokes into `.mp4` (delegates to `video_pintura.py`). `buscar`: finds an already-made freely-licensed image (Openverse/Wikimedia Commons) — doesn't assemble or compose. `render`: 3D scene/model → a three.js page, chains into `pintor.pintar` with `--pintar` (delegates to `render3d.py`). `mundo`: real-world subjects — museums, Street View, webcams (delegates to `mundo.py`). `vias`: which providers are configured and responding. | None — on request only | `imagenes/*.png` (and, with `buscar`/`mundo --descargar`, its attribution `.txt`) · `imagen.log` (provider, bytes, path, trimmed prompt for `crear`; input/output for `render` and `render --pintar`) · `imagen_config.json` (each provider's key, all optional) |
+| `imagen.py` | `crear`: provider cascade — your own local server (the only path that keeps the prompt on the machine) → providers with a key, in the order set in `imagen_config.json` (Pollinations, Cloudflare Workers AI, Together, Hugging Face) → anonymous AI Horde. `pintar`: photo → fully local brush-stroke canvas in several styles (delegates to `pintor.py`). `video`: animates those brush strokes into `.mp4` (delegates to `video_pintura.py`). `buscar`: finds an already-made freely-licensed image (Openverse/Wikimedia Commons) — doesn't assemble or compose. `render`: 3D scene/model → a three.js page, chains into `pintor.pintar` with `--pintar` (delegates to `render3d.py`). `mundo`: real-world subjects — museums, Street View, webcams (delegates to `mundo.py`). `vias`: which providers are configured and responding. | None — on request only | `imagenes/*.png` (and, with `buscar`/`mundo --descargar`, its attribution `.txt`) · `imagen.log` (provider, bytes, path, trimmed prompt for `crear`; input/output for `render` and `render --pintar`) · `imagen_config.json` (each provider's key, all optional) |
 | `pintor.py` | The brush-stroke engine (simplified Hertzmann) in several styles (oil, impressionist, watercolor, pastel, charcoal, ink: same engine, a different parameter dict) used by `imagen.py pintar`; also a standalone CLI. | None | Nothing of its own: writes wherever the caller says |
 | `video_pintura.py` | Animates `pintor.py`'s strokes into `.mp4` with variable pacing, honoring the painting's style and paper color; used by `imagen.py video`. | None | Nothing of its own |
 | `render3d.py` | 3D scenes and models (`escena.json`, `.glb`/`.gltf`/`.obj`/`.stl`) as a self-contained page with three.js embedded (MIT), exploded view; `--png` captures it with a headless browser. Used by `imagen.py render`. | None | Nothing in `memory/`: the HTML/PNG is written next to the input, or wherever asked |
@@ -350,6 +360,25 @@ another's.
   make no network calls at all: they only read and write inside `memory/`.
 - The **telegram** module (only via `instalar.py`) calls the Telegram API
   with the configured token and chat id, to notify about permissions/waits.
+- **`presenta.py`**: it touches the network by itself in two of the blocks of
+  the video it generates — «sentidos» calls `exterocepcion.py` (the same
+  `ipinfo.io`/`open-meteo.com` as above) and «mundo» calls
+  `mundo.buscar()`/`descargar()` (The Met, Art Institute of Chicago,
+  Wikimedia Commons); `ABYSS_SIN_RED=1` cuts off both BEFORE touching the
+  network — MEASURED: with that variable set and no prior cached place,
+  «sentidos» falls back to `exterocepcion.py`'s normal "no data" instead of
+  calling the network, but then «mundo» has no subject to search for either
+  (the same flag turns off both blocks, it doesn't tell them apart). And this
+  is what matters to whoever is going to PUBLISH the video, not only to
+  whoever generates it: WITHOUT that variable, MEASURED in the package's own
+  demo video, the «sentidos» block bakes into the `.mp4` itself — visible on
+  screen, not just transmitted over the network — the municipality of
+  whoever generated it (by IP or by what they said, marked «(ES; by IP)»),
+  their local weather (temperature, humidity, wind, day/night), and their
+  machine's telemetry (cpu, free RAM, free disk, free VRAM, GPU
+  temperature). The «auditoría» block, two before it, does anonymize the
+  disk's absolute path by hand before drawing it; «sentidos» still has no
+  guard of that kind for the place and the weather (see "Honest limits").
 
 ## Honest limits
 
@@ -397,6 +426,13 @@ another's.
 - **`cuerpo.py`** never orders anything: it doesn't kill processes, doesn't
   switch models, doesn't suggest anything — it measures, and deciding what to
   do with that measurement is up to whoever reads it, never the script itself.
+- **`presenta.py`**: the «sentidos» block of the video it generates doesn't
+  anonymize the place or the weather, unlike the «auditoría» block with the
+  disk path — publishing the video as generated by default also publishes
+  the municipality and the weather of whoever generated it.
+  `ABYSS_SIN_RED=1` cuts off that leak (the block falls back to "no data"),
+  but it also turns off the whole «mundo» block along with it: today there's
+  no way to ask for just one of the two.
 - **`imagen.py buscar`** doesn't assemble or compose: a scene with several
   concrete elements needs `crear`, not a single-image search.
 - **`imagen.py mundo`** doesn't assemble or compose either (same rule as
@@ -451,16 +487,43 @@ another's.
 
 ## Dependencies
 
-Python 3.12 or newer, standard library for almost everything. In
-[`requirements.txt`](requirements.txt), all commented out by default (install
-one by removing the `#` from its line):
+Python 3.12 or newer, standard library for almost everything. The
+recommended path for the rest is letting the package resolve it itself
+(fifth batch, T5.1) instead of reading
+[`requirements.txt`](requirements.txt) by hand:
+
+```
+python instalar.py --dependencias                        # what's missing, with approx. size
+python instalar.py --instalar-dependencias [mod1,mod2]    # installs ONLY what's really missing
+```
+
+`--dependencias` checks, with a real `import` under the interpreter that
+will actually be used (never a hand-fixed package list), what's missing from
+each optional piece grouped by module (`imagen`, `ojo`, `lector_pdf`,
+`gestos`), reporting it in a table with an approximate size.
+`--instalar-dependencias` (with an optional module list; without one, all of
+them) installs with `sys.executable -m pip install <package>` ONE at a time,
+showing the command before running it and the result after — never silently,
+never at startup, never from inside a hook; if a package fails (no pip, no
+network, `pip install` erroring out) it's reported with its last error line
+and the rest continue, never retrying on its own. `--desinstalar-dependencias`
+does not exist: removing Python packages from someone's environment is
+riskier than adding them, and that's left to whoever installed them. Both
+flags — and the "Dependencies…" checkbox in the Tk window — speak
+`--idioma es|en` (the system's by default, see T5.2 further below);
+[`requirements.txt`](requirements.txt) carries the same list, all commented
+out, for whoever prefers installing by hand without going through
+`instalar.py`.
+
+### What `pip` CAN install
 
 - **Pillow + numpy** — for `pintor.py` (and the `imagen.py pintar` verb that
   uses it) and for `lienzo.py` (blend, double exposure, collage, gradient,
   restore, numbers, remove). Module-level imports: without them, it fails
   with `ModuleNotFoundError` on import, not a silent error dict.
 - **imageio-ffmpeg** (ships its own ffmpeg binary) — for `video_pintura.py`
-  (and `imagen.py video`).
+  (`imagen.py video`) and, with that same binary, for `presenta.py` (see its
+  own section further below).
 - **opencv-python** (`cv2`), optional — for `ojo.py mirar` (without it, "sin
   cv2: no hay ojo"), for `ojo.py fotocopia/despiece/prompt3d` (delegated to
   `lectura_visual.py`/`volumen.py`, which also need `numpy`), for `gestos.py`
@@ -469,32 +532,66 @@ one by removing the `#` from its line):
   `numeros` — without it, each of those steps falls back to a pure-Python
   equivalent: slower, or skipped outright with a warning, never a silent
   failure).
-- **Windows's own OCR engine** (WinRT, `Windows.Media.Ocr`), from the system
-  itself — for `ojo.py texto/fotocopia/tarjeta/manual` (`lectura_visual.py`).
-  It ships ALREADY installed on any Windows with the profile's language pack
-  present: **no `pip install` needed at all**. `tesseract`, if on PATH, is
-  the second path on Windows and the only one off it. Without either, "sin
-  dato: no hay motor OCR" and exit code 2.
 - **`mediapipe`**, optional and only for `ojo.py gestos`/`gestos.py` (hand
   gesture control of the scene) — together with `opencv-python` to read the
   camera. Without it, the message says exactly what to install and exits
   with code 2; nothing installs itself.
+- **PyMuPDF (`fitz`) or pypdf**, optional (either one is enough) — for
+  `lector_pdf.py`. `fitz` gives sections from real font sizes; without
+  either, "sin dato: pip install pymupdf".
+
+### What `pip` CANNOT install (needs the system package manager)
+
+`--dependencias` says this too, with the EXACT command for the operating
+system of the machine it runs on — never a generic one pretending to fit
+anything:
+
+- **OCR engine outside Windows**: on Windows, the text-recognition engine
+  ships with the OS (WinRT, `Windows.Media.Ocr`) — **nothing to install at
+  all**. On Linux, the binary installs with
+  `sudo apt install tesseract-ocr tesseract-ocr-spa` (or your distro
+  manager's equivalent); on macOS, with Homebrew: `brew install tesseract
+  tesseract-lang`. The code always calls the `tesseract` binary via PATH
+  (`subprocess`), never `pytesseract` — installing that pip package wouldn't
+  activate anything, so neither `instalar.py` nor `requirements.txt` offer
+  it. Without either path, `ojo.py texto/fotocopia/tarjeta/manual` says "sin
+  dato: no hay motor OCR" and exits with code 2.
+- **`taller.py` (torch + diffusers)**: they weigh gigabytes and `torch`
+  depends on the card. `--dependencias` detects whether there's an NVIDIA
+  GPU (`nvidia-smi`) and writes the exact command — with a GPU,
+  `pip install torch --index-url https://download.pytorch.org/whl/cu121`;
+  without one, plain `pip install torch` — plus `pip install diffusers`
+  separately; but it installs none of this on its own (see "Local workshop"
+  below).
+- **Headless browser** (Edge/Chrome on Windows; `google-chrome`/`chromium`
+  on Linux/macOS), optional and a SYSTEM dependency, not from
+  `requirements.txt` — for `render3d.py`/`imagen.py render --png` (and
+  `--pintar`, which forces it; and `presenta.py`'s "3D"/"hologram" blocks).
+  Looked up in the usual install paths; without it, the HTML page is written
+  all the same and only the capture fails ("sin dato: no hay navegador sin
+  cabeza", exit code 2). `render3d.py` needs nothing else: three.js ships
+  embedded in `abyss/vendor/`.
 - **WIA scanner**, from the system itself and optional — one MORE source for
   `ojo.py fotocopia --escaner` (never the path: without one connected, "sin
   escáner: uso la cámara o un fichero" and it proceeds via the normal path,
   no error).
-- **PyMuPDF (`fitz`) or pypdf**, optional — for `lector_pdf.py`. `fitz` gives
-  sections from real font sizes; without either, "sin dato: pip install
-  pymupdf".
-- **diffusers + torch**, optional and heavy — only for `taller.py` (see
-  "Local workshop" below). No other piece in this package needs them.
-- **Headless browser (Edge/Chrome on Windows; `google-chrome`/`chromium` on
-  Linux/macOS)**, optional and a SYSTEM dependency, not from
-  `requirements.txt` — only for `render3d.py`/`imagen.py render --png` (and
-  `--pintar`, which forces it). Looked up in the usual install paths; without
-  it, the HTML page is written all the same and only the capture fails
-  ("sin dato: no hay navegador sin cabeza", exit code 2). `render3d.py` needs
-  nothing else: three.js ships embedded in `abyss/vendor/`.
+
+### `presenta.py`, its dependencies
+
+`presenta.py` has no row of its own in `--dependencias` (it isn't one of the
+modules `instalar.py` installs), but it imports `pintor.py` and
+`video_pintura.py` as a library, so it inherits their MANDATORY dependencies
+— not optional for it —: **Pillow, numpy, and imageio-ffmpeg** (the same
+`imagen` group above). Without any of the three, `python presenta.py` fails
+on IMPORT, before it ever gets to generating anything. Everything else is
+optional block by block, exactly like in the piece each one calls:
+`opencv-python` plus an OCR engine for the "eye" block, a headless browser
+for "3D"/"hologram", and network for "world" and "senses" (the latter via
+`exterocepcion.py`; `ABYSS_SIN_RED=1` cuts off both BEFORE either is ever
+touched — see "Privacy and what leaves the machine" for what "senses" bakes
+into the video if that variable isn't set). Missing any of those,
+`presenta.py` doesn't crash: it skips that block and says so, on stdout and
+in the video itself — "made with what was here".
 
 ### Local workshop (optional, the cost stated plainly)
 
@@ -505,10 +602,12 @@ module, nor any other piece in this package, calls `pip install` or launches
 the server: whoever uses it has to decide that, by hand.
 
 - **Dependencies**: `pip install diffusers` and, separately, `torch` — with
-  CUDA if there's an NVIDIA GPU (follow the instructions at
+  CUDA if there's an NVIDIA GPU (`python instalar.py --dependencias` already
+  works out the exact command for THIS machine, via `nvidia-smi`; for
+  whatever that command doesn't cover, follow the instructions at
   [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/)
-  for the exact combination for your system; installing the wrong `torch`
-  build is the most common reason this fails to start). Without a GPU, the
+  for the exact combination for your system). Installing the wrong `torch`
+  build is the most common reason this fails to start. Without a GPU, the
   CPU build works the same, just slower (see below).
 - **Model download**: on the FIRST `POST /sdapi/v1/txt2img` (not when the
   server starts), `taller.py` downloads the model (`Lykon/dreamshaper-8` by

@@ -7,18 +7,27 @@ mano abierta y quieta captura PNG, dos manos escalan — nada del vocabulario de
 
 `gestos.py` no llama a `rutas.resolver()` (vive/sirve mientras corre, como `taller.py`: sin
 mem, sin proyecto de Claude Code) — se puede importar DIRECTAMENTE en el proceso de la
-prueba. `mediapipe` NO está instalado en la máquina de desarrollo (medido en
-ESPECIFICACION_TANDA4.md): el caso "sin mediapipe" se prueba tal cual, por subprocess,
-igual que `test_taller.py` prueba "sin diffusers". El caso "con mediapipe" inyecta un
-módulo `mediapipe` FALSO en `sys.modules` (con 21 puntos sintéticos por mano, una o dos) y
-recarga `gestos` para que su `import mediapipe as mp` lo recoja — se limpia siempre en
-`tearDown` para no dejar el módulo falso puesto para las demás pruebas de la suite completa.
+prueba. El caso "sin mediapipe" se prueba por subprocess, igual que `test_taller.py`
+prueba "sin diffusers" — pero SIN depender del inventario real de la máquina que ejecute
+la batería (MEDIDO el 7-sep-2026, tanda 5: `mediapipe` 1.0.1 puede estar instalado ahí y
+la prueba que asumía su ausencia fallaba, y peor, dejaba `gestos.py` llegar a abrir la
+cámara y levantar el servidor antes de reventar). Un `sitecustomize.py` propio antepuesto
+a `PYTHONPATH` bloquea `import mediapipe` en el PROCESO HIJO sin tocar el Python real
+(mismo método que `_entorno_con_modulos_bloqueados()` en
+`test_imagen_dependencias_opcionales.py`), y otro fabrica un `mediapipe` que importa pero
+sin `.solutions` (así mide el `mediapipe` 1.0.1 real en esta máquina) para probar que ESE
+camino también corta antes de tocar hardware. El caso "con mediapipe" (para las funciones
+que sí lo usan) inyecta un módulo `mediapipe` FALSO en `sys.modules` (con 21 puntos
+sintéticos por mano, una o dos) y recarga `gestos` para que su `import mediapipe as mp` lo
+recoja — se limpia siempre en `tearDown` para no dejar el módulo falso puesto para las
+demás pruebas de la suite completa.
 """
 import importlib
 import json
 import os
 import sys
 import tempfile
+import textwrap
 import threading
 import time
 import types
@@ -298,20 +307,86 @@ class ServidorSoloEnLoopback(unittest.TestCase):
             srv.server_close()
 
 
+def _entorno_sin_mediapipe(env_base):
+    """`sitecustomize.py` propio antepuesto a `PYTHONPATH` que bloquea `import mediapipe`
+    SIEMPRE en el proceso hijo, sin importar si esta máquina lo tiene instalado o no
+    (mismo método que `_entorno_con_modulos_bloqueados()` en
+    `test_imagen_dependencias_opcionales.py` — el Python real no se toca)."""
+    bloqueo_dir = Path(tempfile.mkdtemp(prefix='abyss_sin_mediapipe_'))
+    (bloqueo_dir / 'sitecustomize.py').write_text(textwrap.dedent('''
+        import sys
+        import importlib.abc
+
+        class _Bloqueador(importlib.abc.MetaPathFinder):
+            def find_spec(self, name, path, target=None):
+                if name.split(".")[0] == "mediapipe":
+                    raise ModuleNotFoundError(
+                        "mediapipe bloqueado por la prueba (sitecustomize)", name="mediapipe")
+                return None
+
+        sys.meta_path.insert(0, _Bloqueador())
+    '''), encoding='utf-8')
+    env = dict(env_base)
+    env['PYTHONPATH'] = str(bloqueo_dir) + os.pathsep + env.get('PYTHONPATH', '')
+    return env
+
+
+def _entorno_con_mediapipe_roto(env_base):
+    """`sitecustomize.py` propio que deja en `sys.modules` un `mediapipe` que IMPORTA sin
+    error pero sin atributo `solutions` — así mide esta tanda (7-sep-2026) el `mediapipe`
+    1.0.1 real instalado en la máquina (`AttributeError: module 'mediapipe' has no
+    attribute 'solutions'` dentro de `crear_detector()`). El Python real no se toca: solo
+    el proceso hijo ve este módulo falso."""
+    bloqueo_dir = Path(tempfile.mkdtemp(prefix='abyss_mediapipe_roto_'))
+    (bloqueo_dir / 'sitecustomize.py').write_text(textwrap.dedent('''
+        import sys
+        import types
+
+        _falso = types.ModuleType("mediapipe")
+        # A propósito SIN "solutions": así mide esta máquina el mediapipe 1.0.1 real.
+        sys.modules["mediapipe"] = _falso
+    '''), encoding='utf-8')
+    env = dict(env_base)
+    env['PYTHONPATH'] = str(bloqueo_dir) + os.pathsep + env.get('PYTHONPATH', '')
+    return env
+
+
 class GestosSinMediapipeCLI(unittest.TestCase):
     def test_sale_con_2_y_el_mensaje_nombra_mediapipe(self):
-        env = dict(os.environ)
-        env.pop('PYTHONPATH', None)  # el entorno real de esta máquina: sin mediapipe instalado
+        env = _entorno_sin_mediapipe(dict(os.environ))
         r = ay.ejecutar(ay.script('gestos.py'), ['--puerto', '0'], env)
         self.assertEqual(r.returncode, 2, f'stdout={r.stdout!r} stderr={r.stderr!r}')
         self.assertIn('mediapipe', r.stdout)
         self.assertIn('pip install', r.stdout)
         self.assertNotIn('Traceback', r.stdout)
         self.assertNotIn('Traceback', r.stderr)
+        # falsador: sin mediapipe, la CLI corta ANTES de tocar cámara o servidor (regla
+        # dura de esta tanda: nada de encender webcam/levantar HTTP sin la dependencia).
+        self.assertNotIn('escuchando en http', r.stdout)
+        self.assertNotIn('calibrando', r.stdout)
 
     def test_argumento_desconocido_sale_con_1_sin_tocar_la_dependencia(self):
         r = ay.ejecutar(ay.script('gestos.py'), ['--no-existe', 'x'], dict(os.environ))
         self.assertEqual(r.returncode, 1)
+
+
+class GestosMediapipeRotoCLI(unittest.TestCase):
+    """Falsador del hallazgo de la tanda 5 (7-sep-2026): `mediapipe` 1.0.1 en la máquina
+    real IMPORTA pero no trae `.solutions`. Antes del arreglo, `main()` solo comprobaba
+    `mp is None` (verdadero solo si el import falla) y seguía adelante hasta abrir la
+    cámara y levantar el servidor con un mediapipe inservible, reventando recién entonces
+    en `crear_detector()` — justo lo que la regla dura de esta tanda prohíbe. Aquí se
+    inyecta ESE mediapipe roto por subprocess y se comprueba que la CLI corta antes."""
+
+    def test_sale_con_2_sin_abrir_camara_ni_servidor(self):
+        env = _entorno_con_mediapipe_roto(dict(os.environ))
+        r = ay.ejecutar(ay.script('gestos.py'), ['--puerto', '0'], env)
+        self.assertEqual(r.returncode, 2, f'stdout={r.stdout!r} stderr={r.stderr!r}')
+        self.assertIn('mediapipe', r.stdout)
+        self.assertNotIn('Traceback', r.stdout)
+        self.assertNotIn('Traceback', r.stderr)
+        self.assertNotIn('escuchando en http', r.stdout)
+        self.assertNotIn('calibrando', r.stdout)
 
 
 def _grupos_de(datos):

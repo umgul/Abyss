@@ -7,11 +7,14 @@ Uso:
     python gestos.py [--camara 0] [--puerto 8799] [--escena f.json] [--holograma]
                       [--vocabulario f.json]
 
-DEPENDENCIA declarada: `mediapipe`, que NO está instalado en la máquina de desarrollo
-(medido el 7-sep-2026). Sin él (y sin `opencv-python`, que hace falta para leer la cámara),
-este guion dice EXACTAMENTE qué instalar y sale con código 2 — nunca instala nada por su
-cuenta. El módulo en sí SÍ se puede importar sin `mediapipe` (las funciones puras de más
-abajo no lo necesitan): solo `main()`/la CLI comprueban la dependencia y cortan ahí.
+DEPENDENCIA declarada: `mediapipe`. Ausente o roto, `main()`/la CLI dicen EXACTAMENTE qué
+instalar y salen con código 2 ANTES de abrir la cámara o levantar el servidor — nunca
+instalan nada por su cuenta. "Roto" no es un caso teórico: MEDIDO el 7-sep-2026 que
+`mediapipe` 1.0.1 puede estar instalado e importar sin error y aun así no traer
+`mediapipe.solutions` (`AttributeError` dentro de `crear_detector()`), así que la
+comprobación mira el atributo, no solo el `import` (`_mediapipe_utilizable()`). El módulo
+en sí SÍ se puede importar sin `mediapipe` (las funciones puras de más abajo no lo
+necesitan): solo `main()`/la CLI comprueban la dependencia y cortan ahí.
 
 ## CORRECCIÓN DEL AUTOR (7-sep-2026, manda sobre cualquier versión anterior de este fichero)
 
@@ -152,10 +155,23 @@ ESTADO_INICIAL = {
 }
 
 
+def _mediapipe_utilizable():
+    """`import mediapipe` puede tener éxito y aun así dejar un módulo inservible: MEDIDO
+    en esta máquina el 7-sep-2026 que `mediapipe` 1.0.1 importa pero no trae
+    `mediapipe.solutions` (`AttributeError` dentro de `crear_detector()`). Comprobar solo
+    `mp is None` no basta — `main()` debe tratar este caso exactamente igual que "falta
+    mediapipe" y cortar ANTES de abrir la cámara o levantar el servidor (nunca a mitad de
+    fotograma, con hardware ya encendido)."""
+    return mp is not None and hasattr(mp, 'solutions') and hasattr(mp.solutions, 'hands')
+
+
 def mensaje_dependencias():
     faltan = []
     if mp is None:
         faltan.append('  - pip install mediapipe')
+    elif not _mediapipe_utilizable():
+        faltan.append('  - pip install --upgrade --force-reinstall mediapipe  '
+                       '(mediapipe está instalado pero sin mediapipe.solutions: versión rota en esta máquina)')
     if cv2 is None:
         faltan.append('  - pip install opencv-python')
     return ('gestos.py necesita paquetes que no están instalados en esta máquina:\n'
@@ -541,7 +557,10 @@ def _abrir_camara(indice):
 
 
 def main(opts):
-    if mp is None or cv2 is None or np is None:
+    if not _mediapipe_utilizable() or cv2 is None or np is None:
+        # Cortar AQUÍ, antes de tocar cámara o servidor: un mediapipe ausente o roto
+        # (ver `_mediapipe_utilizable()`) no debe dejar encender la webcam ni levantar el
+        # HTTP para luego reventar a mitad de fotograma en `crear_detector()`.
         print(mensaje_dependencias())
         return 2
 

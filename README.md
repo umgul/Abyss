@@ -103,6 +103,16 @@ mapa.
   su línea.
 - [`infografia`](skills/infografia/SKILL.md) — de un CSV o JSON a un SVG
   limpio (barras, líneas, tabla), biblioteca estándar sin dependencias.
+- `presenta.py` — sin *skill* propia (mismo caso que `auditar.py`): genera,
+  invocando de verdad las piezas de arriba, el vídeo corto que las enseña
+  (`--salida <ruta.mp4> --idioma es|en --segundos N --ancho N`). Cada bloque
+  es una demostración REAL hecha en el momento — memoria (`varas.py
+  --index`), honestidad (`vigia.py --probar`), auditoría (`auditar.py` sobre
+  el propio paquete), sentidos (`cuerpo.py` + `exterocepcion.py`), el pintor
+  y sus cuatro estilos, un motivo del mundo, el ojo (OCR y fotocopia) y una
+  escena 3D con su holograma — nunca una captura vieja: si una pieza falta en
+  esta máquina, su bloque se salta y el propio vídeo lo dice al final ("se
+  hizo con lo que había").
 
 Por debajo de todas ellas, `abyss/rutas.py` es la única pieza que decide dónde
 viven el código y dónde viven los datos — ninguna otra pieza calcula esa ruta
@@ -347,6 +357,25 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
   hacen ninguna llamada de red: solo leen y escriben dentro de `memory/`.
 - El módulo **telegram** (solo vía `instalar.py`) llama a la API de Telegram
   con el token y chat id que se configuren, para avisar de permisos/esperas.
+- **`presenta.py`**: toca la red por sí mismo en dos de los bloques del vídeo
+  que genera — «sentidos» invoca a `exterocepcion.py` (los mismos
+  `ipinfo.io`/`open-meteo.com` de arriba) y «mundo» invoca a
+  `mundo.buscar()`/`descargar()` (The Met, Art Institute of Chicago,
+  Wikimedia Commons); `ABYSS_SIN_RED=1` corta las dos ANTES de tocar la red
+  — MEDIDO: con esa variable puesta y sin caché de lugar previa, «sentidos»
+  cae al «sin dato» normal de `exterocepcion.py` en vez de llamar a la red,
+  pero entonces «mundo» tampoco tiene motivo que buscar (la misma bandera
+  apaga los dos bloques, no distingue cuál). Y esto es lo que importa a
+  quien vaya a PUBLICAR el vídeo, no solo a quien lo genera: SIN esa
+  variable, MEDIDO en el vídeo de demostración del propio paquete, el
+  bloque «sentidos» deja grabado dentro del propio `.mp4` — visible en
+  pantalla, no solo transmitido por red — el municipio de quien lo generó
+  (por IP o por lo dicho, con la marca «(ES; por IP)»), su meteorología
+  local (temperatura, humedad, viento, día/noche) y la telemetría de su
+  máquina (cpu, RAM libre, disco libre, VRAM libre, temperatura de GPU). El
+  bloque «auditoría», dos antes, sí anonimiza a mano la ruta absoluta del
+  disco antes de dibujarla; «sentidos» todavía no tiene ningún resguardo
+  parecido para el lugar y la meteo (ver "Límites honestos").
 
 ## Límites honestos
 
@@ -395,6 +424,12 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 - **`cuerpo.py`** nunca ordena nada: no cierra procesos, no baja de modelo, no
   sugiere nada — mide, y la decisión de qué hacer con esa medida es de quien
   la lea, nunca del propio guion.
+- **`presenta.py`**: el bloque «sentidos» del vídeo que genera no anonimiza el
+  lugar ni la meteo, a diferencia del bloque «auditoría» con la ruta del
+  disco — publicar el vídeo por defecto publica también el municipio y la
+  meteo de quien lo generó. `ABYSS_SIN_RED=1` corta esa fuga (el bloque cae a
+  «sin dato»), pero de paso apaga también el bloque «mundo» entero: hoy no
+  hay forma de pedir solo una de las dos cosas.
 - **`imagen.py buscar`** no monta ni compone: para una escena con varios
   elementos concretos hace falta `crear`, no una búsqueda de una sola imagen.
 - **`imagen.py mundo`** tampoco monta ni compone (mismo criterio que
@@ -452,16 +487,41 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 
 ## Dependencias
 
-Python 3.12 o superior, biblioteca estándar para casi todo. En
-[`requirements.txt`](requirements.txt), todas comentadas por defecto (se
-instalan solo si se quita el `#` de su línea):
+Python 3.12 o superior, biblioteca estándar para casi todo. La vía
+recomendada para lo demás es dejar que el propio paquete lo resuelva
+(quinta tanda, T5.1) en vez de leer [`requirements.txt`](requirements.txt) a
+mano:
+
+```
+python instalar.py --dependencias                        # qué falta, con tamaño aprox.
+python instalar.py --instalar-dependencias [mod1,mod2]    # instala SOLO lo que de verdad falte
+```
+
+`--dependencias` mira, con un `import` real bajo el intérprete que se vaya a
+usar (nunca una lista de paquetes fijada a mano), qué falta de cada pieza
+opcional agrupada por módulo (`imagen`, `ojo`, `lector_pdf`, `gestos`) y lo
+dice en una tabla con tamaño aproximado. `--instalar-dependencias` (con una
+lista opcional de módulos; sin lista, todos) instala con `sys.executable -m
+pip install <paquete>` UNA a una, enseñando el comando antes de correrlo y el
+resultado después — nunca en silencio, nunca en el arranque, nunca dentro de
+un gancho; si un paquete falla (sin pip, sin red, `pip install` con error) se
+dice con su última línea de error y se sigue con el resto, sin reintentar
+solo. No existe `--desinstalar-dependencias`: quitar paquetes de Python del
+entorno de alguien es más arriesgado que ponerlos, y se deja a quien lo
+instaló. Las dos banderas — y la casilla «Dependencias…» de la ventana Tk —
+hablan en `--idioma es|en` (por defecto, el del sistema, ver T5.2 más abajo);
+[`requirements.txt`](requirements.txt) lleva la misma lista, toda comentada,
+para quien prefiera instalar a mano sin pasar por `instalar.py`.
+
+### Lo que SÍ se puede instalar con `pip`
 
 - **Pillow + numpy** — para `pintor.py` (y el verbo `imagen.py pintar`, que lo
   usa) y para `lienzo.py` (fundir, doble, collage, degradado, restaurar,
   numeros, borrar). Import de nivel de módulo: sin ellas, falla con
   `ModuleNotFoundError` al importar, no con un dict de error silencioso.
 - **imageio-ffmpeg** (trae su propio binario de ffmpeg) — para
-  `video_pintura.py` (y `imagen.py video`).
+  `video_pintura.py` (`imagen.py video`) y, con el mismo binario, para
+  `presenta.py` (ver su propio apartado, más abajo).
 - **opencv-python** (`cv2`), opcional — para `ojo.py mirar` (sin ella, "sin
   cv2: no hay ojo"), para `ojo.py fotocopia/despiece/prompt3d` (delegados en
   `lectura_visual.py`/`volumen.py`, que necesitan además `numpy`), para
@@ -470,31 +530,64 @@ instalan solo si se quita el `#` de su línea):
   moda de `numeros` — sin ella, cada uno de esos pasos usa un equivalente en
   Python puro: más lento, o directamente se salta con aviso, nunca falla en
   silencio).
-- **Motor OCR de Windows** (WinRT, `Windows.Media.Ocr`), del propio sistema —
-  para `ojo.py texto/fotocopia/tarjeta/manual` (`lectura_visual.py`). Viene
-  YA instalado en cualquier Windows con el paquete de idioma del perfil
-  puesto: **no hace falta `pip install` nada**. `tesseract`, si está en el
-  PATH, es la segunda vía en Windows y la única fuera de él. Sin ninguna de
-  las dos, «sin dato: no hay motor OCR» y código 2.
 - **`mediapipe`**, opcional y solo para `ojo.py gestos`/`gestos.py` (control
   de la escena por gestos de la mano) — junto con `opencv-python` para leer
   la cámara. Sin ella, el mensaje dice exactamente qué instalar y sale con
   código 2; nunca se instala nada por su cuenta.
+- **PyMuPDF (`fitz`) o pypdf**, opcional (basta una de las dos) — para
+  `lector_pdf.py`. `fitz` da secciones por tamaño de letra real; sin ninguna
+  de las dos, «sin dato: pip install pymupdf».
+
+### Lo que NO se puede instalar con `pip` (hace falta el gestor del sistema)
+
+`--dependencias` también lo dice, con el comando EXACTO para el sistema
+operativo de la máquina donde se corre — nunca uno genérico fingiendo que
+vale para cualquiera:
+
+- **Motor OCR fuera de Windows**: en Windows, el motor de reconocimiento de
+  texto viene con el sistema (WinRT, `Windows.Media.Ocr`) — **no hace falta
+  instalar nada**. En Linux, el binario se instala con
+  `sudo apt install tesseract-ocr tesseract-ocr-spa` (u homólogo del gestor
+  de la distro); en macOS, con Homebrew: `brew install tesseract
+  tesseract-lang`. El código llama siempre al binario `tesseract` por PATH
+  (`subprocess`), nunca a `pytesseract` — instalar ese paquete de pip no
+  activaría nada, así que ni `instalar.py` ni `requirements.txt` lo ofrecen.
+  Sin ninguna de las dos vías, `ojo.py texto/fotocopia/tarjeta/manual` dice
+  «sin dato: no hay motor OCR» y sale con código 2.
+- **`taller.py` (torch + diffusers)**: pesan gigas y `torch` depende de la
+  tarjeta. `--dependencias` detecta si hay GPU NVIDIA (`nvidia-smi`) y
+  escribe el comando exacto — con GPU, `pip install torch --index-url
+  https://download.pytorch.org/whl/cu121`; sin ella, `pip install torch` a
+  secas — más `pip install diffusers` aparte; pero no instala nada de esto
+  por su cuenta (ver "Taller local" abajo).
+- **Navegador sin cabeza** (Edge/Chrome en Windows; `google-chrome`/
+  `chromium` en Linux/macOS), opcional y del SISTEMA, no de
+  `requirements.txt` — para `render3d.py`/`imagen.py render --png` (y
+  `--pintar`, que lo fuerza; y los bloques «3D»/«holograma» de `presenta.py`).
+  Se busca en las rutas habituales; sin él, la página HTML se escribe igual y
+  solo falla la captura ("sin dato: no hay navegador sin cabeza", código 2).
+  `render3d.py` no depende de nada más: three.js va embebido en
+  `abyss/vendor/`.
 - **Escáner WIA**, del propio sistema y opcional — una fuente MÁS de
   `ojo.py fotocopia --escaner` (nunca el camino: sin uno conectado, «sin
   escáner: uso la cámara o un fichero» y sigue por la vía normal, sin error).
-- **PyMuPDF (`fitz`) o pypdf**, opcional — para `lector_pdf.py`. `fitz` da
-  secciones por tamaño de letra real; sin ninguna de las dos, «sin dato: pip
-  install pymupdf».
-- **diffusers + torch**, opcional y pesada — solo para `taller.py` (ver
-  "Taller local" abajo). Ninguna otra pieza de este paquete las necesita.
-- **Navegador sin cabeza (Edge/Chrome en Windows; `google-chrome`/`chromium`
-  en Linux/macOS)**, opcional y del SISTEMA, no de `requirements.txt` — solo
-  para `render3d.py`/`imagen.py render --png` (y `--pintar`, que lo fuerza).
-  Se busca en las rutas habituales; sin él, la página HTML se escribe igual
-  y solo falla la captura ("sin dato: no hay navegador sin cabeza", código
-  2). `render3d.py` no depende de nada más: three.js va embebido en
-  `abyss/vendor/`.
+
+### `presenta.py`, sus dependencias
+
+`presenta.py` no tiene fila propia en `--dependencias` (no es uno de los
+módulos que instala `instalar.py`), pero importa `pintor.py` y
+`video_pintura.py` como librería, así que hereda sus dependencias
+OBLIGATORIAS — no opcionales para él —: **Pillow, numpy e imageio-ffmpeg**
+(el mismo grupo `imagen` de arriba). Sin cualquiera de las tres,
+`python presenta.py` falla al IMPORTAR, antes de llegar a generar nada. El
+resto es opcional bloque a bloque, exactamente igual que en la pieza que cada
+uno invoca: `opencv-python` + un motor OCR para el bloque «el ojo», un
+navegador sin cabeza para «3D»/«holograma», y red para «mundo» y «sentidos»
+(este último vía `exterocepcion.py`; `ABYSS_SIN_RED=1` corta las dos ANTES de
+tocarla — ver "Privacidad y qué sale de la máquina" para lo que «sentidos»
+deja grabado en el vídeo si esa variable no se pone). Sin alguna de ellas,
+`presenta.py` no revienta: salta ese bloque y lo dice, por stdout y en el
+propio vídeo — "se hizo con lo que había".
 
 ### Taller local (opcional, el coste dicho sin adornos)
 
@@ -505,10 +598,12 @@ esto se instala ni se arranca por su cuenta — ni el módulo `taller` de
 lanza el servidor: hace falta que lo decida quien lo usa, a mano.
 
 - **Dependencias**: `pip install diffusers` y, aparte, `torch` — con CUDA si
-  hay una GPU NVIDIA (sigue las instrucciones de
+  hay una GPU NVIDIA (`python instalar.py --dependencias` ya calcula el
+  comando exacto para ESTA máquina, por `nvidia-smi`; para lo que ese comando
+  no cubra, sigue las instrucciones de
   [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/)
-  para la combinación exacta de tu sistema; instalar el `torch` equivocado es
-  la forma más común de que esto no arranque). Sin GPU, la versión CPU
+  para la combinación exacta de tu sistema). Instalar el `torch` equivocado
+  es la forma más común de que esto no arranque. Sin GPU, la versión CPU
   funciona igual, solo que más despacio (ver abajo).
 - **Descarga del modelo**: al PRIMER `POST /sdapi/v1/txt2img` (no al arrancar
   el servidor), `taller.py` descarga el modelo (`Lykon/dreamshaper-8` por

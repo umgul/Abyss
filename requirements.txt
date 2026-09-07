@@ -1,5 +1,19 @@
 # Abyss funciona con la biblioteca estándar de Python 3.12+ salvo para piezas opcionales.
-# Todas van comentadas a propósito: instala solo la que necesites (quita el # de su línea).
+# Todas van comentadas a propósito: instala solo la que necesites (quita el # de su línea),
+# o mejor, deja que el propio paquete lo resuelva por ti (quinta tanda, T5.1):
+#
+#   python instalar.py --dependencias                  (qué falta, por módulo, con tamaño aprox.)
+#   python instalar.py --instalar-dependencias imagen   (instala SOLO lo que de verdad falte)
+#
+# --instalar-dependencias comprueba con un `import` real bajo el intérprete que se vaya a
+# usar (nunca una lista fija) y enseña el comando `pip install` exacto ANTES de correrlo, uno
+# a uno — este fichero es la referencia legible/instalable a mano cuando no se usa el
+# instalador; los dos deben decir lo mismo (`DEPENDENCIAS` en instalar.py es la fuente viva).
+# Lo que ni el instalador ni este fichero pueden poner —binarios del sistema, nunca de pip—
+# también sale de `--dependencias`: el motor de OCR en Linux/macOS (el paquete `tesseract` de
+# tu gestor; el código llama al binario por PATH, nunca a `pytesseract`) y `torch`+`diffusers`
+# para `taller.py` (pesan gigas y dependen de la tarjeta: `--dependencias` detecta si hay GPU
+# NVIDIA y da el comando exacto, pero nunca instala nada de eso por su cuenta).
 #
 # - pintor.py (y el verbo "imagen.py pintar", que lo usa) necesitan Pillow y numpy para
 #   pintar el cuadro de pinceladas localmente. Son imports de nivel de módulo: sin ellas,
@@ -27,6 +41,12 @@
 #   inventa el texto del PDF.
 # PyMuPDF
 # pypdf
+#
+# - gestos.py (módulo propio del instalador, APAGADO por defecto) necesita mediapipe para el
+#   vocabulario de manos sobre el vídeo de la cámara, y opencv-python + numpy para leerla y
+#   calcular los landmarks. Sin mediapipe/opencv-python, el guion dice exactamente qué
+#   instalar y sale con código 2 — nunca arranca a medias.
+# mediapipe
 #
 # - taller.py (servidor local de texto→imagen para la vía "local" de imagen.py crear, y para
 #   lienzo.py borrar --metodo taller) necesita diffusers + torch. Son PESADAS (GB de descarga

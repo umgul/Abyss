@@ -1,5 +1,7 @@
 # Leyes del SGICP propio
 
+*[English version](leyes.en.md)*
+
 Destilado de las fichas de diseño originales, que no se publican por ser notas personales
 del autor (con su fecha y su voz en primera persona). Aquí solo las leyes, secas, y qué
 pieza del paquete mide cada una. No son buenas prácticas genéricas: son las reglas concretas

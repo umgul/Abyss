@@ -1,48 +1,50 @@
-# Abyss sobre Abyss (T4.2)
+# Abyss on Abyss (T4.2)
 
-*[English version](AUDITORIA_DE_ABYSS.en.md)*
+*[Versión en castellano](AUDITORIA_DE_ABYSS.md)*
 
-Primer informe de `abyss/auditar.py` sobre el propio repositorio, generado con:
+English mirror of [`docs/AUDITORIA_DE_ABYSS.md`](AUDITORIA_DE_ABYSS.md): the first report of
+`abyss/auditar.py` on the repository itself, generated with:
 
 ```
 python abyss/auditar.py . --markdown docs/AUDITORIA_DE_ABYSS.md
 ```
 
-Todo lo que sigue, a partir del título `# Auditoría de …`, es la salida
-TAL CUAL del guion (`a_markdown()`), sin editar ni un hallazgo — incluido lo
-que suspenda: el manifiesto de procedencia no tiene autor real (ver
-comprobación 1 más abajo). Dos notas honestas de quien corrió esta auditoría,
-NO del propio guion, antes de leerla:
+`auditar.py` has no `--idioma` flag and, per T5.2, keeps its own printed
+output in Spanish (only `instalar.py`'s own text is bilingual) — so
+everything below, from the verdict line onward, is the SAME output the
+script wrote (`a_markdown()`), copied as is, not a second run and not a
+single finding edited — including what it fails on: the provenance manifest
+has no real author (see check 1 below). Two honest notes from whoever ran
+this audit, NOT from the script itself, before reading it:
 
-1. **Ruta anonimizada**: `auditar.py` imprime la ruta absoluta que se le da;
-   aquí se ha sustituido a mano por `<raíz del repo Abyss>` porque, en la
-   máquina donde se generó este informe, esa ruta lleva una carpeta de
-   usuario personal — regla dura de este repo (nada de rutas `C:/Users/
-   <alguien>` publicadas). El resto del informe no se ha tocado.
-2. **`pruebas/` cuenta como código auditado, a propósito**: se corrió sobre
-   la raíz del repo entero (no solo `abyss/`) para que la comprobación 1
-   (procedencia) alcance `.claude-plugin/plugin.json` y la comprobación 2
-   (comandos) alcance `hooks/hooks.json` — ninguno de los dos vive dentro de
-   `abyss/`. El precio es que la comprobación 4 (qué sale de la máquina)
-   también cuenta los dominios de ejemplo que la propia batería de pruebas
-   usa a propósito para poner a prueba AL GUION AUDITOR (`pruebas/
-   test_auditar.py`, `pruebas/test_vigia_dominios.py`, `pruebas/datos/
-   paquete_sintetico/malo.py`…) como si fueran red real del paquete
-   distribuido — no lo son. Quien lea la lista de hosts de la comprobación 4
-   tiene que separar los que vienen de `abyss/*.py` (reales) de los que
-   vienen de `pruebas/*.py` (fixtures). Una auditoría futura sobre
-   `abyss/` a secas perdería en cambio el manifiesto y los ganchos — ningún
-   corte es gratis, y `auditar.py` no decide por quien lee cuál importa.
+1. **Anonymized path**: `auditar.py` prints the absolute path it is given;
+   here it has been replaced by hand with `<root of the Abyss repo>` because,
+   on the machine where this report was generated, that path carries a
+   personal user folder — a hard rule of this repo (no `C:/Users/<someone>`
+   paths published). The rest of the report has not been touched.
+2. **`pruebas/` counts as audited code, on purpose**: it was run over the
+   whole repo root (not just `abyss/`) so that check 1 (provenance) reaches
+   `.claude-plugin/plugin.json` and check 2 (commands) reaches
+   `hooks/hooks.json` — neither one lives inside `abyss/`. The price is that
+   check 4 (what leaves the machine) also counts the example domains that
+   the test battery itself uses on purpose to put the AUDITING SCRIPT to the
+   test (`pruebas/test_auditar.py`, `pruebas/test_vigia_dominios.py`,
+   `pruebas/datos/paquete_sintetico/malo.py`…) as if they were the
+   distributed package's real network traffic — they are not. Whoever reads
+   check 4's host list has to separate the ones coming from `abyss/*.py`
+   (real) from the ones coming from `pruebas/*.py` (fixtures). A future audit
+   over `abyss/` alone would instead lose the manifest and the hooks — no cut
+   is free, and `auditar.py` does not decide for the reader which one
+   matters.
 
-El hallazgo más real y persistente de los de la comprobación 4 (y el que de
-verdad vale la pena leer): varios servicios de red del paquete (Pollinations,
+The most real and persistent finding among check 4's (and the one truly
+worth reading): several of the package's network services (Pollinations,
 Hugging Face, Cloudflare Workers AI, Together, AI Horde, Openverse, The Met,
-Art Institute of Chicago, Mapillary, Google Maps/Street View…) están
-nombrados en el README **por marca**, no por el host exacto que usa el
-código (`gen.pollinations.ai`, `router.huggingface.co`,
-`api.cloudflare.com`…) — es una comprobación honesta y esperada según la
-propia especificación de esta tanda ("con lo que salga, incluido lo que
-suspenda"), no un fallo de este informe.
+Art Institute of Chicago, Mapillary, Google Maps/Street View…) are named in
+the README **by brand**, not by the exact host the code uses
+(`gen.pollinations.ai`, `router.huggingface.co`, `api.cloudflare.com`…) — an
+honest, expected check under this batch's own specification ("with whatever
+comes out, including what it fails on"), not a defect of this report.
 
 ---
 

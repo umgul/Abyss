@@ -192,7 +192,13 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     `auditar.py`, corrido sobre el propio paquete) a la lista blanca: sigue sin
     haber fichas de diseño personales, pero la lista de lo permitido en `docs/`
     tenía que crecer con ese fichero o quedaba una lista blanca desactualizada
-    tumbando la suite entera."""
+    tumbando la suite entera.
+
+    T5.2 (7-sep) añadió los espejos en inglés que la propia especificación pide
+    («se añaden `docs/leyes.en.md` y ... `docs/AUDITORIA_DE_ABYSS.en.md`»,
+    ESPECIFICACION_TANDA5.md §T5.2): misma razón, la lista blanca vuelve a
+    crecer con esos dos ficheros o la suite entera queda en rojo por un
+    requisito de la propia especificación."""
 
     def test_no_promete_fichas_originales_ni_siete_leyes(self):
         texto = (RAIZ / 'ESPECIFICACION.md').read_text(encoding='utf-8')
@@ -203,10 +209,12 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     def test_docs_no_lleva_fichas_de_diseno_originales(self):
         docs = RAIZ / 'docs'
         nombres = sorted(p.name for p in docs.iterdir() if p.is_file())
-        permitidos = ['AUDITORIA_DE_ABYSS.md', 'ganchos_settings_ejemplo.json', 'leyes.md']
+        permitidos = ['AUDITORIA_DE_ABYSS.en.md', 'AUDITORIA_DE_ABYSS.md',
+                      'ganchos_settings_ejemplo.json', 'leyes.en.md', 'leyes.md']
         self.assertEqual(nombres, permitidos,
                           'docs/ no debe llevar más que la lista blanca declarada: el leyes.md '
-                          'destilado, el ejemplo de ganchos y el informe de auditoría de T4.2')
+                          'destilado (y su espejo en inglés), el ejemplo de ganchos, y el informe '
+                          'de auditoría de T4.2 (y su espejo en inglés de T5.2)')
 
     def test_leyes_md_tiene_exactamente_seis_leyes_numeradas(self):
         texto = (RAIZ / 'docs' / 'leyes.md').read_text(encoding='utf-8')
@@ -306,6 +314,96 @@ class ReadmeNoVendeLosVerbosDeLaManoComoHechos(unittest.TestCase):
         self.assertNotIn('la mano maneja la escena vía MediaPipe con vocabulario propio, sirve HTTP',
                           texto)
         self.assertIn('pero nada lo consume', texto)
+
+
+def _seccion(texto, encabezado):
+    """Cuerpo de una sección `## <encabezado>` hasta la siguiente `## ` (o el final
+    del fichero) — para no confundir una frase de otra sección con la que toca."""
+    m = re.search(r'^## ' + re.escape(encabezado) + r'\s*$', texto, re.MULTILINE)
+    if not m:
+        return ''
+    resto = texto[m.end():]
+    fin = re.search(r'^## ', resto, re.MULTILINE)
+    return resto[:fin.start()] if fin else resto
+
+
+class ReadmesDicenLoQuePresentaPublicaEnElVideo(unittest.TestCase):
+    """Fallo "grave" medido 7-sep: el capítulo de privacidad enumeraba 12 piezas
+    y NO mencionaba `presenta.py` — la única cuyo PRODUCTO está pensado para
+    publicarse. `presenta.py` toca la red por su cuenta (bloque «mundo»:
+    `mundo.buscar()`/`descargar()`; bloque «sentidos»: `exterocepcion.py`) Y,
+    MEDIDO abriendo el propio vídeo de demostración del paquete (fotograma
+    ~17 s, «Sentidos»), deja grabados en el `.mp4` el municipio de quien lo
+    generó (por IP, marca «(ES; por IP)»), su meteorología local y la
+    telemetría de su máquina — sin ni un aviso en el README (grep de
+    "lugar/ubicaci/personal/compartir/publicar/privacidad" sobre
+    `presenta.py` solo devuelve el comentario que anonimiza la ruta del disco
+    del bloque «auditoría», dos bloques antes).
+
+    El arreglo de código (que el bloque «sentidos» deje de mostrar lugar/meteo
+    por defecto, o los pida tras una bandera explícita) es de `presenta.py`,
+    fuera del alcance de esta prueba (que solo vigila README.md/README.en.md);
+    esta clase falsa que, MIENTRAS ese arreglo no exista, los dos README dicen
+    la verdad completa: qué toca la red y qué queda grabado en el vídeo."""
+
+    SECCION_ES = ('Privacidad y qué sale de la máquina', 'Límites honestos')
+    SECCION_EN = ('Privacy and what leaves the machine', 'Honest limits')
+
+    def test_presenta_py_aparece_en_privacidad_de_los_dos_readme(self):
+        for nombre, (privacidad, _limites) in (('README.md', self.SECCION_ES),
+                                                ('README.en.md', self.SECCION_EN)):
+            texto = (RAIZ / nombre).read_text(encoding='utf-8')
+            cuerpo = _seccion(texto, privacidad)
+            self.assertIn('presenta.py', cuerpo,
+                          f'{nombre}: el capítulo de privacidad no menciona presenta.py')
+
+    def test_privacidad_dice_que_bloques_mundo_y_sentidos_tocan_la_red(self):
+        casos = (
+            ('README.md', self.SECCION_ES[0],
+             ('exterocepcion.py', 'mundo.buscar', 'ABYSS_SIN_RED')),
+            ('README.en.md', self.SECCION_EN[0],
+             ('exterocepcion.py', 'mundo.buscar', 'ABYSS_SIN_RED')),
+        )
+        for nombre, encabezado, marcadores in casos:
+            texto = (RAIZ / nombre).read_text(encoding='utf-8')
+            cuerpo = _seccion(texto, encabezado)
+            bloque_presenta = cuerpo[cuerpo.find('`presenta.py`'):]
+            self.assertTrue(bloque_presenta, f'{nombre}: no se encontró la entrada de presenta.py')
+            for marcador in marcadores:
+                self.assertIn(marcador, bloque_presenta,
+                              f'{nombre}: la entrada de presenta.py no menciona {marcador!r}')
+
+    def test_privacidad_dice_lo_que_el_video_deja_grabado(self):
+        casos = (
+            ('README.md', self.SECCION_ES[0], ('municipio', 'meteorolog', 'telemetría', '(ES; por IP)')),
+            ('README.en.md', self.SECCION_EN[0], ('municipality', 'weather', 'telemetry', '(ES; by IP)')),
+        )
+        for nombre, encabezado, marcadores in casos:
+            texto = (RAIZ / nombre).read_text(encoding='utf-8')
+            cuerpo = _seccion(texto, encabezado)
+            bloque_presenta = cuerpo[cuerpo.find('`presenta.py`'):]
+            for marcador in marcadores:
+                self.assertIn(marcador, bloque_presenta,
+                              f'{nombre}: no dice que el vídeo deja grabado {marcador!r}')
+
+    def test_limites_honestos_avisa_de_la_fuga_en_los_dos_readme(self):
+        casos = (('README.md', self.SECCION_ES[1]), ('README.en.md', self.SECCION_EN[1]))
+        for nombre, encabezado in casos:
+            texto = (RAIZ / nombre).read_text(encoding='utf-8')
+            cuerpo = _seccion(texto, encabezado)
+            self.assertIn('presenta.py', cuerpo,
+                          f'{nombre}: "Límites honestos"/"Honest limits" no avisa de presenta.py')
+            bloque_presenta = cuerpo[cuerpo.find('`presenta.py`'):]
+            self.assertIn('ABYSS_SIN_RED', bloque_presenta,
+                          f'{nombre}: el límite de presenta.py no menciona ABYSS_SIN_RED')
+
+    def test_ningun_nombre_de_municipio_real_se_cuela_en_el_ejemplo(self):
+        # regla dura 4 del encargo (test_sin_datos_personales.py): nada personal en
+        # el repo — el municipio MEDIDO en el vídeo de demostración (un dato real de
+        # quien lo generó) no debe copiarse aquí, ni como ejemplo "ilustrativo".
+        for nombre in ('README.md', 'README.en.md'):
+            texto = (RAIZ / nombre).read_text(encoding='utf-8')
+            self.assertNotIn('Arenys', texto, f'{nombre}: no debe nombrar el municipio real medido')
 
 
 if __name__ == '__main__':

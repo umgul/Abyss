@@ -21,6 +21,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ayudas as ay
@@ -257,6 +258,25 @@ class Horizonte(unittest.TestCase):
         frac = volumen.horizonte(img)
         self.assertIsNotNone(frac)
         self.assertAlmostEqual(frac, 120 / 200, delta=0.05)
+
+    def test_da_igual_la_forma_que_devuelva_houghlinesp(self):
+        # Falsador de la línea 368 (antes del arreglo): `cv2.HoughLinesP` devuelve (N,1,4)
+        # en unas versiones de OpenCV y (N,4) en otras (medido: opencv-contrib-python 5.0.0
+        # da (N,4) en esta máquina). El código viejo hacía
+        # `for x1, y1, x2, y2 in lineas[:, 0]`, que asume (N,1,4): con (N,4),
+        # `lineas[:, 0]` es un vector de escalares y el desempaquetado revienta con
+        # "TypeError: cannot unpack non-iterable numpy.int32 object". Se monkeypatchea
+        # `cv2.HoughLinesP` con las DOS formas y se exige el MISMO resultado en ambas.
+        img = np.full((200, 400, 3), (30, 30, 30), np.uint8)
+        linea = [10, 120, 390, 122]
+        forma_n_1_4 = np.array([[linea]], dtype=np.int32)  # (1, 1, 4)
+        forma_n_4 = np.array([linea], dtype=np.int32)      # (1, 4)
+        with mock.patch.object(cv2, 'HoughLinesP', return_value=forma_n_1_4):
+            frac_n_1_4 = volumen.horizonte(img)
+        with mock.patch.object(cv2, 'HoughLinesP', return_value=forma_n_4):
+            frac_n_4 = volumen.horizonte(img)
+        self.assertIsNotNone(frac_n_1_4)
+        self.assertEqual(frac_n_1_4, frac_n_4)
 
 
 @unittest.skipUnless(cv2 is not None, 'opencv-python no disponible en esta máquina')
