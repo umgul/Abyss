@@ -93,3 +93,4 @@ de historia, de arte, no los repos de imágenes; tiene que plasmar cosas del mun
 - Sin combinar ni componer: el motivo se pinta tal cual llega (o se esboza en el taller y se pinta).
 - Pruebas contra respuestas JSON guardadas (sin red) por fuente; y que sin clave las fuentes con
   clave devuelven «sin clave: …» y no una traza.
+- render sin --html escribe <entrada>_render3d.html junto a la ENTRADA (medido 7-sep 09:50 con pruebas/datos/escena_prueba.json → pruebas/datos/escena_prueba_render3d.html dentro del repo). Debe ir a mem/imagenes/ o junto al --png. Pendiente de arreglo con falsador.
