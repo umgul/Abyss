@@ -1,0 +1,26 @@
+{
+  "result_count": 2,
+  "page_count": 1,
+  "page_size": 20,
+  "page": 1,
+  "results": [
+    {
+      "id": "aaaa1111-bbbb-2222-cccc-333344445555",
+      "title": "Bicicleta roja apoyada en un muro",
+      "creator": "Persona de Ejemplo",
+      "license": "cc0",
+      "license_version": "1.0",
+      "url": "http://127.0.0.1:0/openverse/bicicleta.jpg",
+      "foreign_landing_url": "http://127.0.0.1:0/openverse/paginas/bicicleta"
+    },
+    {
+      "id": "dddd6666-eeee-7777-ffff-888899990000",
+      "title": "Faro visto de lejos al atardecer",
+      "creator": "Otra Persona",
+      "license": "by",
+      "license_version": "4.0",
+      "url": "http://127.0.0.1:0/openverse/faro.jpg",
+      "foreign_landing_url": "http://127.0.0.1:0/openverse/paginas/faro"
+    }
+  ]
+}

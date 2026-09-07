@@ -1,0 +1,38 @@
+# Abyss funciona con la biblioteca estándar de Python 3.12+ salvo para piezas opcionales.
+# Todas van comentadas a propósito: instala solo la que necesites (quita el # de su línea).
+#
+# - pintor.py (y el verbo "imagen.py pintar", que lo usa) necesitan Pillow y numpy para
+#   pintar el cuadro de pinceladas localmente. Son imports de nivel de módulo: sin ellas,
+#   `import pintor` falla con ModuleNotFoundError en el momento de importarlo (no hay
+#   fallback silencioso a un dict con "error"). El verbo "crear" de imagen.py (la cascada
+#   de proveedores) no las usa y sigue funcionando igual sin ellas.
+# Pillow
+# numpy
+#
+# - imagen.py video / video_pintura.py necesitan imageio-ffmpeg (trae su propio binario de
+#   ffmpeg, no hace falta instalarlo aparte) para codificar el .mp4 a partir del .json.gz
+#   que deja pintor.py. Sin ella, video() lanza RuntimeError con el motivo y la CLI imprime
+#   "sin video: ..." (código 2), no revienta con una traza oscura.
+# imageio-ffmpeg
+#
+# - ojo.py necesita opencv-python (el módulo `cv2`) para leer la webcam. Es OPCIONAL: sin
+#   él, ojo.py imprime "sin cv2: no hay ojo" y sale con código 1. lienzo.py también la usa,
+#   pero como OPCIONAL de verdad: sin ella, restaurar/numeros/borrar caen a un equivalente
+#   en Python puro (más lento, o un paso que se salta con aviso) — nunca fallan del todo.
+# opencv-python
+#
+# - lector_pdf.py necesita PyMuPDF (el módulo `fitz`) o pypdf para extraer texto de un PDF.
+#   Con fitz, las secciones salen de tamaños de letra reales (mejor heurística); sin ninguna
+#   de las dos, la CLI imprime "sin dato: pip install pymupdf" y sale con código 1 — nunca
+#   inventa el texto del PDF.
+# PyMuPDF
+# pypdf
+#
+# - taller.py (servidor local de texto→imagen para la vía "local" de imagen.py crear, y para
+#   lienzo.py borrar --metodo taller) necesita diffusers + torch. Son PESADAS (GB de descarga
+#   entre el propio paquete y el modelo) y torch cambia según tengas GPU NVIDIA o no — sigue
+#   pytorch.org/get-started/locally para instalar la versión correcta en vez de "pip install
+#   torch" a ciegas. Sin ellas, taller.py imprime el pip install exacto y sale con código 2;
+#   ninguna otra pieza de este paquete las necesita.
+# diffusers
+# torch

@@ -1,0 +1,37 @@
+{
+  "batchcomplete": "",
+  "query": {
+    "pages": {
+      "111": {
+        "pageid": 111,
+        "ns": 6,
+        "title": "File:Ejemplo puente de piedra.jpg",
+        "imageinfo": [
+          {
+            "url": "http://127.0.0.1:0/commons/puente.jpg",
+            "descriptionurl": "http://127.0.0.1:0/commons/paginas/puente",
+            "extmetadata": {
+              "Artist": {"value": "<a href=\"//example.org/usuario/Alguien\">Alguien</a>"},
+              "LicenseShortName": {"value": "CC BY-SA 4.0"}
+            }
+          }
+        ]
+      },
+      "222": {
+        "pageid": 222,
+        "ns": 6,
+        "title": "File:Ejemplo bosque de niebla.jpg",
+        "imageinfo": [
+          {
+            "url": "http://127.0.0.1:0/commons/bosque.jpg",
+            "descriptionurl": "http://127.0.0.1:0/commons/paginas/bosque",
+            "extmetadata": {
+              "Artist": {"value": "Otra Persona Más"},
+              "License": {"value": "public domain"}
+            }
+          }
+        ]
+      }
+    }
+  }
+}

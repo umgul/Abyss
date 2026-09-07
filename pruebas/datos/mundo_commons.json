@@ -1,0 +1,74 @@
+{
+ "query": {
+  "pages": {
+   "3121032": {
+    "pageid": 3121032,
+    "ns": 6,
+    "title": "File:Detail of the Da Vinci's The Last Supper by Giacomo Raffaelli, Vienna.jpg",
+    "imageinfo": [
+     {
+      "size": 1710908,
+      "width": 3314,
+      "height": 1971,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/af/Detail_of_the_Da_Vinci%27s_The_Last_Supper_by_Giacomo_Raffaelli%2C_Vienna.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Detail_of_the_Da_Vinci%27s_The_Last_Supper_by_Giacomo_Raffaelli,_Vienna.jpg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Afernand74\" title=\"User:Afernand74\">Alberto Fernandez Fernandez</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY 2.5",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "License": {
+        "value": "cc-by-2.5",
+        "source": "commons-templates",
+        "hidden": ""
+       },
+       "Credit": {
+        "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   },
+   "24759": {
+    "pageid": 24759,
+    "ns": 6,
+    "title": "File:Leonardo da Vinci (1452-1519) - The Last Supper (1495-1498).jpg",
+    "imageinfo": [
+     {
+      "size": 23766563,
+      "width": 5076,
+      "height": 2645,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/08/Leonardo_da_Vinci_%281452-1519%29_-_The_Last_Supper_%281495-1498%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Leonardo_da_Vinci_(1452-1519)_-_The_Last_Supper_(1495-1498).jpg",
+      "extmetadata": {
+       "Artist": {
+        "value": "<bdi><a href=\"https://en.wikipedia.org/wiki/en:Leonardo_da_Vinci\" class=\"extiw\" title=\"w:en:Leonardo da Vinci\"><span title=\"Italian Renaissance polymath (1452−1519)\">Leonardo da Vinci</span></a></bdi>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "Public domain",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "License": {
+        "value": "pd",
+        "source": "commons-templates",
+        "hidden": ""
+       },
+       "Credit": {
+        "value": "Unknown source<span style=\"display: none;\">Unknown source</span>",
+        "source": "commons-desc-page"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+}

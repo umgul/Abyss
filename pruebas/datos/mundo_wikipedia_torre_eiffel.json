@@ -1,0 +1,23 @@
+{
+ "title": "Torre Eiffel",
+ "description": "monumento en París, Francia",
+ "extract": "La torre Eiffel, inicialmente llamada Tour de 300 mètres es una estructura de hierro pudelado diseñada inicialmente por los ingenieros civiles Maurice Koechlin y Émile Nouguier y construida, tras el rediseño estético de Stephen Sauvestre, por el ingeniero civil francés Gustave Eiffel y sus colaborad",
+ "coordinates": {
+  "lat": 48.858296,
+  "lon": 2.294479
+ },
+ "content_urls": {
+  "desktop": {
+   "page": "https://es.wikipedia.org/wiki/Torre_Eiffel",
+   "revisions": "https://es.wikipedia.org/wiki/Torre_Eiffel?action=history",
+   "edit": "https://es.wikipedia.org/wiki/Torre_Eiffel?action=edit",
+   "talk": "https://es.wikipedia.org/wiki/Discusi%C3%B3n:Torre_Eiffel"
+  },
+  "mobile": {
+   "page": "https://es.wikipedia.org/wiki/Torre_Eiffel",
+   "revisions": "https://es.wikipedia.org/wiki/Special:History/Torre_Eiffel",
+   "edit": "https://es.wikipedia.org/wiki/Torre_Eiffel?action=edit",
+   "talk": "https://es.wikipedia.org/wiki/Discusi%C3%B3n:Torre_Eiffel"
+  }
+ }
+}

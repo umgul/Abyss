@@ -1,0 +1,41 @@
+# notify-telegram.ps1
+# Claude Code -> Telegram. Fires from the user-level Notification hook
+# (~/.claude/settings.json) whenever Claude Code needs permission or is
+# waiting for input. Lives outside any project. Reuses the Telegram bot
+# configured by the installer (token/chat id filled in by instalar.py).
+# To disable: remove the "hooks" block from ~/.claude/settings.json (or delete this file).
+
+$ErrorActionPreference = 'SilentlyContinue'
+
+$Token  = '<TELEGRAM_BOT_TOKEN>'
+$ChatId = '<CHAT_ID>'
+
+# Hook payload (JSON) arrives on stdin
+$raw = [Console]::In.ReadToEnd()
+$data = $null
+if ($raw) { try { $data = $raw | ConvertFrom-Json } catch { } }
+
+$msg = 'Claude Code te necesita (permiso o esperando input).'
+$cwd = ''
+if ($data) {
+    if ($data.message) { $msg = [string]$data.message }
+    if ($data.cwd)     { $cwd = [string]$data.cwd }
+}
+
+$project = ''
+if ($cwd) { $project = Split-Path -Leaf $cwd }
+
+$text = "Claude Code`n$msg"
+if ($project) { $text = "$text`n($project)" }
+
+$payload = @{ chat_id = $ChatId; text = $text } | ConvertTo-Json -Compress
+$bytes   = [System.Text.Encoding]::UTF8.GetBytes($payload)
+
+try {
+    Invoke-RestMethod -Method Post `
+        -Uri "https://api.telegram.org/bot$Token/sendMessage" `
+        -ContentType 'application/json; charset=utf-8' `
+        -Body $bytes -TimeoutSec 15 | Out-Null
+} catch { }
+
+exit 0

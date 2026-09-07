@@ -1,0 +1,46 @@
+{
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "<PYTHON> \"<RUTA_DEL_PAQUETE>/continuidad.py\" --arranque",
+          "timeout": 60
+        }
+      ]
+    }
+  ],
+  "SessionEnd": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "<PYTHON> \"<RUTA_DEL_PAQUETE>/continuidad.py\" --cierre",
+          "timeout": 60
+        }
+      ]
+    }
+  ],
+  "UserPromptSubmit": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "<PYTHON> \"<RUTA_DEL_PAQUETE>/continuidad.py\" --despertar",
+          "timeout": 30
+        }
+      ]
+    }
+  ],
+  "Stop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "<PYTHON> \"<RUTA_DEL_PAQUETE>/vigia.py\" --verificar",
+          "timeout": 30
+        }
+      ]
+    }
+  ]
+}

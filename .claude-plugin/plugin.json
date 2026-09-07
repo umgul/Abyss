@@ -1,0 +1,16 @@
+{
+  "name": "abyss",
+  "version": "0.1.0",
+  "description": "Skills and self-instrumentation for Claude Code that measure instead of decree.",
+  "homepage": "https://github.com/umgul/abyss",
+  "repository": "https://github.com/umgul/abyss",
+  "license": "Apache-2.0",
+  "keywords": [
+    "claude-code",
+    "skills",
+    "hooks",
+    "self-instrumentation",
+    "memory",
+    "sgicp"
+  ]
+}

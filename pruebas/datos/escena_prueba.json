@@ -1,0 +1,9 @@
+{
+  "unidades": "m",
+  "piezas": [
+    {"nombre": "base", "tipo": "caja", "pos": [0, 0.2, 0], "tam": [2, 0.4, 2], "color": "#7a6b57", "grupo": "cuerpo"},
+    {"nombre": "columna", "tipo": "cilindro", "pos": [0, 1.4, 0], "tam": [0.3, 0.3, 2], "color": "#c9c2b3", "grupo": "cuerpo"},
+    {"nombre": "remate", "tipo": "esfera", "pos": [0, 2.8, 0], "tam": [0.5], "color": "#d4af37", "grupo": "remate"}
+  ],
+  "camara": {"pos": [5, 3.5, 6], "mirar": [0, 1.2, 0], "fov": 50}
+}

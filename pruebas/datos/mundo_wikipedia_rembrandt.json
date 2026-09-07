@@ -1,0 +1,19 @@
+{
+ "title": "Rembrandt",
+ "description": "pintor y grabador neerlandés (1606–1669)",
+ "extract": "Rembrandt Harmenszoon van Rijn, más conocido simplemente como Rembrandt, fue un pintor y grabador neerlandés. La historia del arte lo considera uno de los mayores maestros barrocos de la pintura y el grabado, el artista más importante de la historia de los Países Bajos. Su aporte a la pintura coinci",
+ "content_urls": {
+  "desktop": {
+   "page": "https://es.wikipedia.org/wiki/Rembrandt",
+   "revisions": "https://es.wikipedia.org/wiki/Rembrandt?action=history",
+   "edit": "https://es.wikipedia.org/wiki/Rembrandt?action=edit",
+   "talk": "https://es.wikipedia.org/wiki/Discusi%C3%B3n:Rembrandt"
+  },
+  "mobile": {
+   "page": "https://es.wikipedia.org/wiki/Rembrandt",
+   "revisions": "https://es.wikipedia.org/wiki/Special:History/Rembrandt",
+   "edit": "https://es.wikipedia.org/wiki/Rembrandt?action=edit",
+   "talk": "https://es.wikipedia.org/wiki/Discusi%C3%B3n:Rembrandt"
+  }
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "searchinfo": {
+  "search": "Rembrandt"
+ },
+ "search": [
+  {
+   "id": "Q5598",
+   "title": "Q5598",
+   "pageid": 6645,
+   "concepturi": "http://www.wikidata.org/entity/Q5598",
+   "repository": "wikidata",
+   "url": "//www.wikidata.org/wiki/Q5598",
+   "display": {
+    "label": {
+     "value": "Rembrandt",
+     "language": "es"
+    },
+    "description": {
+     "value": "pintor y grabador neerlandés (1606–1669)",
+     "language": "es"
+    }
+   },
+   "label": "Rembrandt",
+   "description": "pintor y grabador neerlandés (1606–1669)",
+   "match": {
+    "type": "label",
+    "language": "es",
+    "text": "Rembrandt"
+   }
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "pagination": {
+  "total": 132740,
+  "limit": 3
+ },
+ "data": [
+  {
+   "_score": 169.27669,
+   "id": 16568,
+   "title": "Water Lilies",
+   "date_display": "1906",
+   "artist_display": "Claude Monet (French, 1840–1926)",
+   "dimensions": "89.9 × 94.1 cm (35 3/8 × 37 1/16 in.); Framed: 103.2 × 107 × 5.8 cm (40 5/8 × 42 1/8 × 2 1/4 in.)",
+   "medium_display": "Oil on canvas",
+   "is_public_domain": true,
+   "department_title": "Painting and Sculpture of Europe",
+   "image_id": "3c27b499-af56-f0d5-93b5-a7f2f1ad5813"
+  },
+  {
+   "_score": 142.12128,
+   "id": 87088,
+   "title": "Water Lily Pond",
+   "date_display": "1900",
+   "artist_display": "Claude Monet (French, 1840–1926)",
+   "dimensions": "89.8 × 101 cm (35 3/8 × 39 3/4 in.); Framed: 112.4 × 122.6 × 10.2 cm (44 1/4 × 48 1/4 × 4 in.)",
+   "medium_display": "Oil on canvas",
+   "is_public_domain": true,
+   "department_title": "Painting and Sculpture of Europe",
+   "image_id": "8534685d-1102-e1e3-e194-94f6e925e8b0"
+  },
+  {
+   "_score": 127.072395,
+   "id": 97933,
+   "title": "Water Lily Pond",
+   "date_display": "1917–19",
+   "artist_display": "Claude Monet (French, 1840–1926)",
+   "dimensions": "130.2 × 201.9 cm (51 1/2 × 79 1/2 in.); Framed: 147.4 × 218.5 × 9.9 cm (58 × 86 × 3 7/8 in.)",
+   "medium_display": "Oil on canvas",
+   "is_public_domain": true,
+   "department_title": "Painting and Sculpture of Europe",
+   "image_id": "7a23ad22-2044-6d7d-6315-9b101dadc559"
+  }
+ ],
+ "config": {
+  "iiif_url": "https://www.artic.edu/iiif/2",
+  "website_url": "http://www.artic.edu"
+ }
+}

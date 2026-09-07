@@ -1,0 +1,30 @@
+# Datos generados: viven en memory/ del proyecto del USUARIO, nunca en este repo.
+# Esto es solo una red de seguridad por si alguna vez aparece un memory/ aquí
+# dentro (p. ej. una prueba mal apuntada) — nunca debería llevar nada real.
+# Ojo: NO listar aquí los nombres sueltos de plantillas/*.json (imagen_config.json,
+# modelo_preferido.json, temas_noticias.json) — esos SÍ van en el repo, son las
+# semillas que instalar.py copia a memory/ la primera vez.
+/memory/
+**/memory/
+sesiones/
+relojes.jsonl
+bolsas.json
+imagenes/
+ojo_*.jpg
+
+# Lo único que el propio paquete instalado escribe en su carpeta de código
+# (§1/§4 de ESPECIFICACION.md: la única excepción permitida)
+abyss/config.json
+
+# Copias de seguridad fechadas que dejan varas.py (MEMORY.md.abyss-*.bak) e
+# instalar.py (settings.json.abyss-*.bak) — nunca se commitean
+*.abyss-*.bak
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+
+# Personales (regla 2 del encargo): jamás se leen, mueven ni borran, solo se ignoran
+/HILO_ABYSS_conversacion.md
+/Sesiones1.txt

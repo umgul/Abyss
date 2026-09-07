@@ -1,0 +1,30 @@
+{
+  "_doc": "Configuración de imagen.py. Cada clave es OPCIONAL; sin ninguna, solo queda la vía 'horde' (AI Horde, anónima). Las claves son tuyas y no viajan con el paquete.",
+  "orden": [
+    "local",
+    "pollinations",
+    "cloudflare",
+    "together",
+    "huggingface",
+    "horde"
+  ],
+  "local_url": "",
+  "local_estilo": "a1111",
+  "local_steps": 20,
+  "local_cfg": 6.0,
+  "pollinations_key": "",
+  "cloudflare_account_id": "",
+  "cloudflare_api_token": "",
+  "together_key": "",
+  "together_modelo": "black-forest-labs/FLUX.1-schnell-Free",
+  "huggingface_key": "",
+  "huggingface_modelo": "black-forest-labs/FLUX.1-schnell",
+  "horde_key": "0000000000",
+  "horde_steps": 20,
+  "taller_url": "",
+  "taller_denoise": 0.75,
+  "taller_pasos": 20,
+  "google_maps_key": "",
+  "mapillary_token": "",
+  "windy_key": ""
+}
