@@ -21,6 +21,11 @@ no una promesa que este módulo compruebe).
                      # sin --min-zona: 0,05% del área ya redimensionada (suelo 20 px)
     python lienzo.py borrar <img> (--caja x,y,w,h | --mascara m.png | --color #rrggbb[,tolerancia])
                      [--metodo telea|ns|taller] [--salida f.png]
+    python lienzo.py cubista <foto> [--facetas 220] [--desplazamiento 0.07] [--giro 7]
+                     [--sin-contorno] [--difuminado-fondo N] [--semilla 7]
+                     [--pasos N --pasos-dir DIR] [--salida f.png]
+    python lienzo.py surrealista <foto> [--fuerza 26] [--escala 90] [--viraje 42] [--semilla 7]
+                     [--pasos N --pasos-dir DIR] [--salida f.png]
 
 `fundir`: `b` se redimensiona al tamaño de `a` (LANCZOS) y se combina con un modo de mezcla
 clásico (`mezcla` = normal; `multiplicar`, `pantalla`, `superponer`, `luz_suave` = fórmulas
@@ -119,6 +124,39 @@ alrededor de ella (contra la mediana de desviación local de toda la imagen): si
 1 % de la imagen o el anillo tiene más textura que esa mediana, imprime un aviso ("borrón
 probable…") y lo deja en el JSON (`aviso`, `None` si no aplica) — con `--metodo taller` no avisa
 (ya es el método recomendado para esos casos).
+
+`cubista`/`surrealista` (encargo 9-sep: "dos estilos pictóricos NUEVOS"): la pregunta de fondo
+no era qué parámetros pintar, sino DÓNDE viven — `pintor.py` es un motor de PINCELADAS
+(Hertzmann 1998: por cada radio, difuminar, medir error por celdas, poner una pincelada
+perpendicular al gradiente); sus seis estilos son el MISMO bucle con otro dict de radios/
+umbral/alfa (ver el docstring de `pintor.py`). Cubismo y surrealismo no son eso: no son una
+pincelada más fina o más gorda, son otra COMPOSICIÓN de la imagen ENTERA — llamarlos "otro
+estilo de pintor.py" habría sido mentir con el nombre (un radio de pincel distinto no es una
+faceta ni un derretido). Por eso viven aquí, como dos verbos más de `lienzo.py`, que ya opera
+sobre la foto entera de una vez (como `collage`/`degradado`), no pincelada a pincelada.
+
+`cubista` (analítico): puntos semilla sobre los bordes REALES de la foto (`cv2.Canny`) más un
+relleno aleatorio y un marco (para cubrir el lienzo entero) -> triangulación de Delaunay de esos
+puntos (`cv2.Subdiv2D` — ya dependencia opcional del paquete, sin necesitar scipy; sin OpenCV,
+una rejilla triangular con jitter, declarada como lo que es: NO una Delaunay real) -> cada
+triángulo se aplana a su color medio (medido sobre la foto ORIGINAL) -> se desplaza y gira un
+poco alrededor de su propio centro, de MAYOR a MENOR área, sobre un fondo difuminado y con el
+color atenuado (para que el hueco que deja una faceta movida enseñe un eco de la escena, no un
+vacío) -> un contorno más oscuro remata cada faceta para que la junta se vea — eso ES lo que
+hace el cubismo analítico: descomponer en planos y enseñar varios a la vez.
+
+`surrealista`: dos campos de ruido de BAJA frecuencia (rejilla gruesa remuestreada a tamaño
+completo — la propia interpolación bicúbica hace de paso-bajo) como mapa de desplazamiento
+(x,y), que remuestrea la foto entera (`cv2.remap`, o un bilineal propio sin OpenCV) — las formas
+se derriten sin romperse, porque el desplazamiento cambia suave de un píxel a su vecino — más un
+viraje de tono (canal H de HSV) para el color onírico.
+
+Los dos ENSEÑAN EL PROCESO en vídeo (como `video_pintura.py` con las pinceladas, pero aquí no
+hay pinceladas que filmar: el efecto es una sola pasada por foto): con `--pasos N --pasos-dir
+DIR` escriben N fotogramas de progreso — `cubista` revelando facetas de mayor a menor área,
+`surrealista` interpolando el campo de deformación y el viraje de 0 a su fuerza completa — que
+`video_composicion.py` (hermano de `video_pintura.py` para composiciones que no son pinceladas)
+convierte en `.mp4`.
 
 Qué sale de la máquina: NADA salvo `borrar --metodo taller`, y eso solo llega a la máquina que
 TÚ configures en `taller_url` (por defecto, ninguna — sin configurar, ese método falla con "sin
@@ -950,6 +988,363 @@ def borrar(ruta, caja=None, mascara=None, color=None, metodo='telea', salida=Non
     return r
 
 
+# ───────────────────────── cubista (facetas analíticas de verdad) ─────────────────────────
+#
+# Ver el docstring del módulo para el POR QUÉ vive aquí y no como un "estilo" más de
+# pintor.py: no es una pincelada, es otra composición de la imagen entera.
+
+def _color_medio_poligono(arr_rgb, pts):
+    """Media de color de `arr_rgb` (H,W,3 uint8) dentro del polígono `pts`, recortando
+    primero a su caja delimitadora — no la imagen entera: con cientos de facetas por
+    cuadro, enmascarar la imagen COMPLETA cada vez sería O(facetas × píxeles_totales);
+    la caja lo deja en O(facetas × píxeles_de_su_propia_caja), que es lo que hace
+    falta de verdad. `None` si la faceta cae fuera del lienzo o es tan fina que ningún
+    píxel entero queda dentro (triángulo casi colineal de la triangulación)."""
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x0, x1 = max(0, int(math.floor(min(xs)))), min(arr_rgb.shape[1], int(math.ceil(max(xs))) + 1)
+    y0, y1 = max(0, int(math.floor(min(ys)))), min(arr_rgb.shape[0], int(math.ceil(max(ys))) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return None
+    m = Image.new('L', (x1 - x0, y1 - y0), 0)
+    ImageDraw.Draw(m).polygon([(px - x0, py - y0) for px, py in pts], fill=255)
+    mascara = np.asarray(m) > 0
+    if not mascara.any():
+        return None
+    color = arr_rgb[y0:y1, x0:x1][mascara].mean(axis=0)
+    return tuple(int(round(c)) for c in color)
+
+
+def _area_triangulo(pts):
+    (x1, y1), (x2, y2), (x3, y3) = pts
+    return abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2.0
+
+
+def _puntos_de_bordes(gris_u8, n, rnd):
+    """`n` puntos MUESTREADOS de los bordes reales de `gris_u8` (`cv2.Canny`; sin OpenCV,
+    gradiente de Sobel propio sobre su percentil 90 — más lento y menos limpio, declarado,
+    no medido a escala real). El cubismo analítico rompe la figura por donde YA hay un
+    borde en la escena, no por una rejilla arbitraria: sin este paso, las facetas caerían
+    donde caiga la rejilla y ninguna seguiría el contorno de nada."""
+    if cv2 is not None:
+        bordes = cv2.Canny(gris_u8, 60, 160)
+    else:
+        gy, gx = np.gradient(gris_u8.astype(np.float32))
+        mag = np.hypot(gx, gy)
+        bordes = (mag > np.percentile(mag, 90)).astype(np.uint8) * 255
+    ys, xs = np.nonzero(bordes)
+    if ys.size == 0:
+        return np.empty((0, 2), dtype=np.float64)
+    n = min(int(n), ys.size)
+    idx = rnd.choice(ys.size, size=n, replace=False)
+    return np.stack([xs[idx], ys[idx]], axis=1).astype(np.float64)
+
+
+def _puntos_de_marco(ancho, alto, por_lado):
+    """Puntos a lo largo de los cuatro bordes del lienzo: sin ellos, la triangulación de
+    Delaunay se para donde caiga el punto semilla más externo y deja un borde de imagen
+    sin ninguna faceta que lo cubra (fondo asomando por fuera, no por un hueco a propósito)."""
+    lin = np.linspace(0, 1, max(2, int(por_lado)))
+    arriba = np.stack([lin * (ancho - 1), np.zeros_like(lin)], axis=1)
+    abajo = np.stack([lin * (ancho - 1), np.full_like(lin, alto - 1)], axis=1)
+    izq = np.stack([np.zeros_like(lin), lin * (alto - 1)], axis=1)
+    der = np.stack([np.full_like(lin, ancho - 1), lin * (alto - 1)], axis=1)
+    return np.concatenate([arriba, abajo, izq, der], axis=0)
+
+
+def _triangular_rejilla(ancho, alto, n_deseado):
+    """Fallback SIN OpenCV: NO es una Delaunay real (declarado, no se hace pasar por una)
+    — una rejilla regular de celdas partidas en dos triángulos por su diagonal, con el
+    tamaño de celda elegido para acercarse a `n_deseado` facetas (cada celda da 2). Sigue
+    cubriendo el lienzo entero y sigue dando polígonos con los que trabajar; lo que pierde
+    es que las facetas ya no nacen de los bordes reales de la foto."""
+    celdas = max(1, round(n_deseado / 2))
+    cols = max(1, round(math.sqrt(celdas * ancho / max(1, alto))))
+    filas = max(1, round(celdas / cols))
+    xs = np.linspace(0, ancho - 1, cols + 1)
+    ys = np.linspace(0, alto - 1, filas + 1)
+    triangulos = []
+    for j in range(filas):
+        for i in range(cols):
+            a, b = (xs[i], ys[j]), (xs[i + 1], ys[j])
+            c, d = (xs[i], ys[j + 1]), (xs[i + 1], ys[j + 1])
+            triangulos.append([a, b, c])
+            triangulos.append([b, d, c])
+    return triangulos
+
+
+def _triangular_delaunay(ancho, alto, puntos, n_deseado):
+    """Triangulación de Delaunay de `puntos` (`cv2.Subdiv2D` — ya dependencia opcional del
+    paquete: no hace falta scipy) recortada al rectángulo del lienzo: `Subdiv2D` también
+    genera triángulos de un "punto en el infinito" propio de su algoritmo incremental; se
+    descartan quedándose solo con los que caen ENTEROS dentro de `(0,0,ancho,alto)`. Sin
+    OpenCV, cae a `_triangular_rejilla` (declarado ahí lo que pierde)."""
+    if cv2 is None:
+        return _triangular_rejilla(ancho, alto, n_deseado)
+    subdiv = cv2.Subdiv2D((0, 0, int(ancho), int(alto)))
+    for x, y in puntos:
+        x = min(max(float(x), 0.0), ancho - 1.0)
+        y = min(max(float(y), 0.0), alto - 1.0)
+        try:
+            subdiv.insert((x, y))
+        except cv2.error:
+            continue  # punto duplicado o degenerado: se salta, no revienta el cuadro entero
+    triangulos = []
+    for t in subdiv.getTriangleList():
+        pts = [(float(t[0]), float(t[1])), (float(t[2]), float(t[3])), (float(t[4]), float(t[5]))]
+        if all(0 <= px <= ancho - 1 and 0 <= py <= alto - 1 for px, py in pts):
+            triangulos.append(pts)
+    return triangulos
+
+
+def _rotar_y_mover(pts, angulo, dx, dy):
+    cx = sum(p[0] for p in pts) / 3.0
+    cy = sum(p[1] for p in pts) / 3.0
+    ca, sa = math.cos(angulo), math.sin(angulo)
+    out = []
+    for px, py in pts:
+        rx, ry = px - cx, py - cy
+        out.append((cx + rx * ca - ry * sa + dx, cy + rx * sa + ry * ca + dy))
+    return out
+
+
+def _fondo_atenuado(img, radio):
+    """Fondo del cuadro cubista: la foto difuminada y con el color atenuado hacia su propia
+    luminancia (NO gris puro: solo atenuado) — para que el hueco que deja una faceta
+    desplazada enseñe un eco borroso de la escena, no un vacío ni un color ajeno a la foto.
+    `radio` grande de más aplana el eco hasta volverlo irreconocible; pequeño de más deja
+    ver una foto nítida por las rendijas, que compite con las facetas en vez de quedarse
+    detrás — el valor por defecto de `cubista()` (ancho/45) es una elección declarada,
+    medida solo en que no revienta, no una ley de proporción."""
+    difuso = img.filter(ImageFilter.GaussianBlur(radio))
+    arr = _a01(difuso)
+    luminancia = (0.299 * arr[..., 0] + 0.587 * arr[..., 1] + 0.114 * arr[..., 2])[..., None]
+    atenuado = arr * 0.45 + luminancia * 0.55
+    return Image.fromarray(_de01(atenuado), 'RGB')
+
+
+def _escribir_pasos(pasos_dir, generar_frame, pasos):
+    """Escribe `pasos` fotogramas PNG numerados (`paso_000.png`, ...) en `pasos_dir` —
+    `generar_frame(k)` devuelve la imagen PIL del paso `k` (0-indexado; `k == pasos - 1`
+    es el cuadro acabado, igual al PNG final). Mismo propósito que el `.json.gz` de
+    pinceladas de `pintor.py`/`video_pintura.py`, pero aquí el "trazo" de cada paso ya es
+    una imagen entera compuesta por `cubista()`/`surrealista()` — no hay pinceladas que
+    guardar, así que el formato natural es una carpeta de fotogramas, no otro `.json.gz`."""
+    os.makedirs(pasos_dir, exist_ok=True)
+    ancho_indice = max(3, len(str(pasos - 1)))
+    rutas = []
+    for k in range(pasos):
+        ruta = os.path.join(pasos_dir, f'paso_{k:0{ancho_indice}d}.png')
+        generar_frame(k).save(ruta)
+        rutas.append(ruta)
+    return rutas
+
+
+def cubista(ruta, facetas=220, desplazamiento=0.07, giro=7.0, contorno=True, difuminado_fondo=None,
+            semilla=7, salida=None, pasos=None, pasos_dir=None):
+    """Cubismo ANALÍTICO de verdad (ver el docstring del módulo: no es una pincelada más
+    gorda) — descompone `ruta` en facetas poligonales sembradas en sus bordes reales,
+    aplana cada una a su color medio y la desplaza/gira un poco sobre un fondo atenuado,
+    de MAYOR a MENOR área.
+
+    `facetas`: cuántos puntos semilla se piden (bordes + relleno); el número REAL de
+    triángulos que salen de la triangulación se mide y se devuelve en `"facetas"` — no
+    tiene por qué coincidir. `desplazamiento`: cuánto se mueve cada faceta, como fracción
+    de su propio "radio" (raíz del área) — así una faceta grande se mueve más píxeles que
+    una diminuta sin que ninguna de las dos pierda su forma. `giro`: rotación máxima en
+    GRADOS alrededor de su propio centro. `contorno=False`: sin la línea oscura que remata
+    cada faceta (junta visible). `pasos`+`pasos_dir`: además del PNG final, escribe esa
+    cantidad de fotogramas de progreso (facetas reveladas de MAYOR a MENOR área) en ese
+    directorio, para `video_composicion.py` — sin `pasos_dir` no se escribe ninguno.
+
+    Devuelve {"salida", "facetas", "cobertura_facetas" (fracción del lienzo que ACABA bajo
+    alguna faceta; el resto es fondo asomando por los huecos — medido, no una ley),
+    "pasos" (lista de rutas, o None sin `pasos_dir`)}."""
+    img = _cargar_rgb(ruta)
+    ancho, alto = img.size
+    arr = np.asarray(img)
+    gris = np.asarray(img.convert('L'))
+    rnd = np.random.RandomState(int(semilla))
+
+    n_borde = max(8, round(facetas * 0.7))
+    n_relleno = max(4, int(facetas) - n_borde)
+    puntos = np.concatenate([
+        _puntos_de_bordes(gris, n_borde, rnd),
+        np.stack([rnd.uniform(0, ancho - 1, n_relleno), rnd.uniform(0, alto - 1, n_relleno)], axis=1),
+        _puntos_de_marco(ancho, alto, max(3, round(math.sqrt(max(1, facetas))))),
+    ], axis=0)
+
+    triangulos_pts = _triangular_delaunay(ancho, alto, puntos, int(facetas))
+    facetas_calc = []  # [(area, color, pts_originales)], luego ordenado de mayor a menor
+    for pts in triangulos_pts:
+        area = _area_triangulo(pts)
+        if area < 3.0:
+            continue  # esquirla degenerada de la triangulación (casi colineal): sin color fiable
+        color = _color_medio_poligono(arr, pts)
+        if color is None:
+            continue
+        facetas_calc.append((area, color, pts))
+    facetas_calc.sort(key=lambda f: f[0], reverse=True)
+
+    # El jitter (giro + desplazamiento) de cada faceta se decide UNA sola vez aquí, con el
+    # mismo generador ya usado arriba para las semillas: así el cuadro FINAL no cambia según
+    # se pidan pasos de vídeo o no — medido en desarrollo: si el jitter se calculase dentro
+    # de la función que dibuja cada fotograma, se consumirían números aleatorios distintos
+    # según cuántas veces se llame, y el último paso dejaría de coincidir con el PNG final.
+    jitters = []
+    for area, _color, _pts in facetas_calc:
+        radio = math.sqrt(area)
+        angulo = math.radians(rnd.uniform(-giro, giro))
+        rumbo = rnd.uniform(0, 2 * math.pi)
+        dist = desplazamiento * radio
+        jitters.append((angulo, math.cos(rumbo) * dist, math.sin(rumbo) * dist))
+
+    radio_fondo = float(difuminado_fondo) if difuminado_fondo is not None else max(4, round(ancho / 45))
+    fondo_img = _fondo_atenuado(img, radio_fondo)
+    grosor_contorno = max(1, round(ancho / 700))
+
+    def _dibujar(hasta):
+        lienzo = fondo_img.copy()
+        d = ImageDraw.Draw(lienzo)
+        for (area, color, pts), (angulo, dx, dy) in list(zip(facetas_calc, jitters))[:hasta]:
+            pts_mov = _rotar_y_mover(pts, angulo, dx, dy)
+            d.polygon(pts_mov, fill=color)
+            if contorno:
+                oscuro = tuple(max(0, int(c * 0.55)) for c in color)
+                d.line(pts_mov + [pts_mov[0]], fill=oscuro, width=grosor_contorno)
+        return lienzo
+
+    total = len(facetas_calc)
+    final = _dibujar(total)
+    salida = salida or _nombre_salida(ruta, 'cubista')
+    final.save(salida)
+
+    cobertura = float(np.mean(np.any(np.asarray(final) != np.asarray(fondo_img), axis=-1))) if total else 0.0
+
+    rutas_pasos = None
+    if pasos and pasos_dir:
+        n_pasos = max(1, int(pasos))
+
+        def _frame(k):
+            hasta = max(1, round((k + 1) * total / n_pasos)) if total else 0
+            return _dibujar(hasta)
+
+        rutas_pasos = _escribir_pasos(pasos_dir, _frame, n_pasos)
+
+    return {"salida": salida, "facetas": total, "cobertura_facetas": round(cobertura, 4), "pasos": rutas_pasos}
+
+
+# ───────────────────────── surrealista (deformación de dominio) ─────────────────────────
+#
+# Ver el docstring del módulo para el POR QUÉ vive aquí y no como un "estilo" más de
+# pintor.py: es la imagen ENTERA remuestreada por un campo, no una pincelada.
+
+def _campo_desplazamiento(ancho, alto, escala, rnd):
+    """Dos campos (dx, dy) de ruido de baja frecuencia, en [-1,1] antes de escalar por la
+    fuerza pedida: una rejilla GRUESA (`escala` px por celda) de números aleatorios,
+    remuestreada a tamaño completo con `Image.resize(..., BICUBIC)` — esa interpolación
+    hace de filtro paso-bajo (una rejilla FINA daría arrugas de alta frecuencia, no el
+    derretido de formas anchas que pide un paisaje onírico)."""
+    gh, gw = max(2, round(alto / escala)), max(2, round(ancho / escala))
+    campos = []
+    for _ in range(2):
+        rejilla = rnd.uniform(-1.0, 1.0, (gh, gw)).astype(np.float32)
+        campo = np.asarray(Image.fromarray(rejilla, mode='F').resize((ancho, alto), Image.BICUBIC))
+        campos.append(np.clip(campo, -1.2, 1.2))  # la bicúbica puede rebasar un poco [-1,1]
+    return campos[0], campos[1]
+
+
+def _remuestrear_bilineal(arr, sx, sy):
+    """Remuestreo bilineal manual (sin OpenCV): para cada píxel de salida, mezcla de los
+    cuatro vecinos de `arr` en la posición fraccionaria `(sx, sy)` — mismo resultado que
+    `cv2.remap(..., INTER_LINEAR)`, más lento (Python+numpy en vez del C de OpenCV) pero
+    sin depender de él, como el resto de `lienzo.py` declara para sus pasos opcionales."""
+    alto, ancho = arr.shape[:2]
+    x0 = np.clip(np.floor(sx).astype(np.int32), 0, ancho - 1)
+    y0 = np.clip(np.floor(sy).astype(np.int32), 0, alto - 1)
+    x1 = np.clip(x0 + 1, 0, ancho - 1)
+    y1 = np.clip(y0 + 1, 0, alto - 1)
+    wx = (sx - x0)[..., None]
+    wy = (sy - y0)[..., None]
+    sup = arr[y0, x0] * (1 - wx) + arr[y0, x1] * wx
+    inf = arr[y1, x0] * (1 - wx) + arr[y1, x1] * wx
+    return sup * (1 - wy) + inf * wy
+
+
+def _derretir(arr01, dx, dy, t):
+    """Remuestrea `arr01` (H,W,3 en [0,1]) con el campo `(dx, dy)` (ya en píxeles, a fuerza
+    completa) escalado por `t` — `t=0` deja la imagen intacta, `t=1` la fuerza completa;
+    un `t` intermedio es justo lo que necesita el vídeo de progreso para enseñar el
+    derretido EN MARCHA, no como un corte entre dos fotogramas."""
+    alto, ancho = arr01.shape[:2]
+    yy, xx = np.mgrid[0:alto, 0:ancho].astype(np.float32)
+    sx = np.clip(xx + dx * t, 0, ancho - 1)
+    sy = np.clip(yy + dy * t, 0, alto - 1)
+    if cv2 is not None:
+        return cv2.remap(arr01, sx, sy, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    return _remuestrear_bilineal(arr01, sx, sy)
+
+
+def _virar_tono(img_rgb, grados):
+    """Gira el canal H de HSV `grados` (0-360, aunque Pillow lo guarde en 0-255) — un
+    viraje de color parejo en toda la imagen, no un balance de blancos ni una corrección:
+    es justo el efecto "onírico" que pide el encargo, declarado como lo que es."""
+    if not grados:
+        return img_rgb
+    hsv = np.asarray(img_rgb.convert('HSV')).astype(np.int16)
+    desplazamiento = int(round(grados / 360.0 * 255))
+    hsv[..., 0] = (hsv[..., 0] + desplazamiento) % 256
+    return Image.fromarray(hsv.astype(np.uint8), 'HSV').convert('RGB')
+
+
+def surrealista(ruta, fuerza=26.0, escala=90.0, viraje=42.0, semilla=7, salida=None,
+                pasos=None, pasos_dir=None):
+    """Deformación de dominio de baja frecuencia + viraje de tono — ver el docstring del
+    módulo (no es una pincelada: es la imagen entera remuestreada por un campo, más un
+    giro de HSV).
+
+    `fuerza`: desplazamiento MÁXIMO, en píxeles, del campo. `escala`: tamaño en píxeles de
+    cada celda de la rejilla de ruido ANTES de suavizarla a tamaño completo — mayor
+    escala, formas más anchas y suaves; menor, más arrugas. `viraje`: grados de giro del
+    tono (HSV). `pasos`+`pasos_dir`: fotogramas de progreso interpolando el campo y el
+    viraje de 0 a su fuerza completa (0 = foto intacta, último paso = igual al PNG final)
+    — para `video_composicion.py`; sin `pasos_dir` no se escribe ninguno.
+
+    Devuelve {"salida", "fuerza", "escala", "viraje", "desplazamiento_medido" (media de
+    `hypot(dx,dy)` en píxeles sobre TODO el lienzo, a fuerza completa — comprueba que el
+    campo de verdad mueve algo, no promete cuánto se "ve" el derretido), "pasos"}."""
+    img = _cargar_rgb(ruta)
+    ancho, alto = img.size
+    rnd = np.random.RandomState(int(semilla))
+    dx01, dy01 = _campo_desplazamiento(ancho, alto, float(escala), rnd)
+    dx, dy = dx01 * float(fuerza), dy01 * float(fuerza)
+    desplazamiento_medio = float(np.hypot(dx, dy).mean())
+
+    arr01 = _a01(img)
+
+    def _render(t):
+        derretida = _derretir(arr01, dx, dy, t)
+        base = Image.fromarray(_de01(derretida), 'RGB')
+        return _virar_tono(base, float(viraje) * t)
+
+    final = _render(1.0)
+    salida = salida or _nombre_salida(ruta, 'surrealista')
+    final.save(salida)
+
+    rutas_pasos = None
+    if pasos and pasos_dir:
+        n_pasos = max(1, int(pasos))
+
+        def _frame(k):
+            t = (k + 1) / n_pasos  # el ÚLTIMO paso (t=1.0) es igual al PNG final
+            return _render(t)
+
+        rutas_pasos = _escribir_pasos(pasos_dir, _frame, n_pasos)
+
+    return {"salida": salida, "fuerza": float(fuerza), "escala": float(escala), "viraje": float(viraje),
+            "desplazamiento_medido": round(desplazamiento_medio, 2), "pasos": rutas_pasos}
+
+
 # ───────────────────────── CLI ─────────────────────────
 
 def _valor_de(argv, i, banderas_bool=()):
@@ -979,7 +1374,12 @@ def _cli(argv):
         return _cli_numeros(resto)
     if verbo == 'borrar':
         return _cli_borrar(resto)
-    print(f'verbo desconocido: "{verbo}" (usa fundir/doble/collage/degradado/restaurar/numeros/borrar)')
+    if verbo == 'cubista':
+        return _cli_cubista(resto)
+    if verbo == 'surrealista':
+        return _cli_surrealista(resto)
+    print(f'verbo desconocido: "{verbo}" (usa fundir/doble/collage/degradado/restaurar/numeros/'
+          'borrar/cubista/surrealista)')
     return 1
 
 
@@ -1146,9 +1546,60 @@ def _cli_borrar(resto):
     return 0
 
 
-if __name__ == '__main__':
+def _cli_cubista(resto):
+    pos, opts, err = _parse_generico(
+        resto, {'--facetas': 'facetas', '--desplazamiento': 'desplazamiento', '--giro': 'giro',
+                 '--difuminado-fondo': 'difuminado_fondo', '--semilla': 'semilla',
+                 '--pasos': 'pasos', '--pasos-dir': 'pasos_dir', '--salida': 'salida'},
+        {'--sin-contorno'})
+    if err:
+        print(err)
+        return 1
+    if len(pos) != 1:
+        print('cubista necesita una foto')
+        return 1
     try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+        r = cubista(pos[0], facetas=int(opts.get('facetas', 220)),
+                    desplazamiento=float(opts.get('desplazamiento', 0.07)),
+                    giro=float(opts.get('giro', 7.0)), contorno=not opts.get('sin_contorno'),
+                    difuminado_fondo=float(opts['difuminado_fondo']) if 'difuminado_fondo' in opts else None,
+                    semilla=int(opts.get('semilla', 7)), salida=opts.get('salida'),
+                    pasos=int(opts['pasos']) if 'pasos' in opts else None,
+                    pasos_dir=opts.get('pasos_dir'))
+    except Exception as e:
+        print(f'sin lienzo: {type(e).__name__} {e}')
+        return 2
+    print(json.dumps(r, ensure_ascii=False))
+    return 0
+
+
+def _cli_surrealista(resto):
+    pos, opts, err = _parse_generico(
+        resto, {'--fuerza': 'fuerza', '--escala': 'escala', '--viraje': 'viraje',
+                 '--semilla': 'semilla', '--pasos': 'pasos', '--pasos-dir': 'pasos_dir',
+                 '--salida': 'salida'})
+    if err:
+        print(err)
+        return 1
+    if len(pos) != 1:
+        print('surrealista necesita una foto')
+        return 1
+    try:
+        r = surrealista(pos[0], fuerza=float(opts.get('fuerza', 26.0)), escala=float(opts.get('escala', 90.0)),
+                         viraje=float(opts.get('viraje', 42.0)), semilla=int(opts.get('semilla', 7)),
+                         salida=opts.get('salida'), pasos=int(opts['pasos']) if 'pasos' in opts else None,
+                         pasos_dir=opts.get('pasos_dir'))
+    except Exception as e:
+        print(f'sin lienzo: {type(e).__name__} {e}')
+        return 2
+    print(json.dumps(r, ensure_ascii=False))
+    return 0
+
+
+if __name__ == '__main__':
+    try:                       # la consola de Windows y la salida tienen que hablar
+        from . import consola  # el mismo idioma: ver abyss/consola.py
+    except ImportError:
+        import consola
+    consola.preparar()
     sys.exit(_cli(sys.argv[1:]))
