@@ -28,3 +28,36 @@ __pycache__/
 # Personales (regla 2 del encargo): jamás se leen, mueven ni borran, solo se ignoran
 /HILO_ABYSS_conversacion.md
 /Sesiones1.txt
+
+# El perfil del navegador propio (cámara ya concedida) vive FUERA del paquete: ver
+# abyss/navegador.py:carpeta_de_perfiles(). Esto es solo la red por si una versión
+# vieja o una prueba mal apuntada lo vuelve a dejar aquí — el 8-sep-2026 fueron
+# 782 MB dentro del repo, el 96 % de su peso, y 3.082 hallazgos falsos en su
+# propia auditoría.
+/mem/
+**/mem/navegador/
+
+# Nada de terceros viaja en este repositorio: ni bibliotecas, ni modelos, ni wasm.
+# Los baja `python instalar.py --descargas` DESPUÉS de clonar, y cada descarga
+# escribe al lado su fichero de licencia (mismo patrón que ya usaba --manos).
+#
+# Por qué, y no es una manía de peso: este paquete ofrece `auditar.py` para mirar
+# un paquete ANTES de instalarlo. Un repositorio que solo contiene texto se puede
+# leer entero; uno con 31 MB de binarios de terceros no, y entonces la promesa de
+# auditabilidad la sostiene la confianza en vez de la lectura.
+# MEDIDO el 9-sep-2026: mp/ 26 MB · modelos/u2netp.onnx 4.574.861 B ·
+# three.min.js 669.884 B. El repo pasa de 40 MB a algo que cabe en una lectura.
+#
+# Los .txt de licencia SÍ se quedan: son texto, documentan qué se va a bajar, y
+# tienen que poder leerse antes de bajar nada.
+abyss/vendor/mp/
+!abyss/vendor/mp/LICENSE-*.txt
+abyss/vendor/modelos/*
+!abyss/vendor/modelos/LICENSE-*.txt
+#
+# three.min.js SÍ se queda dentro, y es una decisión, no un olvido: son 669.884
+# bytes, lleva su licencia MIT al lado, y YA está en la historia de este
+# repositorio —quitarlo del índice ahora no lo quita del clon, para eso habría
+# que reescribir la historia—, así que sacarlo no ahorraría nada hoy y sí
+# añadiría un modo de fallo: sin él, los tres visores 3D no arrancan recién
+# clonado el repositorio. Lo gordo era mp/ y el modelo, y eso ya no sube.
