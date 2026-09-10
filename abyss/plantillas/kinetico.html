@@ -1,0 +1,1120 @@
+<meta charset="utf-8">
+<title>Visor kinético</title>
+<style>
+ :root{--tinta:#e8eaed;--flojo:#8d949e;--linea:#22262c;--fondo:#06070a;--caja:#0f1216;--acento:#7fd1c1}
+ *{box-sizing:border-box}
+ html,body{margin:0;height:100%;background:var(--fondo);color:var(--tinta);overflow:hidden;
+   font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+ #todo{display:flex;height:100%}
+ /* el fondo del panel sale del vídeo del proyecto, reducido a WebP animado por
+    fondo_hud.py: ruta relativa, sin códec, 174.992 bytes */
+ #izq{width:344px;flex:none;border-right:1px solid var(--linea);display:flex;
+   flex-direction:column;position:relative;isolation:isolate}
+ #izq::before{content:'';position:absolute;inset:0;z-index:-2;opacity:.55;
+   background:url('fondo_hud.webp') center 55%/cover no-repeat}
+ #izq::after{content:'';position:absolute;inset:0;z-index:-1;
+   background:linear-gradient(180deg,#06070ad9 0%,#06070a8c 38%,#06070ad9 100%)}
+ #izq > *{position:relative}
+ #camcaja{position:relative;background:#000;aspect-ratio:4/3;flex:none;display:none}
+ #camcaja.encendida{display:block}
+ #vid{display:none}
+ #esq{width:100%;height:100%;display:block}
+ #panel{padding:12px 14px;overflow:auto;flex:1}
+ #der{flex:1;position:relative;min-width:0}
+ #lienzo{width:100%;height:100%;display:block;position:relative;z-index:1}
+ h1{font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:0;padding:10px 14px;
+   border-bottom:1px solid var(--linea);color:var(--flojo);font-weight:600}
+ #n_nombre{font-size:17px;font-weight:600;line-height:1.25;margin:0 0 3px;word-break:break-all}
+ #n_capa{font-size:13.5px;margin-bottom:9px}
+ #n_grados{color:var(--flojo);font-size:13px;border-bottom:1px solid var(--linea);
+   padding-bottom:9px;margin-bottom:9px}
+ #n_ficha{font-size:14px;line-height:1.55;color:#c3c9d0;border-left:2px solid var(--acento);
+   padding-left:9px;margin:0 0 10px;max-height:30vh;overflow:auto}
+ #n_ficha.vacia{border-left-color:#3a4048;color:var(--flojo);font-style:italic}
+ .lista{font-size:13px;line-height:1.5;max-height:34vh;overflow:auto}
+ .lista b{color:var(--acento);font-weight:600;display:block;margin:7px 0 2px}
+ .lista span{color:var(--flojo);display:block;word-break:break-all}
+ .fila{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+ .fila b{color:var(--acento);font-weight:600;font-variant-numeric:tabular-nums}
+ #lectura{color:var(--flojo);font-size:13px;border-top:1px solid var(--linea);
+   margin-top:12px;padding-top:9px}
+ #capas{padding:0 14px 10px;font-size:12.5px}
+ #capas div{display:flex;align-items:center;gap:7px;padding:1px 0;color:var(--flojo);cursor:pointer}
+ #capas i{width:9px;height:9px;border-radius:2px;display:inline-block;flex:none}
+ #capas .titulillo{color:#5d646d;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+   margin:9px 0 3px;padding-top:7px;border-top:1px solid #22262c;cursor:default}
+ #capas .clave{cursor:default}
+ #capas div.apagada{opacity:.35;text-decoration:line-through}
+ #estado{position:absolute;left:14px;top:12px;color:var(--flojo);font-size:11px}
+ #mandos{position:absolute;right:12px;top:10px;display:flex;gap:8px;z-index:5}
+ button{background:var(--caja);color:var(--tinta);border:1px solid var(--linea);
+   padding:7px 13px;border-radius:5px;cursor:pointer;font:inherit}
+ button:hover{border-color:#39414b}
+ button.grabando{border-color:#e0564f;color:#e0564f}
+ #pie{position:absolute;left:14px;bottom:10px;right:14px;color:#5d646d;font-size:11px}
+ #buscar{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5}
+ #buscar input{background:var(--caja);border:1px solid var(--linea);color:var(--tinta);
+   padding:7px 12px;border-radius:5px;font:inherit;width:260px}
+</style>
+<div id="todo">
+ <div id="izq">
+  <h1 id='titulo'>&nbsp;</h1>
+  <div id="camcaja"><video id="vid" playsinline></video><canvas id="esq"></canvas></div>
+  <div id="capas"></div>
+  <div id="panel">
+   <p id="n_nombre">—</p>
+   <div id="n_capa"></div>
+   <div id="n_grados"></div>
+   <div id="n_ficha"></div>
+   <div class="lista" id="n_listas"></div>
+   <div id="lectura">
+    <div class="fila"><span>manos</span><b id="v_manos">0</b></div>
+    <div class="fila"><span>dedos</span><b id="v_dedos">0</b></div>
+    <div class="fila"><span>empuje x / y</span><b id="v_emp">0.000 / 0.000</b></div>
+    <div class="fila"><span>distancia</span><b id="v_dist">—</b></div>
+    <div class="fila"><span>etiquetas a la vista</span><b id="v_lab">0</b></div>
+    <div style="margin-top:9px;color:#6e757e;font-size:11px">
+     <b>mano a los lados</b> gira el edificio &middot; <b>arriba y abajo</b> sube y baja
+     de planta &middot; <b>dos manos</b> acercan o alejan &middot; <b>puño</b> abre el
+     módulo que tengas delante &middot; <b>dos puños</b> paran en seco.<br><br>
+     Sin cámara: arrastra, rueda para acercar, clic en un módulo, buscador arriba.
+    </div>
+   </div>
+  </div>
+ </div>
+ <div id="der">
+  <canvas id="lienzo"></canvas>
+  <div id="estado">cargando el mapa&hellip;</div>
+  <div id="buscar"><input id="q" placeholder="buscar un módulo" autocomplete="off"></div>
+  <div id="mandos">
+   <button id="b_camara">Encender cámara</button>
+   <button id="b_rec">Grabar</button>
+   <button id="b_todo">Ver todo</button>
+  </div>
+  <div id="pie"></div>
+ </div>
+</div>
+<canvas id="mezcla" width="1600" height="900" style="display:none"></canvas>
+<script src="three.min.js"></script>
+<script type="module">
+import {Vara, creaSuavizador, leerMando, d3} from './gestos_comun.js';
+const $ = s => document.querySelector(s);
+
+/* ─── datos ─────────────────────────────────────────────────────────────────── */
+const M = await fetch('nodos.json').then(r => r.json());
+const FUENTE = await fetch('fuente_sdf.json').then(r => r.json());
+const NODOS = M.items, ARISTAS = M.aristas, PLANTAS = M.grupos;
+const R = M.rotulos || {};          // LAS PALABRAS: no hay ni una en esta plantilla
+const V = M.vista || {};
+const CELDA = V.celda || 6.0, ALTO_PLANTA = V.alto_planta || 40.0;
+document.title = M.titulo || 'Visor kinético';
+$('#titulo').textContent = M.titulo || '';
+
+/* Lo DERIVADO se deriva aquí, en una pasada sobre las aristas, en vez de venir dado.
+   Antes `entra`, `sale`, `conc` y `atras` viajaban en el fichero como si fueran datos de
+   origen, y eso permite que el fichero y el dibujo digan cosas distintas sin que nadie se
+   entere. Derivarlo es lo que hace que la prueba de aceptación sea una falsación: si esto
+   deriva mal, el mapa de siempre sale distinto y se ve en el acto. */
+{
+  const capaDe = {};
+  NODOS.forEach(n => { capaDe[n.id] = n.grupo; n.entra = 0; n.sale = 0; });
+  const porIdTmp = {}; NODOS.forEach(n => porIdTmp[n.id] = n);
+  for (const e of ARISTAS){
+    if (porIdTmp[e.de]) porIdTmp[e.de].sale++;
+    if (porIdTmp[e.a])  porIdTmp[e.a].entra++;
+    e.atras = capaDe[e.a] < capaDe[e.de];
+  }
+  // los concentradores: los que acumulan >= el 60% de las aristas, no un número decretado
+  const orden = [...NODOS].sort((a, b) => (b.entra + b.sale) - (a.entra + a.sale));
+  const tope = Math.round(ARISTAS.length * 0.60);
+  const conc = new Set(); let suma = 0;
+  for (const n of orden){
+    if (suma >= tope || (n.entra + n.sale) === 0) break;
+    conc.add(n.id);
+    suma = ARISTAS.filter(e => conc.has(e.de) || conc.has(e.a)).length;
+  }
+  M.concentradores = [...conc];
+  for (const e of ARISTAS) e.conc = conc.has(e.de) || conc.has(e.a);
+}
+const porId = {}; NODOS.forEach((n, i) => { n.i = i; porId[n.id] = n; });
+const colorCapa = {}; PLANTAS.forEach(p => colorCapa[p.id] = new THREE.Color(p.color));
+
+/* El color puede venir por GRUPO (la planta) o por CLASE, si los datos traen `clases`. La
+   plantilla no sabe qué es una clase: se limita a colorear por la que le declaren y a poner
+   su nombre en la leyenda. Quien decide que un .xlsx es una hoja de cálculo es el adaptador
+   (kinetico.py), no esto — el mismo visor pinta un grafo de módulos sin enterarse de que
+   existen las extensiones. */
+const CLASES = M.clases || null;
+const colorClase = {}; (CLASES || []).forEach(c => colorClase[c.id] = new THREE.Color(c.color));
+const colorDe = n => (CLASES && n.clase && colorClase[n.clase]) || colorCapa[n.grupo];
+
+/* `alpha:true` solo hace falta cuando hay fondo debajo; sin él se pide igual y no cuesta
+   nada, pero el color de limpieza cambia: con fondo, transparente para que se vea; sin
+   fondo, el mismo negro de siempre para que la escena se vea idéntica a antes. */
+const FONDO = M.fondo || null;
+const ren = new THREE.WebGLRenderer({canvas:$('#lienzo'), antialias:true, alpha:!!FONDO});
+if (FONDO){
+  /* El fondo va como CSS DEL PROPIO LIENZO, no en un div detrás. Probé primero el div
+     absoluto dentro de #der y salía de 0x0: MEDIDO con getComputedStyle, #der da width 0px
+     y height 0px, y el lienzo no se entera porque el renderer le escribe su tamaño en
+     píxeles con setSize(). O sea que un hermano absoluto del lienzo hereda ese cero y no se
+     ve. Pintándolo en el lienzo, el fondo mide siempre lo que mide la escena.
+     Y no se mete en la escena 3D a propósito: como textura de three.js habría que decidir
+     si gira con la cámara —y girar el escritorio de alguien mientras mira sus carpetas
+     marea— o si se queda quieta, que es justo lo que hace un fondo de CSS gratis.
+     El velo va en la misma propiedad, como un degradado plano encima: sin él, una foto
+     clara deja los nombres, que van casi en blanco, ilegibles. */
+  const v = (FONDO.velo == null) ? 0.45 : FONDO.velo;
+  $('#lienzo').style.background =
+    'linear-gradient(rgba(13,15,18,' + v + '), rgba(13,15,18,' + v + ')), '
+    + 'url("' + FONDO.fichero + '") center / cover no-repeat';
+  ren.setClearAlpha(0);
+}
+ren.outputColorSpace = THREE.SRGBColorSpace;
+const esc = new THREE.Scene();
+// Con fondo, la escena NO pinta el suyo: `esc.background` es un color opaco que se dibuja
+// antes que nada y tapaba la foto por debajo del lienzo, aunque el lienzo fuera transparente
+// y el CSS estuviera bien puesto. Sin fondo, se queda como estaba.
+esc.background = FONDO ? null : new THREE.Color('#06070a');
+esc.fog = new THREE.Fog('#06070a', 220, 620);
+const cam = new THREE.PerspectiveCamera(50, 1, 0.5, 1400);
+const mundo = new THREE.Group(); esc.add(mundo);
+/* Luz. Antes las bolas eran de color plano: sin una luz que las recorra, una esfera y un
+   círculo se pintan igual. Con una luz principal alta, un relleno frío por detrás y un
+   ambiente flojo, cada bola tiene su lado iluminado, su lado en sombra y su brillo, que es
+   lo que hace que se vea redonda. */
+esc.add(new THREE.AmbientLight(0xffffff, 0.42));
+const solPral = new THREE.DirectionalLight(0xffffff, 2.1);
+solPral.position.set(0.55, 1.0, 0.75);
+esc.add(solPral);
+const relleno = new THREE.DirectionalLight(0x89b7ff, 0.85);
+relleno.position.set(-0.8, -0.25, -0.6);
+esc.add(relleno);
+
+/* ─── las plantas ───────────────────────────────────────────────────────────── */
+const discos = [];
+for (const p of PLANTAS){
+  const g = new THREE.PlaneGeometry(p.ancho + CELDA, p.fondo + CELDA);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color: new THREE.Color(p.color), transparent:true, opacity:0.10,
+    side:THREE.DoubleSide, depthWrite:false}));
+  m.rotation.x = -Math.PI/2; m.position.y = p.y - 1.4;
+  mundo.add(m); discos.push(m);
+  const b = new THREE.LineSegments(new THREE.EdgesGeometry(g),
+    new THREE.LineBasicMaterial({color:new THREE.Color(p.color), transparent:true, opacity:0.5}));
+  b.rotation.x = -Math.PI/2; b.position.y = p.y - 1.4; mundo.add(b);
+}
+
+/* El TAMAÑO de la bola sale de la distribución de ESTA escena, no de una fórmula fija.
+   Antes era `0.45 + 0.30*log2(grado+1)`, calibrada para los grados de un grafo (0 a 135).
+   Con otra fuente el número es otra cosa: en un árbol de carpetas `cuenta` son BYTES, y esa
+   misma fórmula daba radios de más de 5 unidades en una rejilla de 6 — bolas que se comían
+   la planta entera. Medido el 9-sep-2026 sobre 49 ficheros.
+   Ahora se mapea el rango real [mínimo, máximo] de la escena sobre una banda de radios fija.
+   Lo que se conserva es lo que importa: quién es más grande que quién, y cuánto. Y el rango
+   de llegada es el mismo que tenía el mapa de dependencias, así que ese sigue viéndose igual. */
+const RADIO_MIN = 0.45, RADIO_MAX = 2.60;
+const cuentaDe = n => (n.cuenta != null ? n.cuenta : n.entra + n.sale);
+/* El tamaño se escala DENTRO de cada forma, no contra todas las cosas a la vez.
+   Por qué: cuando las formas cuentan cosas distintas, el mismo número no significa lo
+   mismo. En la escena de ficheros la bola vale BYTES y el cubo vale FICHEROS DENTRO —
+   MEDIDO: una carpeta de 100 ficheros da log2(101) = 6,7 y un fichero de 1 MB da
+   log2(1e6) = 19,9, así que puestos en la misma regla TODAS las carpetas caían al radio
+   mínimo por sistema, sin que su número dijera nada. No es que se vieran pequeñas: es que
+   habían dejado de medir. Con una escala por forma, cada familia reparte su rango entre
+   los suyos, que es la única comparación que significa algo.
+   Si todas las cosas son de la misma forma —el caso de un grafo de módulos— esto da
+   exactamente lo mismo que antes: una sola familia, una sola escala. */
+const _escalas = {};
+for (const n of NODOS){
+  const f = n.forma || 'esfera', c = cuentaDe(n);
+  const e = _escalas[f] || (_escalas[f] = {lo: Infinity, hi: -Infinity});
+  if (c < e.lo) e.lo = c;
+  if (c > e.hi) e.hi = c;
+}
+for (const f in _escalas){
+  const e = _escalas[f];
+  e.l0 = Math.log2(Math.max(0, e.lo) + 1);
+  e.span = (Math.log2(Math.max(0, e.hi) + 1) - e.l0) || 1;
+}
+const radioDe = (c, forma) => {
+  const e = _escalas[forma || 'esfera'] || _escalas['esfera'];
+  return RADIO_MIN + (RADIO_MAX - RADIO_MIN)
+         * (Math.log2(Math.max(0, c) + 1) - e.l0) / e.span;
+};
+
+/* Y el corte de lejanía: de lejos solo se etiquetan los que mandan. El umbral era el número
+   9, que era el que servía para aquellos grados. Aquí se saca de la propia distribución. */
+const CORTE_LEJOS = (() => {
+  const v = NODOS.map(cuentaDe).sort((a, b) => a - b);
+  return v.length ? v[Math.floor(v.length * 0.80)] : 0;
+})();
+
+/* ─── los módulos: una sola malla instanciada ──────────────────────────────── */
+// subdivisión 3: 1.280 triángulos por bola. Con 1 eran 80 y se le veían las caras
+const geoN = new THREE.IcosahedronGeometry(1, 3);
+
+/* El cubo con los cantos matados. Un BoxGeometry pelado al lado de estas bolas canta: la
+   bola tiene 1.280 triángulos y recoge la luz por toda su superficie, y el cubo la recogería
+   en seis parches planos con los cantos infinitamente afilados, que en un render con
+   especular se ve como un recorte de cartón.
+   Esto parte de una caja subdividida y empuja cada vértice a la superficie de un cubo
+   redondeado: se recorta el vértice al núcleo (la caja encogida en el radio del bisel) y se
+   vuelve a sacar a esa distancia en la dirección que sobresalía. El resultado tiene 768
+   triángulos —del mismo orden que la bola— y un canto que devuelve un reflejo estrecho, que
+   es justo lo que hace que un cubo se lea como un objeto sólido y no como una silueta. */
+function geometriaCuboRedondo(radio, divisiones){
+  const g = new THREE.BoxGeometry(1, 1, 1, divisiones, divisiones, divisiones);
+  const p = g.getAttribute('position'), nucleo = 0.5 - radio;
+  for (let k = 0; k < p.count; k++){
+    const v = new THREE.Vector3(p.getX(k), p.getY(k), p.getZ(k));
+    const c = new THREE.Vector3(Math.max(-nucleo, Math.min(nucleo, v.x)),
+                                Math.max(-nucleo, Math.min(nucleo, v.y)),
+                                Math.max(-nucleo, Math.min(nucleo, v.z)));
+    const d = v.clone().sub(c);
+    if (d.lengthSq() > 1e-9) v.copy(c).add(d.normalize().multiplyScalar(radio));
+    p.setXYZ(k, v.x, v.y, v.z);
+  }
+  g.deleteAttribute('normal'); g.computeVertexNormals();
+  return g;
+}
+const geoC = geometriaCuboRedondo(0.16, 4);
+// el color va POR INSTANCIA (setColorAt); pedir vertexColors haria que buscara
+// un color en la geometria, que no lo tiene, y saldria todo negro
+const matN = new THREE.MeshStandardMaterial({roughness:0.34, metalness:0.18});
+/* Dos mallas y no una: cada `InstancedMesh` lleva UNA geometría, así que en cuanto hay dos
+   formas hacen falta dos. Cada nodo se apunta la suya (`n.malla`) y su sitio dentro de ella
+   (`n.ins`), porque el índice de instancia YA no es el índice del nodo. Si los datos no
+   declaran `forma`, todo es esfera y esto se comporta igual que antes. */
+const cuantosCubos = NODOS.filter(n => n.forma === 'cubo').length;
+const nodosM = new THREE.InstancedMesh(geoN, matN, Math.max(1, NODOS.length - cuantosCubos));
+const cubosM = new THREE.InstancedMesh(geoC, matN, Math.max(1, cuantosCubos));
+const tmp = new THREE.Object3D(), colN = new THREE.Color();
+const CRECE = 1.34;                 // lo que engorda la cosa que tienes abierta
+// un cubo de lado 2r «pesa» más que una bola de radio r: se le baja para que a igual dato
+// ocupen lo mismo a ojo (la razón de volúmenes bola/cubo es pi/6 = 0,5236; su raíz cúbica,
+// 0,806, es el factor que iguala el LADO al diámetro percibido)
+const CUBO_ENCOGE = 0.806;
+function mallaDe(n){ return n.malla === 'cubo' ? cubosM : nodosM; }
+function ponForma(i, factor){
+  const n = NODOS[i], m = mallaDe(n);
+  tmp.position.set(n.x, n.y, n.z);
+  tmp.rotation.set(0, n.giroPropio || 0, 0);
+  tmp.scale.setScalar(n.radio * factor * (n.malla === 'cubo' ? CUBO_ENCOGE * 2 : 1));
+  tmp.updateMatrix(); m.setMatrixAt(n.ins, tmp.matrix);
+  m.instanceMatrix.needsUpdate = true;
+}
+const ponEsfera = ponForma;          // el nombre viejo, para no tocar a sus llamadores
+let sigBola = 0, sigCubo = 0;
+NODOS.forEach((n, i) => {
+  n.radio = radioDe(cuentaDe(n), n.forma);
+  n.malla = (n.forma === 'cubo') ? 'cubo' : 'esfera';
+  n.ins = (n.malla === 'cubo') ? sigCubo++ : sigBola++;
+  // un giro fijo por cubo, sacado de su propio índice: alineados todos igual parecen una
+  // maqueta, y girados al azar cada vez la escena no sería la misma dos veces
+  if (n.malla === 'cubo') n.giroPropio = ((n.i * 37) % 90) * Math.PI / 180;
+  ponForma(i, 1);
+  mallaDe(n).setColorAt(n.ins, colN.copy(colorDe(n)));
+});
+mundo.add(nodosM); mundo.add(cubosM);
+// El raycaster devuelve `instanceId`, que ya NO es el índice del nodo: hace falta el camino
+// de vuelta, uno por malla.
+const deBola = new Int32Array(Math.max(1, NODOS.length - cuantosCubos)).fill(-1);
+const deCubo = new Int32Array(Math.max(1, cuantosCubos)).fill(-1);
+NODOS.forEach((n, i) => { (n.malla === 'cubo' ? deCubo : deBola)[n.ins] = i; });
+
+/* El halo de la bola abierta. Es UNA sola malla que se mueve a la bola elegida, no una por
+   nodo: con 195 bolas en la escena de ficheros, 195 halos apagados serían 195 objetos
+   transparentes ordenándose cada fotograma para no verse ninguno.
+   Por qué un shader de fresnel y no una esfera más grande con color: una esfera opaca
+   taparía la bola; una translúcida uniforme la ensucia. El fresnel enciende SOLO el borde
+   —el brillo crece donde la superficie se va de canto respecto a la cámara— así que se ve
+   un anillo de luz alrededor y el centro queda limpio. Se dibuja por dentro (BackSide) y
+   suma en vez de tapar (AdditiveBlending), que es lo que hace que parezca luz y no pintura. */
+const halo = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 3), new THREE.ShaderMaterial({
+  uniforms: {color:{value:new THREE.Color('#4fe3ff')},
+             color2:{value:new THREE.Color('#8b7bff')},
+             fuerza:{value:1.0}},
+  transparent:true, depthWrite:false, side:THREE.BackSide,
+  blending:THREE.AdditiveBlending,
+  vertexShader:`
+    varying vec3 vN; varying vec3 vV;
+    void main(){
+      vN = normalize(normalMatrix * normal);
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vV = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader:`
+    uniform vec3 color, color2; uniform float fuerza;
+    varying vec3 vN; varying vec3 vV;
+    void main(){
+      float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));  // 0 de frente, 1 de canto
+      float a = pow(f, 1.85) * fuerza;
+      if (a < 0.004) discard;
+      gl_FragColor = vec4(mix(color, color2, f), a);
+    }`,
+}));
+halo.visible = false; halo.renderOrder = 8; halo.frustumCulled = false;
+mundo.add(halo);
+const HALO_CRECE = 1.92;
+/* El aura del ROCE: la misma malla de fresnel, clonada, a media luz y más pegada. La idea es
+   que se vea el aura asomando —lo que va a pasar si abres— sin darla ya hecha. Si el roce
+   luciera igual que abrir, abrir dejaría de significar nada. */
+const haloRoce = halo.clone();
+haloRoce.material = halo.material.clone();
+haloRoce.material.uniforms = THREE.UniformsUtils.clone(halo.material.uniforms);
+haloRoce.visible = false; haloRoce.renderOrder = 7;
+mundo.add(haloRoce);
+const HALO_ROCE_CRECE = 1.34, CRECE_ROCE = 1.13;     // cuánto sobresale el anillo por fuera de la bola crecida
+
+/* La sombra en el suelo. No es un mapa de sombras de verdad: con un edificio de 250
+   unidades de alto, un mapa que lo cubriera entero daría manchas de diez unidades por
+   texel, peor que nada. Es una mancha oscura bajo cada bola, en su planta. Lo que hace es
+   lo que hace una sombra: decir a qué altura está la bola. */
+const geoS = new THREE.CircleGeometry(1, 28);
+geoS.rotateX(-Math.PI / 2);
+const sombras = new THREE.InstancedMesh(geoS, new THREE.MeshBasicMaterial({
+  color: 0x000000, transparent: true, opacity: 0.34, depthWrite: false}), NODOS.length);
+NODOS.forEach((n, i) => {
+  const p = PLANTAS.find(x => x.id === n.grupo);
+  tmp.position.set(n.x, p.y - 1.36, n.z);
+  tmp.scale.set(n.radio * 1.25, 1, n.radio * 1.25);
+  tmp.updateMatrix(); sombras.setMatrixAt(i, tmp.matrix);
+});
+sombras.instanceMatrix.needsUpdate = true;
+sombras.renderOrder = 1;
+mundo.add(sombras);
+
+/* ─── las aristas ───────────────────────────────────────────────────────────
+   Los 4 concentradores se llevan 309 de las 472. Dibujarlas todas sería una madeja que
+   tapa el mapa, así que van aparte: solo se ven al abrir un módulo. Las 163 restantes
+   están SIEMPRE, y las 9 que van hacia atrás (de una capa alta a una baja) en rojo,
+   porque son la excepción y merecen verse. */
+function lineas(lista, colorFijo){
+  const pos = [], col = [];
+  for (const e of lista){
+    const a = porId[e.de], b = porId[e.a];
+    if (!a || !b) continue;
+    pos.push(a.x, a.y, a.z, b.x, b.y, b.z);
+    const ca = colorFijo || colorDe(a), cb = colorFijo || colorDe(b);
+    col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+const sueltas = ARISTAS.filter(e => !e.conc && !e.atras);
+const atras = ARISTAS.filter(e => e.atras);
+const lSueltas = new THREE.LineSegments(lineas(sueltas), new THREE.LineBasicMaterial({
+  vertexColors:true, transparent:true, opacity:0.26}));
+mundo.add(lSueltas);
+const lAtras = new THREE.LineSegments(lineas(atras, new THREE.Color('#ff5252')),
+  new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:0.75}));
+mundo.add(lAtras);
+const lFoco = new THREE.LineSegments(new THREE.BufferGeometry(),
+  new THREE.LineBasicMaterial({vertexColors:true, transparent:true, opacity:0.95}));
+mundo.add(lFoco);
+
+/* ─── las etiquetas ─────────────────────────────────────────────────────────
+   Todas en UNA malla. Cada letra es un cuadradito cuya textura no guarda el dibujo de la
+   letra sino su distancia al borde: por eso el contorno se reconstruye limpio a cualquier
+   tamaño, y se lee tanto de lejos como muy de cerca. Cada letra lleva además el punto del
+   módulo al que pertenece, así que el vértice se coloca mirando siempre a la cámara. */
+const texF = await new Promise(ok => new THREE.TextureLoader().load('fuente_sdf.png', t => {
+  t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+  t.generateMipmaps = true; ok(t); }));
+const RJ = FUENTE.rejilla, CELDA_PX = FUENTE.celda_px, EM_PX = FUENTE.em_px, MAR = FUENTE.margen_px;
+
+function troceaNombre(s, max = 11, lineas_max = 3){
+  const partes = s.split('_'), out = []; let cur = '';
+  for (const p of partes){
+    const t = cur ? cur + '_' + p : p;
+    if (t.length <= max) cur = t; else { if (cur) out.push(cur); cur = p; }
+  }
+  if (cur) out.push(cur);
+  if (out.length > lineas_max){ const r = out.slice(0, lineas_max); r[lineas_max-1] += '…'; return r; }
+  return out;
+}
+const EM_U = 0.80, INTER = 1.20;
+/* Los cuatro concentradores llevan la etiqueta más grande. No es adorno: de lejos ninguna
+   etiqueta llega a los 7 px que hacen falta para leerse, y el edificio se queda mudo. Con
+   esto, desde lejos se leen los rótulos de planta y los cuatro nombres que sostienen 309
+   de las 472 dependencias; los demás aparecen cuando te acercas. */
+const CONC = new Set(M.concentradores);
+const ESC_CONC = 3.2;
+const pos = [], off = [], uvs = [], idx = [], nodoDe = [];
+// `elegida` es 0 o 1 por letra: la de la bola abierta. `grad` es la altura de esa
+// letra DENTRO de su propio rótulo (0 abajo, 1 arriba), que es lo que permite
+// pintar el degradado sin saber en el shader cuántas líneas tiene el nombre.
+const eleg = [], grd = [];
+let v = 0;
+NODOS.forEach(n => {
+  n.esc = CONC.has(n.id) ? ESC_CONC : 1.0;
+  const ls = troceaNombre(n.corto);
+  n.lineas = ls;
+  const alto = ls.length * INTER * EM_U * n.esc;
+  // se cuenta ya con la bola CRECIDA: si no, al abrir un módulo su propia etiqueta se
+  // mete dentro de la bola y el único nombre que querías leer es el que desaparece
+  n.anclaY = n.y + n.radio * CRECE + 0.9 * n.esc + alto / 2;
+  ls.forEach((ln, li) => {
+    const EMn = EM_U * n.esc;
+    let ancho = 0;
+    for (const c of ln) ancho += (FUENTE.glifos[c] ? FUENTE.glifos[c].avance : 0.5) * EMn;
+    let x = -ancho / 2;
+    const y = alto/2 - (li + 0.8) * INTER * EMn;
+    for (const c of ln){
+      const G = FUENTE.glifos[c];
+      if (!G){ x += 0.5 * EMn; continue; }
+      const w = (CELDA_PX / EM_PX) * EMn, h = w;
+      const f = Math.floor(G.celda / RJ), co = G.celda % RJ;
+      const u0 = co / RJ, u1 = (co + 1) / RJ, v0 = 1 - (f + 1) / RJ, v1 = 1 - f / RJ;
+      const x0 = x - (MAR / EM_PX) * EMn, y0 = y - (MAR / EM_PX) * EMn;
+      const esq = [[x0, y0, u0, v0], [x0 + w, y0, u1, v0], [x0 + w, y0 + h, u1, v1], [x0, y0 + h, u0, v1]];
+      for (const [ox, oy, uu, vv] of esq){
+        // el ancla va POR ENCIMA del modulo: si va en su centro, la esfera la tapa
+        pos.push(n.x, n.anclaY, n.z);
+        off.push(ox, oy); uvs.push(uu, vv); nodoDe.push(n.i);
+        eleg.push(0);
+        grd.push(alto > 0 ? Math.max(0, Math.min(1, (oy + alto/2) / alto)) : 0.5);
+      }
+      idx.push(v, v+1, v+2, v, v+2, v+3); v += 4;
+      x += G.avance * EMn;
+    }
+  });
+});
+const gLab = new THREE.BufferGeometry();
+gLab.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+gLab.setAttribute('desplaza', new THREE.Float32BufferAttribute(off, 2));
+gLab.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+gLab.setAttribute('alfa', new THREE.Float32BufferAttribute(new Float32Array(pos.length/3), 1));
+gLab.setAttribute('elegida', new THREE.Float32BufferAttribute(eleg, 1));
+gLab.setAttribute('grad', new THREE.Float32BufferAttribute(grd, 1));
+gLab.setIndex(idx);
+const alfaLab = gLab.getAttribute('alfa');
+const elegLab = gLab.getAttribute('elegida');
+const primeraDe = new Int32Array(NODOS.length).fill(-1), cuantosDe = new Int32Array(NODOS.length);
+nodoDe.forEach((n, k) => { if (primeraDe[n] < 0) primeraDe[n] = k; cuantosDe[n]++; });
+
+const matLab = new THREE.ShaderMaterial({
+  uniforms: {mapa:{value:texF}, tinta:{value:new THREE.Color('#eef1f4')},
+             suave:{value:0.10}, escala:{value:1.0},
+             // el nombre de lo que tienes abierto: de aguamarina abajo a azul arriba
+             tintaA:{value:new THREE.Color('#5ff0d0')},
+             tintaB:{value:new THREE.Color('#7aa2ff')},
+             creceSel:{value:1.55},
+             // el reborde oscuro que hace que el blanco se lea sobre CUALQUIER fondo
+             sombra:{value:new THREE.Color('#05070a')},
+             // cuánto sobresale ese reborde, en unidades de la distancia del SDF
+             grosorSombra:{value:0.22}},
+  transparent:true, depthWrite:false,
+  vertexShader:`
+    attribute vec2 desplaza; attribute float alfa;
+    attribute float elegida; attribute float grad;
+    uniform float escala; uniform float creceSel;
+    varying vec2 vUv; varying float vAlfa; varying float vSel; varying float vGrad;
+    void main(){
+      vUv = uv; vAlfa = alfa; vSel = elegida; vGrad = grad;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      // la elegida crece alrededor de su propio ancla, así que sube y baja a la vez y no
+      // se despega del nombre: es el MISMO rótulo, más grande, no otro puesto encima
+      // el atributo elegida ya no es 0/1 sino 0 - 0,45 rozada - 1 abierta: esto interpola.
+      // OJO: aqui dentro no puede ir una comilla invertida, que cierra el literal.
+      // el nombre que rozas crece casi la mitad de lo que crecerá al abrirlo
+      mv.xy += desplaza * escala * mix(1.0, creceSel, elegida);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader:`
+    uniform sampler2D mapa; uniform vec3 tinta, tintaA, tintaB, sombra;
+    uniform float suave; uniform float grosorSombra;
+    varying vec2 vUv; varying float vAlfa; varying float vSel; varying float vGrad;
+    void main(){
+      if (vAlfa < 0.01) discard;
+      float d = texture2D(mapa, vUv).r - 0.5;    // distancia al borde de la letra
+      float w = fwidth(d) + suave * 0.02;
+      float a = smoothstep(-w, w, d);                       // la letra
+      // El reborde: la MISMA letra, engordada, en oscuro. Es lo que hace el Explorador de
+      // Windows con los nombres del escritorio —blanco con sombra— y por eso se leen sobre
+      // cualquier fondo de pantalla sin cambiar de color. Probé antes a elegir tinta clara u
+      // oscura según la luminancia del fondo medida por bandas: funcionaba, pero es más
+      // código, hay que remedir cada vez que se cambia el fondo, y en el borde entre dos
+      // bandas la letra dudaba. Esto no duda nunca.
+      // la misma letra con la distancia desplazada: eso ES engordarla, en un SDF
+      float aBorde = smoothstep(-w, w, d + grosorSombra * 0.5);
+      float aTotal = max(a, aBorde * 0.92);
+      if (aTotal < 0.02) discard;
+      // el degradado va por la ALTURA del rótulo, no por la letra: si fuera por letra,
+      // cada una tendría el degradado entero y se vería a rayas
+      vec3 c = mix(tinta, mix(tintaA, tintaB, vGrad), vSel);
+      // ni la abierta ni la rozada se apagan con la distancia como las demás: el nombre de
+      // lo que tienes debajo del ratón tiene que leerse aunque esté lejos, que para eso lo
+      // estás señalando
+      gl_FragColor = vec4(mix(sombra, c, a), aTotal * max(vAlfa, vSel * 0.92));
+    }`,
+});
+const labels = new THREE.Mesh(gLab, matLab);
+labels.frustumCulled = false; labels.renderOrder = 10;
+mundo.add(labels);
+
+/* Rótulo de cada planta: su propia malla, grande y siempre encendida. De lejos los
+   módulos no se distinguen todavía, y sin esto no habría nada que leer. */
+let alfaRotulos = null, matRot = null;
+{
+  const P2=[], O2=[], U2=[], I2=[]; let w2=0;
+  const EM2 = 3.2;
+  PLANTAS.forEach(p => {
+    // sin toLowerCase: cuando el nombre del nivel es el de una carpeta de verdad,
+    // «Documents» en minúsculas deja de ser el nombre de nada
+    const txt = p.id + '  ' + p.nombre + '  ' + p.n;
+    let ancho = 0;
+    for (const c of txt) ancho += (FUENTE.glifos[c] ? FUENTE.glifos[c].avance : 0.5) * EM2;
+    let x = 0;               // alineado a la izquierda desde el borde, no centrado
+    for (const c of txt){
+      const G = FUENTE.glifos[c];
+      if (!G){ x += 0.5*EM2; continue; }
+      const w = (CELDA_PX/EM_PX)*EM2;
+      const f = Math.floor(G.celda/RJ), co = G.celda % RJ;
+      const u0=co/RJ, u1=(co+1)/RJ, v0=1-(f+1)/RJ, v1=1-f/RJ;
+      const x0 = x-(MAR/EM_PX)*EM2, y0 = -(MAR/EM_PX)*EM2;
+      for (const [ox,oy,uu,vv] of [[x0,y0,u0,v0],[x0+w,y0,u1,v0],[x0+w,y0+w,u1,v1],[x0,y0+w,u0,v1]]){
+        // A la DERECHA de su planta, no en el centro: centrado se comía las bolas del medio,
+        // que son justo las que uno mira. `ancho` es el lado de la planta, y el rótulo se
+        // ancla en su borde derecho con un palmo de aire.
+        P2.push((p.ancho || 0) / 2 + 12, p.y + 4, 0); O2.push(ox, oy); U2.push(uu, vv);
+      }
+      I2.push(w2,w2+1,w2+2, w2,w2+2,w2+3); w2 += 4;
+      x += G.avance*EM2;
+    }
+  });
+  const g2 = new THREE.BufferGeometry();
+  g2.setAttribute('position', new THREE.Float32BufferAttribute(P2,3));
+  g2.setAttribute('desplaza', new THREE.Float32BufferAttribute(O2,2));
+  g2.setAttribute('uv', new THREE.Float32BufferAttribute(U2,2));
+  g2.setAttribute('alfa', new THREE.Float32BufferAttribute(new Float32Array(P2.length/3).fill(1),1));
+  g2.setIndex(I2);
+  const m2 = matRot = matLab.clone();
+  m2.uniforms.mapa.value = texF;
+  // blanco, igual que los nombres: era gris para que no compitiera con ellos, pero
+  // sobre una foto de fondo el gris se hunde y el reborde oscuro ya evita que compita
+  m2.uniforms.tinta.value = new THREE.Color('#eef1f4');
+  const rotulos = new THREE.Mesh(g2, m2);
+  rotulos.frustumCulled = false; rotulos.renderOrder = 9;
+  mundo.add(rotulos);
+  alfaRotulos = g2.getAttribute('alfa');
+}
+
+$('#capas').innerHTML = PLANTAS.map(p =>
+  `<div data-capa="${p.id}"><i style="background:${p.color}"></i>${p.id} · ${p.nombre} · ${p.n}</div>`).join('')
+  // Los formatos son la CLAVE del color, no un filtro: por eso no se pueden apagar. Las
+  // plantas sí se apagan, porque eso quita cosas de la vista; apagar un color no querría
+  // decir nada. El cuadradito de las carpetas va con el canto matado, igual que sus cubos.
+  + (CLASES ? '<div class="titulillo">' + (R.clases || 'formatos') + '</div>' + CLASES.map(c =>
+      `<div class="clave"><i style="background:${c.color};border-radius:${c.id === 'carpeta' ? '3px' : '50%'}"></i>${c.nombre} · ${c.n}</div>`).join('') : '');
+
+/* ─── estado y cámara ──────────────────────────────────────────────────────── */
+let giro = 0.5, giroObj = 0.5, alto = 100, altoObj = 100, dist = 260, distObj = 260;
+let elegido = -1, capasOn = new Set(PLANTAS.map(p => p.id));
+const centroY = (PLANTAS.length - 1) * ALTO_PLANTA / 2;
+
+function medir(){
+  const c = $('#lienzo'), w = c.clientWidth, h = c.clientHeight;
+  ren.setSize(w, h, false); ren.setPixelRatio(Math.min(2, devicePixelRatio));
+  cam.aspect = (w>0 && h>0) ? w/h : 16/9; cam.updateProjectionMatrix();
+}
+addEventListener('resize', medir); medir();
+
+/* ─── ficha del módulo ─────────────────────────────────────────────────────── */
+// 0 apagado · 0,45 rozado · 1 abierto. El roce se queda a mitad de camino a propósito: es
+// la misma razón que en `pintaBola` — si rozar diera el resultado, abrir no significaría nada.
+const ROTULO_ROCE = 0.45;
+function marcaRotulo(nodo, valor){
+  if (nodo < 0 || primeraDe[nodo] < 0) return;
+  const a = primeraDe[nodo], b = a + cuantosDe[nodo];
+  for (let k = a; k < b; k++) elegLab.array[k] = valor;
+  elegLab.needsUpdate = true;
+}
+
+// el color de la bola abierta: el de su capa, pero encendido hacia el cian del halo, para
+// que la propia bola brille y no solo el anillo. Se guarda el de antes y se devuelve al
+// soltarla, que si no la escena se va llenando de bolas encendidas que ya nadie mira.
+const CIAN = new THREE.Color('#4fe3ff');
+/* Tres estados, no dos: 0 apagada · 1 rozada por el ratón · 2 abierta.
+   0.62 hacia el cian y no 0.42: con menos, el x1.22 la dejaba casi blanca y perdía a la vez
+   su color de formato y el cian; así se lee encendida Y de qué formato es. El estado 1 va a
+   la mitad de camino a propósito: el roce tiene que insinuar el aura, no dar el resultado
+   —si el ratón encendiera lo mismo que abrir, abrir dejaría de significar nada. */
+function pintaBola(i, encendida){
+  const n = NODOS[i], m = mallaDe(n), base = colorDe(n);
+  const k = encendida === 2 ? 0.62 : encendida ? 0.34 : 0;
+  const b = encendida === 2 ? 1.22 : encendida ? 1.12 : 1;
+  m.setColorAt(n.ins, k ? colN.copy(base).lerp(CIAN, k).multiplyScalar(b) : colN.copy(base));
+  m.instanceColor.needsUpdate = true;
+}
+
+function abre(i){
+  if (elegido >= 0 && elegido !== i){ ponEsfera(elegido, 1); marcaRotulo(elegido, 0); pintaBola(elegido, 0); }
+  elegido = i;
+  ponEsfera(i, CRECE);
+  marcaRotulo(i, 1);
+  pintaBola(i, 2);
+  const n = NODOS[i];
+  halo.position.set(n.x, n.y, n.z);
+  halo.scale.setScalar(n.radio * CRECE * HALO_CRECE);
+  halo.visible = true;
+  $('#n_nombre').textContent = n.completo;
+  const p = PLANTAS.find(x => x.id === n.grupo);
+  $('#n_capa').innerHTML = `<span style="color:${p.color}">${p.id} · ${p.nombre}</span>`;
+  /* NI UNA PALABRA DEL DOMINIO EN ESTA PLANTILLA. Las frases vienen en `rotulos`, dentro
+     del fichero de datos, porque lo que significa una arista depende de qué se esté
+     mirando: en un grafo de dependencias «X lo usan», en un árbol de carpetas «contiene X».
+     Una plantilla que trae escrita una de las dos miente sobre la otra.
+     La dirección del contrato: una arista [a, b] significa que b depende de a. */
+  const frase = (plantilla, cuantos) => String(plantilla || '').replace('{n}', cuantos);
+  $('#n_grados').textContent =
+    frase(R.salientes, n.sale) + (R.entrantes ? ' · ' + frase(R.entrantes, n.entra) : '');
+  // la descripción viene con el dato, y con ella de dónde sale. Si no hay, se dice con la
+  // frase que traiga el fichero, no con una escrita aquí
+  const f = $('#n_ficha');
+  const marcas = (n.marcas || []).map(m => (R.marcas || {})[m]).filter(Boolean);
+  f.textContent = n.descripcion || marcas.join(' · ') || R.sin_descripcion || 'sin dato con fuente';
+  f.classList.toggle('vacia', !n.descripcion);
+  const acc = textoAccion(n);
+  $('#n_grados').textContent = ($('#n_grados').textContent + (acc ? '  ·  ' + acc : '')).trim();
+  f.title = n.descripcion_como
+    ? n.descripcion_como + (n.descripcion_fuente ? ' — ' + n.descripcion_fuente : '') : '';
+  const depende = ARISTAS.filter(e => e.a === n.id).map(e => e.de).sort();
+  const usan    = ARISTAS.filter(e => e.de === n.id).map(e => e.a).sort();
+  $('#n_listas').innerHTML =
+    (usan.length ? '<b>' + (R.lista_salientes || 'salen') + ' (' + usan.length + ')</b>'
+                 + usan.map(x=>`<span>${x}</span>`).join('') : '')
+  + (depende.length ? '<b>' + (R.lista_entrantes || 'entran') + ' (' + depende.length + ')</b>'
+                    + depende.map(x=>`<span>${x}</span>`).join('') : '')
+  + (!usan.length && !depende.length
+      ? '<span>' + (R.sin_conexiones || 'sin conexiones en los datos medidos') + '</span>' : '');
+  // sus aristas, dibujadas solo ahora
+  const suyas = ARISTAS.filter(e => e.de === n.id || e.a === n.id);
+  lFoco.geometry.dispose();
+  lFoco.geometry = lineas(suyas, new THREE.Color('#ffffff'));
+  lSueltas.material.opacity = 0.07;
+}
+function cierra(){
+  if (elegido >= 0){
+    // devolvía el tamaño y nada más: el aura, el color encendido y el nombre en cian se
+    // quedaban puestos sobre una cosa que ya no estaba abierta
+    ponForma(elegido, 1); marcaRotulo(elegido, 0); pintaBola(elegido, 0);
+  }
+  elegido = -1; halo.visible = false;
+  lFoco.geometry.dispose(); lFoco.geometry = new THREE.BufferGeometry();
+  lSueltas.material.opacity = 0.26;
+  $('#n_nombre').textContent = '—'; $('#n_capa').textContent = '';
+  $('#n_grados').textContent = ''; $('#n_listas').innerHTML = '';
+  $('#n_ficha').textContent = ''; $('#n_ficha').classList.remove('vacia');
+}
+$('#b_todo').onclick = () => { cierra(); distObj = 260; altoObj = centroY; giroObj = 0.5; };
+$('#q').addEventListener('input', e => {
+  const t = e.target.value.trim().toLowerCase();
+  if (t.length < 2) return;
+  const n = NODOS.find(x => x.completo.toLowerCase().includes(t));
+  if (n){ abre(n.i); altoObj = n.y; distObj = 42; giroObj = Math.atan2(n.x, n.z + 0.001); }
+});
+$('#capas').addEventListener('click', e => {
+  const d = e.target.closest('[data-capa]'); if (!d) return;
+  const id = +d.dataset.capa;      // era `dataset.grupo`, que no existe: NaN,
+  if (!isFinite(id)) return;       // y el filtro de plantas no apagaba nada
+  capasOn.has(id) ? capasOn.delete(id) : capasOn.add(id);
+  d.classList.toggle('apagada', !capasOn.has(id));
+});
+
+/* ratón */
+const c3 = $('#lienzo');
+
+/* Lo que el ratón está rozando. Se calcula en el `pointermove` y NO en el bucle: mover el
+   ratón es lo que puede cambiarlo, así que lanzar el rayo 30 veces por segundo cuando el
+   ratón lleva un minuto quieto sería tirar el tiempo. Mientras se arrastra no se busca
+   nada: arrastrando se gira el edificio, y encender lo que pasa por debajo sería ruido. */
+const rayo = new THREE.Raycaster(), pt = new THREE.Vector2();
+let rozado = -1;
+
+/* El nodo que hay bajo el puntero, o -1. Lo usan el roce, el clic y el doble clic: antes
+   cada uno lanzaba su propio rayo y los dos SOLO miraban las esferas, así que con las
+   carpetas convertidas en cubos habrían dejado de poderse pinchar. Y `instanceId` ya no es
+   el índice del nodo: hay que pasar por el camino de vuelta de cada malla. */
+function nodoBajo(e){
+  const r = c3.getBoundingClientRect();
+  pt.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pt.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  rayo.setFromCamera(pt, cam);
+  for (const g of rayo.intersectObjects([nodosM, cubosM], false)){
+    if (g.instanceId == null) continue;
+    const i = (g.object === cubosM ? deCubo : deBola)[g.instanceId];
+    if (i >= 0 && capasOn.has(NODOS[i].grupo)) return i;
+  }
+  return -1;
+}
+function ponRoce(i){
+  if (i === rozado) return;
+  if (rozado >= 0 && rozado !== elegido){
+    ponForma(rozado, 1); pintaBola(rozado, 0); marcaRotulo(rozado, 0);
+  }
+  rozado = i;
+  if (i >= 0 && i !== elegido){
+    const n = NODOS[i];
+    ponForma(i, CRECE_ROCE); pintaBola(i, 1); marcaRotulo(i, ROTULO_ROCE);
+    haloRoce.position.set(n.x, n.y, n.z);
+    haloRoce.scale.setScalar(n.radio * CRECE_ROCE * HALO_ROCE_CRECE
+                             * (n.malla === 'cubo' ? CUBO_ENCOGE * 2 : 1));
+    haloRoce.visible = true;
+    c3.style.cursor = 'pointer';
+  } else {
+    haloRoce.visible = false;
+    c3.style.cursor = '';
+  }
+}
+c3.addEventListener('pointermove', e => { if (!arr) ponRoce(nodoBajo(e)); });
+c3.addEventListener('pointerleave', () => ponRoce(-1));
+let arr = false, ax = 0, ay = 0;
+c3.addEventListener('pointerdown', e => { arr = true; ax = e.clientX; ay = e.clientY; });
+addEventListener('pointerup', () => { arr = false; });
+addEventListener('pointermove', e => {
+  if (!arr) return;
+  giroObj += (e.clientX - ax) * 0.006; altoObj += (e.clientY - ay) * 0.55;
+  ax = e.clientX; ay = e.clientY;
+});
+c3.addEventListener('wheel', e => {
+  distObj = Math.max(14, Math.min(520, distObj * (1 + e.deltaY * 0.0011)));
+}, {passive:true});
+c3.addEventListener('click', e => {
+  const i = nodoBajo(e);
+  // Clic en el vacío = soltar. Antes no había forma de deshacer una selección con el ratón:
+  // una vez abierta una cosa, la ficha se quedaba puesta para siempre y el halo también.
+  if (i >= 0) abre(i); else cierra();
+});
+c3.addEventListener('dblclick', e => { const i = nodoBajo(e); if (i >= 0) haz(NODOS[i]); });
+
+/* El pie dice de dónde sale TODO esto. No son dos campos con nombre fijo: es lo que el
+   adaptador haya querido declarar, entero. Una escena sin procedencia lo dice también. */
+$('#pie').textContent = Object.values(M.procedencia || {}).filter(Boolean).join(' · ')
+  || 'sin procedencia declarada: este fichero no dice de dónde salió';
+$('#estado').textContent = NODOS.length + ' ' + (R.cosas || 'elementos')
+  + (PLANTAS.length > 1 ? ' en ' + PLANTAS.length + ' ' + (R.grupos || 'grupos') : '')
+  + '. Arrastra, o pulsa «Encender cámara».';
+
+/* ─── la mano ──────────────────────────────────────────────────────────────── */
+const suaviza = creaSuavizador(); const varaEsc = new Vara(); const mandoEstado = {malos:0};
+const vid=$('#vid'), esq=$('#esq'), ctx=esq.getContext('2d');
+let detector=null, corriendo=false, ultimoT=-1, ultimasManos=[];
+const CONEX=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+             [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+$('#b_camara').onclick = () => corriendo ? apagaCamara()
+  : arranca().catch(e => { $('#estado').textContent='sin cámara: '+e.message; });
+async function arranca(){
+  const {FilesetResolver, HandLandmarker} = await import('./mp/vision_bundle.mjs');
+  $('#estado').textContent = 'pidiendo cámara…';
+  vid.srcObject = await navigator.mediaDevices.getUserMedia({video:{width:960,height:720}});
+  await vid.play(); esq.width = vid.videoWidth; esq.height = vid.videoHeight;
+  $('#estado').textContent = 'cargando el modelo de manos…';
+  const fs = await FilesetResolver.forVisionTasks('./mp/wasm');
+  detector = await HandLandmarker.createFromOptions(fs, {
+    baseOptions:{modelAssetPath:'./mp/hand_landmarker.task'},
+    numHands:2, runningMode:'VIDEO',
+    minHandDetectionConfidence:0.6, minTrackingConfidence:0.6});
+  corriendo = true;
+  $('#b_camara').textContent='Apagar cámara'; $('#camcaja').classList.add('encendida');
+  $('#estado').textContent='mueve la mano: el mando es lento a propósito';
+}
+function apagaCamara(){
+  if(!corriendo) return;
+  corriendo=false;
+  if(vid.srcObject){ vid.srcObject.getTracks().forEach(p=>p.stop()); vid.srcObject=null; }
+  ctx.clearRect(0,0,esq.width,esq.height);
+  $('#b_camara').textContent='Encender cámara'; $('#camcaja').classList.remove('encendida');
+  $('#estado').textContent='cámara apagada · el botón la enciende otra vez';
+  ultimasManos=[];
+}
+function pintaEsqueleto(manos){
+  ctx.save(); ctx.clearRect(0,0,esq.width,esq.height);
+  ctx.translate(esq.width,0); ctx.scale(-1,1); ctx.drawImage(vid,0,0,esq.width,esq.height);
+  ctx.restore();
+  for(const p of manos){
+    ctx.strokeStyle='rgba(127,209,193,.85)'; ctx.lineWidth=2;
+    for(const c of CONEX){ ctx.beginPath();
+      ctx.moveTo((1-p[c[0]].x)*esq.width,p[c[0]].y*esq.height);
+      ctx.lineTo((1-p[c[1]].x)*esq.width,p[c[1]].y*esq.height); ctx.stroke(); }
+    ctx.fillStyle='#e8eaed';
+    for(const q of p){ ctx.beginPath(); ctx.arc((1-q.x)*esq.width,q.y*esq.height,3,0,6.284); ctx.fill(); }
+  }
+}
+
+/* ─── qué etiquetas se ven ──────────────────────────────────────────────────
+   No se enseñan las 180 a la vez: de lejos no cabrían y se convertirían en una mancha.
+   Se enseña por cercanía y por grado, y se comprueba en pantalla que no se pisen. El
+   número que sale en el panel es cuántas hay puestas de verdad, no una estimación. */
+const vAux = new THREE.Vector3();
+let cadaTantos = 0, vistas = 0, diag = null;
+function decideEtiquetas(){
+  const c = $('#lienzo'), W = c.clientWidth, H = c.clientHeight;
+  const cajas = [];
+  const orden = NODOS.map(n => {
+    // el punto que se mide es donde va la ETIQUETA (encima de la bola), no la bola
+    vAux.set(n.x, n.anclaY, n.z); mundo.localToWorld(vAux);
+    const d = vAux.distanceTo(cam.position);
+    vAux.project(cam);
+    return {n, d, x:(vAux.x*0.5+0.5)*W, y:(-vAux.y*0.5+0.5)*H, z:vAux.z};
+  }).filter(o => o.z < 1 && capasOn.has(o.n.grupo))
+    // el módulo abierto va SIEMPRE el primero: es el único nombre que has pedido leer,
+    // y sin esto se lo podía comer el vecino que llegara antes al mismo hueco
+    .sort((a,b) => (a.n.i === elegido ? -1 : b.n.i === elegido ? 1 : 0)
+                || ((b.n.entra + b.n.sale) - (a.n.entra + a.n.sale)) || (a.d - b.d));
+
+  const alturaPx = o => (EM_U * o.n.esc) * (H / (2 * Math.tan(cam.fov*Math.PI/360) * o.d));
+  // por qué se ve lo que se ve: los cinco primeros candidatos con su tamaño en pantalla
+  diag = {alto_lienzo: H, ancho_lienzo: W, candidatos: orden.length,
+          primeros: orden.slice(0,5).map(o => ({id:o.n.corto, grado:(o.n.cuenta != null ? o.n.cuenta : o.n.entra + o.n.sale),
+                    d:+o.d.toFixed(1), px:+alturaPx(o).toFixed(2)}))};
+  vistas = 0;
+  const alfa = alfaLab.array;
+  alfa.fill(0);
+  for (const o of orden){
+    const px = alturaPx(o), abierto = o.n.i === elegido;
+    if (!abierto){
+      if (px < 7) continue;                     // por debajo de 7 px no se lee: no se pone
+      if (cuentaDe(o.n) < CORTE_LEJOS && o.d > 90) continue;  // de lejos, solo los que mandan
+      if (vistas >= 110) break;
+    }
+    const anchoPx = px * 0.62 * Math.max(...o.n.lineas.map(l => l.length));
+    const altoPx = px * 1.22 * o.n.lineas.length;
+    const caja = [o.x - anchoPx/2, o.y - altoPx/2, o.x + anchoPx/2, o.y + altoPx/2];
+    let choca = false;
+    for (const b of cajas){
+      if (caja[0] < b[2]+7 && caja[2] > b[0]-7 && caja[1] < b[3]+7 && caja[3] > b[1]-7){ choca = true; break; }
+    }
+    if (choca) continue;
+    cajas.push(caja);
+    const p0 = primeraDe[o.n.i], k = cuantosDe[o.n.i];
+    const val = (elegido >= 0 && elegido !== o.n.i) ? 0.35 : 1.0;
+    for (let j = p0; j < p0 + k; j++) alfa[j] = val;
+    vistas++;
+  }
+  alfaLab.needsUpdate = true;
+  $('#v_lab').textContent = vistas + ' de ' + NODOS.length;
+}
+
+/* ─── lo que se graba ──────────────────────────────────────────────────────── */
+const mez=$('#mezcla'), mctx=mez.getContext('2d');
+function mezcla(){
+  mctx.fillStyle='#06070a'; mctx.fillRect(0,0,1600,900);
+  const c3=$('#lienzo'); if(c3.width) mctx.drawImage(c3, 300, 0, 1300, 900);
+  if(esq.width) mctx.drawImage(esq, 8, 8, 284, 213);
+  // el título de la escena, para que el vídeo diga QUÉ se está mirando: un visor genérico
+  // grabando sin decir de qué es sirve de poco cuando luego juntas varios
+  mctx.fillStyle='#8fbdd1'; mctx.font='600 15px Segoe UI, sans-serif';
+  mctx.fillText((M.titulo||'').slice(0,36), 12, 232);
+  mctx.fillStyle='#e8eaed'; mctx.font='600 16px Segoe UI, sans-serif';
+  mctx.fillText(($('#n_nombre').textContent||'').slice(0,34), 12, 262);
+  mctx.fillStyle='#8d949e'; mctx.font='12px Segoe UI, sans-serif';
+  mctx.fillText(($('#n_capa').textContent||''), 12, 284);
+  mctx.fillText(($('#n_grados').textContent||''), 12, 304);
+  mctx.fillText((R.cosas||'elementos') + ' con nombre a la vista: ' + $('#v_lab').textContent, 12, 328);
+}
+let grabadora=null, trozos=[];
+/* GRABAR = lo que se ve en la PANTALLA, igual que compartir pantalla en una reunión.
+   Antes se grababa `mez`, un lienzo compuesto aparte con la escena, la cámara y la ficha:
+   salía limpio, pero SOLO salía eso. Nada de lo que ocurre fuera del lienzo entraba —
+   ni el sitio oficial que abre el puño, ni el PDF, ni una ventana encima— y para enseñar
+   cómo se usa esto hace falta justamente lo de fuera.
+   `getDisplayMedia` es la misma puerta que usa cualquier videollamada: el navegador saca
+   su propio selector (pantalla entera / ventana / pestaña) y graba lo elegido en vivo.
+   Tiene que salir de un CLIC, y por eso vive en el botón y no se puede disparar con un
+   gesto. Si se cancela el selector o el navegador no la trae, se cae al lienzo de antes,
+   que sigue funcionando: peor demo, pero nunca un botón muerto. */
+$('#b_rec').onclick = async () => {
+  if(grabadora && grabadora.state==='recording'){
+    grabadora.stop(); $('#b_rec').textContent='Grabar'; $('#b_rec').classList.remove('grabando'); return;
+  }
+  trozos=[];
+  let flujo=null;
+  try{
+    flujo = await navigator.mediaDevices.getDisplayMedia({video:{frameRate:30}, audio:false});
+    flujo.getVideoTracks()[0].addEventListener('ended', () => {
+      if(grabadora && grabadora.state==='recording') grabadora.stop();
+      $('#b_rec').textContent='Grabar'; $('#b_rec').classList.remove('grabando');
+    });
+  }catch(e){ flujo = mez.captureStream(30); }
+  grabadora=new MediaRecorder(flujo,{mimeType:'video/webm;codecs=vp9',videoBitsPerSecond:9000000});
+  grabadora.ondataavailable=e=>{ if(e.data.size) trozos.push(e.data); };
+  grabadora.onstop=()=>{ const a=document.createElement('a');
+    a.download=(String(M.titulo||'kinetico').replace(/[^\w.-]+/g,'_').slice(0,48)||'kinetico')+'.webm';
+    a.href=URL.createObjectURL(new Blob(trozos,{type:'video/webm'})); a.click(); };
+  grabadora.start(); $('#b_rec').textContent='Parar'; $('#b_rec').classList.add('grabando');
+};
+if(new URLSearchParams(location.search).get('mezcla')==='1')
+  mez.style.cssText='display:block;position:fixed;inset:0;z-index:60;width:100vw;height:auto';
+
+/* ─── el mando ──────────────────────────────────────────────────────────────
+   Lo mismo mueve el mapa venga de la cámara de esta página o del lector que lo lleva
+   dentro: una sola función, para que no haya dos maneras de moverse que se desvíen. */
+/* ─── lo que se puede HACER con una cosa ────────────────────────────────────
+   Un explorador no es solo mirar. Cada item puede traer una `accion`: entrar en una
+   carpeta, abrir un fichero, ir a un sitio. Se dispara con el SEGUNDO puño sobre la misma
+   cosa, nunca con el primero: el primero la abre y te enseña qué es, el segundo actúa. Con
+   una sola pasada, un gesto mal leído te metería en otra carpeta sin que lo pidieras. */
+function textoAccion(n){
+  const a = n && n.accion;
+  if (!a || !a.tipo || a.tipo === 'ficha') return '';
+  if (a.tipo === 'entrar') return 'cierra el puño otra vez para ENTRAR aquí';
+  if (a.tipo === 'abrir')  return 'cierra el puño otra vez para ABRIRLO con tu programa de siempre';
+  if (a.tipo === 'url')    return 'cierra el puño otra vez para abrir su enlace';
+  return '';
+}
+let haciendo = false;
+async function haz(n){
+  const a = n && n.accion;
+  if (!a || !a.tipo || a.tipo === 'ficha' || haciendo) return false;
+  haciendo = true;
+  $('#estado').textContent = (a.tipo === 'entrar' ? 'entrando en ' : 'abriendo ') + n.corto + '…';
+  try {
+    if (a.tipo === 'url' && a.destino){ location.href = a.destino; return true; }
+    const r = await fetch('/' + (a.tipo === 'entrar' ? 'entrar' : 'abrir'),
+                          {method:'POST', headers:{'Content-Type':'application/json'},
+                           body: JSON.stringify({destino: a.destino})});
+    const j = await r.json();
+    if (!j.ok){ $('#estado').textContent = 'no se pudo: ' + (j.por_que || 'sin dato'); return false; }
+    // entrar cambia la escena entera: la página se recarga y sale la carpeta nueva
+    if (a.tipo === 'entrar'){ location.reload(); return true; }
+    $('#estado').textContent = 'abierto: ' + n.corto;
+    return true;
+  } catch(e){
+    $('#estado').textContent = 'no se pudo: ' + e.message;
+    return false;
+  } finally { haciendo = false; }
+}
+
+function abreElDelCentro(){
+  let mejor = -1, dmin = 1e9;
+  const c = $('#lienzo'), W = c.clientWidth, H = c.clientHeight;
+  NODOS.forEach(n => {
+    if(!capasOn.has(n.grupo)) return;
+    vAux.set(n.x,n.y,n.z); mundo.localToWorld(vAux); vAux.project(cam);
+    if(vAux.z >= 1) return;
+    const dx=(vAux.x*0.5)*W, dy=(-vAux.y*0.5)*H, d=dx*dx+dy*dy;
+    if(d < dmin){ dmin = d; mejor = n.i; }
+  });
+  if(mejor >= 0) abre(mejor);
+  return mejor;
+}
+const ALTO_MAX = (PLANTAS.length - 1) * ALTO_PLANTA;
+function aplicaMando(G){
+  // primero abrir: el puño también frena, y si el freno saliera antes con un `return`
+  // el puño sostenido no llegaría nunca a abrir el módulo
+  if(G.abrir){
+    const antes = elegido;
+    const ahora = abreElDelCentro();
+    // el segundo puño sobre la MISMA cosa es el que hace algo
+    if (ahora >= 0 && ahora === antes) haz(NODOS[ahora]);
+  }
+  // los dos puños (o uno) paran en seco: el edificio deja de girar donde está
+  if(G.parar){ giroObj = giro; altoObj = alto; distObj = dist; return; }
+  // Un 25% menos de recorrido por el mismo gesto, a petición del usuario: 2,2 -> 1,65,
+  // 60 -> 45 y 1,6 -> 1,2 (los tres x0,75). Se baja AQUÍ y no en gestos_comun.js porque
+  // allí está el vocabulario que comparten todos los visores: tocarlo cambiaría también
+  // el despiece de objetos, que nadie ha dicho que vaya rápido.
+  giroObj += G.dx * 1.65;
+  // la altura se topa AQUÍ, no solo al pintar: si no, el objetivo se va lejos y luego
+  // hay que deshacer todo ese camino antes de que se mueva nada
+  altoObj = Math.max(-10, Math.min(ALTO_MAX + 10, altoObj - G.dy * 45));
+  distObj = Math.max(14, Math.min(520, distObj * (1 - G.zoom * 1.2)));
+}
+/* -1 abajo del todo, +1 arriba del todo, 0 en medio. El lector lo usa para saber que
+   seguir empujando ya no sube más y que lo que toca es salir del mapa. */
+function borde(){ return altoObj <= -8 ? -1 : altoObj >= ALTO_MAX + 8 ? 1 : 0; }
+
+/* Empotrado dentro del lector: la cámara y los gestos son del lector, aquí solo se
+   obedece. Se apagan los mandos propios para que no haya dos dueños del mismo mapa. */
+const EMPOTRADO = new URLSearchParams(location.search).get('empotrado') === '1';
+if(EMPOTRADO){
+  $('#lectura').style.display = 'none';
+  // los botones del mapa se quitan enteros: el lector pone los suyos en el mismo sitio y
+  // uno tapaba al otro
+  $('#mandos').style.display = 'none';
+  // el lector pone sus propios botones en la esquina de abajo: se le deja sitio a la
+  // línea de procedencia para que no quede una encima de otra
+  $('#pie').style.right = '272px';
+  $('#estado').textContent = 'mapa de su arquitectura';
+}
+window.MANDO = {
+  aplica: aplicaMando,
+  abreCentro: abreElDelCentro,
+  cierra, verTodo: () => { cierra(); distObj = 260; altoObj = centroY; giroObj = 0.5; },
+  /* El encuadre con el que se llega desde el lector. 62 unidades no es un número bonito:
+     es lo medido — a 110 se leen 4 nombres, a 80 unos 29, a 62 alrededor de 85. Más cerca
+     ya no cabe el edificio. */
+  encuadra: (d = 62) => { distObj = d; altoObj = centroY; giroObj = 0.5; },
+  lienzo: () => $('#lienzo'),
+  diag: () => diag,
+  borde,
+  panel: () => ({nombre: $('#n_nombre').textContent, capa: $('#n_capa').textContent,
+                 grados: $('#n_grados').textContent, ficha: $('#n_ficha').textContent,
+                 etiquetas: $('#v_lab').textContent}),
+  listo: true,
+};
+
+/* ─── bucle ────────────────────────────────────────────────────────────────── */
+const Q = new URLSearchParams(location.search);
+if(Q.has('dist')) dist = distObj = parseFloat(Q.get('dist'));
+if(Q.has('alto')) alto = altoObj = parseFloat(Q.get('alto'));
+if(Q.has('giro')) giro = giroObj = parseFloat(Q.get('giro'));
+if(Q.has('abre')){ const n = NODOS.find(x=>x.completo===Q.get('abre')); if(n) abre(n.i); }
+
+function bucle(t){
+  requestAnimationFrame(bucle);
+  // el halo respira. No es adorno: quieto, un anillo de luz se confunde con el brillo
+  // especular de la propia bola; latiendo se lee como «esta es la que tienes abierta».
+  if (halo.visible){
+    halo.material.uniforms.fuerza.value = 1.28 + 0.34 * Math.sin(t * 0.0034);
+    halo.rotation.y = t * 0.00022;
+  }
+  if (haloRoce.visible){
+    // medio paso por detrás de la otra: a la mitad de fuerza y en contrafase, para que no
+    // parpadeen a la vez cuando se ve una cosa abierta y otra rozada al lado
+    haloRoce.material.uniforms.fuerza.value = 0.62 + 0.18 * Math.sin(t * 0.0034 + Math.PI);
+    haloRoce.rotation.y = -t * 0.00022;
+  }
+  if(corriendo && detector && vid.readyState>=2 && vid.currentTime!==ultimoT){
+    ultimoT = vid.currentTime;
+    const r = detector.detectForVideo(vid, t);
+    const manos = (r.landmarks||[]).filter(m=>m.length===21).map((m,i)=>suaviza(i,m,t));
+    ultimasManos = manos; pintaEsqueleto(manos);
+    const dt = Math.min(0.05, (t-(bucle.antes||t))/1000); bucle.antes = t;
+    const G = leerMando(manos, t, dt, mandoEstado, varaEsc);
+    $('#v_manos').textContent = G.manos; $('#v_dedos').textContent = G.dedos;
+    $('#v_emp').textContent = (G.dx>=0?'+':'')+G.dx.toFixed(3)+' / '+(G.dy>=0?'+':'')+G.dy.toFixed(3);
+    // SOLO aplicaMando: estas tres líneas volvían a hacer aquí lo mismo que hace ella, y
+    // el mapa se movía al DOBLE con la cámara puesta (empotrado en el lector iba bien,
+    // porque allí solo se llama a aplicaMando). Además la de la altura no llevaba tope.
+    aplicaMando(G);
+  }
+  giro += (giroObj-giro)*0.07;
+  alto += (altoObj-alto)*0.07;
+  dist += (distObj-dist)*0.07;
+  alto = Math.max(-30, Math.min((PLANTAS.length-1)*ALTO_PLANTA + 30, alto));
+  mundo.rotation.y = giro;
+  cam.position.set(0, alto + dist*0.30, dist);
+  cam.lookAt(0, alto, 0);
+  matLab.uniforms.escala.value = 1.0;
+  discos.forEach((d,i) => { d.visible = capasOn.has(PLANTAS[i].id); });
+  if((cadaTantos++ % 5) === 0){
+    decideEtiquetas();
+    // el rótulo de la planta es para orientarse de lejos; de cerca solo estorba a los
+    // nombres de los módulos, así que se apaga a medida que te acercas
+    if(alfaRotulos){
+      const v = Math.max(0.10, Math.min(1, (dist - 25) / 45));
+      alfaRotulos.array.fill(v); alfaRotulos.needsUpdate = true;
+    }
+  }
+  $('#v_dist').textContent = Math.round(dist) + ' u';
+  ren.render(esc, cam);
+  mezcla();
+}
+requestAnimationFrame(bucle);
+</script>
