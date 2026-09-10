@@ -1,5 +1,5 @@
 {
-  "_doc": "Configuración de imagen.py. Cada clave es OPCIONAL; sin ninguna, solo queda la vía 'horde' (AI Horde, anónima). Las claves son tuyas y no viajan con el paquete.",
+  "_doc": "Configuración de imagen.py. Cada clave es OPCIONAL; sin ninguna, solo queda la vía 'horde' (AI Horde, anónima). Las claves son TUYAS y no viajan con el paquete: mira `_ayuda` para saber qué desbloquea cada una, qué pasa sin ella y dónde se saca. Este fichero vive en tu carpeta de memoria, nunca en el repositorio.",
   "orden": [
     "local",
     "pollinations",
@@ -26,5 +26,70 @@
   "taller_pasos": 20,
   "google_maps_key": "",
   "mapillary_token": "",
-  "windy_key": ""
+  "windy_key": "",
+  "_ayuda": {
+    "horde_key": {
+      "desbloquea": "generar imágenes sin registrarte en nada",
+      "sin_ella": "nada: ya viene puesta",
+      "donde": "https://aihorde.net/terms",
+      "nota": "El '0000000000' que trae es la clave ANÓNIMA que el propio proyecto publica para quien no quiere cuenta. Es la única credencial que este paquete distribuye, y la distribuye porque su dueño la hizo pública. Con cuenta propia irías más rápido."
+    },
+    "pollinations_key": {
+      "desbloquea": "generar imágenes por Pollinations",
+      "sin_ella": "se salta ese proveedor y sigue con el siguiente de `orden`",
+      "donde": "https://enter.pollinations.ai",
+      "nota": "Su documentación avisa de que esta clave da acceso completo a la cuenta y no debe acabar en un navegador, una app ni un repositorio."
+    },
+    "cloudflare_account_id": {
+      "desbloquea": "generar imágenes con Workers AI (junto con el token)",
+      "sin_ella": "se salta ese proveedor",
+      "donde": "https://developers.cloudflare.com/workers-ai/platform/pricing/"
+    },
+    "cloudflare_api_token": {
+      "desbloquea": "generar imágenes con Workers AI (junto con el id de cuenta)",
+      "sin_ella": "se salta ese proveedor",
+      "donde": "https://developers.cloudflare.com/workers-ai/platform/pricing/",
+      "nota": "El cupo gratuito se cuenta por CUENTA, no por persona."
+    },
+    "together_key": {
+      "desbloquea": "generar imágenes con FLUX en together.ai",
+      "sin_ella": "se salta ese proveedor",
+      "donde": "https://docs.together.ai/docs/api-keys-authentication",
+      "nota": "Es la clave de toda la cuenta, no de un modelo. Comprobado el 9-sep-2026: su página de precios cobra por imagen; el 'gratis ilimitado' que circula sale de una promoción de 2024 para cuentas nuevas."
+    },
+    "huggingface_key": {
+      "desbloquea": "generar imágenes con la inferencia de HuggingFace",
+      "sin_ella": "se salta ese proveedor",
+      "donde": "https://huggingface.co/docs/hub/security-tokens",
+      "nota": "El token vale en lugar de una contraseña: abre también tus repositorios privados. Y cualquiera que lo vea puede revocarlo sin tener ningún permiso sobre tu cuenta."
+    },
+    "google_maps_key": {
+      "desbloquea": "traer una foto a pie de calle (Google Street View) para pintarla",
+      "sin_ella": "esa fuente NO toca la red y lo dice: «sin clave»",
+      "donde": "https://developers.google.com/maps/documentation/streetview/usage-and-billing",
+      "nota": "ES LA ÚNICA QUE PUEDE COSTARTE DINERO. Pide tarjeta, y pasadas las 10.000 llamadas gratis al mes cobra 7,00 $ por cada 1.000, sin tope por defecto. Su propia guía dice que el dueño de la clave paga los cargos del abuso. Restríngela por API y por uso."
+    },
+    "mapillary_token": {
+      "desbloquea": "traer fotos de calle de Mapillary",
+      "sin_ella": "esa fuente NO toca la red y lo dice: «sin clave»",
+      "donde": "https://www.mapillary.com/developer/api-documentation",
+      "nota": "No cobra, pero sus términos te hacen responsable de todo lo que se haga con tu cuenta."
+    },
+    "windy_key": {
+      "desbloquea": "traer la vista de una cámara pública en directo (Windy)",
+      "sin_ella": "esa fuente NO toca la red y lo dice: «sin clave»",
+      "donde": "sin dato con fuente — se pide en el sitio de Windy",
+      "nota": "Su contrato prohíbe expresamente publicar la clave o dársela a terceros (art. 7.1.3)."
+    },
+    "local_url": {
+      "desbloquea": "generar con TU propio servidor de imágenes, sin salir de la máquina",
+      "sin_ella": "se salta esa vía y pasa a la siguiente de `orden`",
+      "donde": "la url de tu servidor (por ejemplo un A1111 en local)"
+    },
+    "taller_url": {
+      "desbloquea": "el taller de retoque contra un servidor propio",
+      "sin_ella": "las operaciones de retoque que no necesitan modelo siguen funcionando",
+      "donde": "la url de tu servidor"
+    }
+  }
 }

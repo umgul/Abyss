@@ -75,8 +75,41 @@ líneas de `MODULOS` (`linea`) son documentación del código y se muestran igua
 los dos idiomas; el detalle `toca`/`aviso` (con vocabulario castellano de control
 como «ganchos») solo se imprime en `--idioma es`, para no dejar vocabulario sin
 traducir en la vista inglesa — el README/SKILL en inglés cubre ese detalle.
+
+Sexta tanda (T6, MediaPipe Tasks Vision para el visor cinético): el JS+wasm+
+modelo de manos que necesita `abyss/plantillas/kinetica.html` (vía `gestos.py`)
+NO se instala con pip — es un paquete de NPM que corre DENTRO DEL NAVEGADOR,
+servido por jsdelivr, más el modelo de manos de Google
+(`storage.googleapis.com`). Pesa ~27 MB en total (medido 8-sep-2026: seis
+ficheros, ver `VENDOR_MP`) y por eso NUNCA va en el repositorio de git — a
+diferencia de `three.min.js`, que sí se commitea por pesar unos cientos de KB.
+`--manos` los baja a `abyss/vendor/mp/`, SOLO los que falten (si ya están
+todos, no toca la red); enseña ANTES de empezar de dónde y cuánto ocupa cada
+uno — nunca en silencio, nunca desde un gancho. Sin red: UN aviso limpio
+(nunca una traza de Python) y se para ahí mismo, sin repetir el mismo fallo con
+lo que quedara por bajar. `--dependencias` también dice si estos ficheros
+están o faltan, igual que con los paquetes de pip (pero no son lo mismo: no se
+instalan con `--instalar-dependencias`). La licencia (Apache License 2.0, del
+propio proyecto MediaPipe) se escribe aparte, en
+`abyss/vendor/mp/LICENSE-mediapipe.txt`, al terminar la descarga.
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import os
+import sys
+# La consola de Windows y la salida tienen que hablar el mismo idioma (ver abyss/consola.py:
+# sin esto, una `ñ` se pinta como dos símbolos en una consola en la página 850). Aquí se
+# carga POR RUTA y no con `import consola` a secas porque este guion vive en la RAÍZ del
+# repositorio, no dentro de `abyss/`, así que su carpeta no tiene ese módulo al lado.
+try:
+    import importlib.util as _u
+    _e = _u.spec_from_file_location(
+        'abyss_consola', os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       'abyss', 'consola.py'))
+    _c = _u.module_from_spec(_e); _e.loader.exec_module(_c); _c.preparar()
+except Exception:
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')   # sin arreglar la consola, como antes
+    except Exception:
+        pass
 import os
 import json
 import time
@@ -85,8 +118,30 @@ import subprocess
 import locale
 import platform
 import warnings
+import socket
+import urllib.request
+import urllib.error
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))     # raíz del repo: aquí vive este fichero
+
+# ── el color de la ventana ──────────────────────────────────────────────────
+# Sacados del CSS de la web del proyecto, no elegidos aquí. El instalador es un panel de
+# control, así que el fondo honesto es el de las páginas-informe (#0a0a0f sobre #12121a) y
+# no el negro puro del vestíbulo; el puente entre los dos lenguajes es el acento #8fbdd1,
+# que es justo lo que hace su cinta de navegación.
+# Contraste MEDIDO sobre #0a0a0f, porque su propio CSS se impone un suelo de 4,5:1 y lo
+# escribe en un comentario: #dfe6e9 da 15,6:1, #8fbdd1 9,8:1 y #00b894 7,8:1 — valen para
+# texto. #636e72 (3,77:1) y #6c5ce7 (4,07:1) NO llegan, así que aquí solo se usan para
+# líneas y bordes, nunca para algo que haya que leer.
+C_FONDO = '#0a0a0f'
+C_PANEL = '#12121a'
+C_BORDE = '#2d3436'
+C_TINTA = '#dfe6e9'
+C_TINTA_VIVA = '#f2f4f6'
+C_ACENTO = '#8fbdd1'
+C_OK = '#00b894'
+C_MARCA = '#6c5ce7'      # solo líneas: no llega al suelo de contraste para texto
+C_APAGADO = '#636e72'    # ídem
 PKG = os.path.join(RAIZ, 'abyss')                     # el paquete instalado (== rutas.CODE)
 PLANTILLAS = os.path.join(RAIZ, 'plantillas')
 
@@ -155,18 +210,23 @@ MODULOS = [
              ('SessionStart', ['--arranque'], 60),
              ('SessionEnd', ['--cierre'], 60),
              ('UserPromptSubmit', ['--despertar'], 30),
-         ]),
+         ],
+         toca_en="SessionStart/SessionEnd/UserPromptSubmit hooks → continuidad.py "
+                 "--arranque/--cierre/--despertar"),
     dict(id='vigia', script='vigia.py', defecto=True,
          linea='Penaliza la confabulación: caza números, rutas y citas que no salieron de ninguna parte.',
          linea_en='Penalizes confabulation: catches numbers, paths and quotes that came from nowhere.',
          toca='gancho Stop → vigia.py --verificar; ficheros mem/confabulaciones.jsonl',
-         hooks=[('Stop', ['--verificar'], 30)]),
+         hooks=[('Stop', ['--verificar'], 30)],
+         toca_en="Stop hook → vigia.py --verificar; files: mem/confabulaciones.jsonl"),
     dict(id='exterocepcion', script='exterocepcion.py', defecto=True,
          linea='Lugar, meteo y canal en cada prompt (ipinfo.io, open-meteo.com, nominatim); sin red, «sin dato».',
          linea_en='Place, weather and channel on every prompt (ipinfo.io, open-meteo.com, nominatim); '
                   'without network, "no data".',
          toca='sin gancho propio (lo usa continuidad --despertar); ficheros mem/lugar.json, mem/meteo.json',
-         hooks=[]),
+         hooks=[],
+         toca_en="no hook of its own (continuidad --despertar uses it); files: mem/lugar.json, "
+                 "mem/meteo.json"),
     dict(id='modelo', script='modelo.py', defecto=True,
          linea='Avisa si Fable bajó a Opus y qué revisar cuando se vuelve.',
          linea_en='Warns if Fable dropped to Opus, and what to check when it comes back.',
@@ -178,18 +238,23 @@ MODULOS = [
          # ahora solo una librería que usa `continuidad.py --despertar` en cada prompt.
          toca='sin gancho propio (lo usa continuidad --despertar); ficheros mem/modelo_preferido.json',
          hooks=[],
-         plantilla='modelo_preferido.json'),
+         plantilla='modelo_preferido.json',
+         toca_en="no hook of its own (continuidad --despertar uses it); files: mem/modelo_preferido.json"),
     dict(id='noticias', script='noticias.py', defecto=True,
          linea='El día y lo reciente nuestro visto desde fuera (Google News RSS), al arrancar.',
          linea_en='The day and our recent activity seen from outside (Google News RSS), on startup.',
          toca='sin gancho propio (lo usa continuidad --arranque); ficheros mem/noticias.json, mem/temas_*.json',
-         hooks=[], plantilla='temas_noticias.json'),
+         hooks=[], plantilla='temas_noticias.json',
+         toca_en="no hook of its own (continuidad --arranque uses it); files: mem/noticias.json, "
+                 "mem/temas_*.json"),
     dict(id='propiocepcion', script='propiocepcion.py', defecto=True,
          linea='Mide cada sesión contra mi propia distribución; varas.py pone los ◆ del índice (MEMORY.md).',
          linea_en='Measures each session against its own distribution; varas.py sets the ◆ marks in the '
                   'index (MEMORY.md).',
          toca='sin gancho propio (varas.py --index lo invoca continuidad --cierre); ficheros mem/propiocepcion.json',
-         hooks=[]),
+         hooks=[],
+         toca_en="no hook of its own (continuidad --cierre invokes varas.py --index); files: "
+                 "mem/propiocepcion.json"),
     dict(id='ojo', script='ojo.py', defecto=True,
          linea='El ojo, con verbos: mirar (webcam), texto/fotocopia/tarjeta/manual (OCR, delega en '
                'lectura_visual.py), despiece/prompt3d (2,5D, delega en volumen.py), gestos (control por '
@@ -202,7 +267,13 @@ MODULOS = [
          hooks=[], aviso='OpenCV (cv2) para mirar/fotocopia/despiece/prompt3d (numpy también para '
                           'despiece/prompt3d), tesseract opcional para el OCR de texto/fotocopia/tarjeta/'
                           'manual, mediapipe para gestos — cada verbo dice exactamente qué instalar si '
-                          'falta y sale con código 2; nunca se instala nada desde aquí.'),
+                          'falta y sale con código 2; nunca se instala nada desde aquí.',
+         toca_en="no hook — it never fires by itself; manual use; files mem/ojo.log (verbs "
+                 "mirar/texto/fotocopia/tarjeta/manual); despiece/prompt3d/gestos don't touch mem",
+         aviso_en="OpenCV (cv2) for mirar/fotocopia/despiece/prompt3d (numpy too, for despiece/prompt3d), "
+                  "tesseract optional for OCR on texto/fotocopia/tarjeta/manual, mediapipe for gestos — "
+                  "each verb says exactly what to install if it's missing and exits with code 2; nothing "
+                  "is ever installed from here."),
     dict(id='imagen', script='imagen.py', defecto=True,
          linea='Crear una imagen por cascada de proveedores, pintarla localmente por pinceladas (varios '
                'estilos), animarla en vídeo, renderizar una escena 3D, o buscar una imagen ya hecha o un '
@@ -229,7 +300,30 @@ MODULOS = [
                'por file://). `lienzo.py` (fundir/collage/restaurar/pintar por números/borrar) vive '
                'en el mismo paquete, sin módulo de instalación propio (sin gancho, no toca settings.json). '
                'Opcionales: Pillow+numpy (pintar, lienzo), imageio-ffmpeg (video), OpenCV (lienzo.py: ruido/'
-               'arañazos/relleno/zonas conexas — sin ella, más lento o con menos pasos, nunca falla del todo).'),
+               'arañazos/relleno/zonas conexas — sin ella, más lento o con menos pasos, nunca falla del todo).',
+         toca_en="no hook — manual use; \"crear\" tries local first (your own server) → providers with a "
+                 "key (pollinations/cloudflare/together/huggingface, in the order set by "
+                 "imagen_config.json) → anonymous horde; \"buscar\" queries Openverse/Wikimedia Commons; "
+                 "\"render\" delegates to render3d.py (three.js embedded, headless browser for --png) and "
+                 "chains into pintor.pintar via --pintar; \"mundo\" delegates to mundo.py (Met/AIC/Commons "
+                 "need no key; Street View/Mapillary/Windy need a key); files mem/imagen.log (crear, and "
+                 "both outputs of render/render --pintar), mem/imagenes/ (with --descargar, plus a .txt "
+                 "attribution file), mem/imagen_config.json (keys ALWAYS go there, never in the repo)",
+         aviso_en="only the \"local\" path never sends your text off your machine; everything else sends it "
+                  "to an outside service. \"pintar\"/\"video\" are fully local. \"buscar\" sends the search "
+                  "TEXT to Openverse/Wikimedia Commons (never to the \"crear\" providers); it only searches "
+                  "and fetches with attribution, it doesn't assemble or compose anything. \"mundo\" sends "
+                  "the subject TEXT to whichever source is requested (Met/AIC/Commons need no key; "
+                  "streetview/mapillary/webcam only if there's a key/token in imagen_config.json — "
+                  "without one, that source doesn't even touch the network). \"render\"/\"render --pintar\" "
+                  "are local except for --png, which launches a LOCAL headless browser (it never uploads "
+                  "anything to a service: it reads the HTML via file://). `lienzo.py` "
+                  "(fundir/collage/restaurar/numeros/borrar — blend, collage, restore, paint-by-numbers, "
+                  "erase) lives in the same package, with "
+                  "no install module of its own (no hook, doesn't touch settings.json). Optional: "
+                  "Pillow+numpy (pintar, lienzo), imageio-ffmpeg (video), OpenCV (lienzo.py: "
+                  "noise/scratches/fill/connected regions — without it, slower or with fewer steps, but "
+                  "never fails completely)."),
     dict(id='render3d', script='render3d.py', defecto=True,
          linea='Escenas y modelos 3D (glb/gltf/obj/stl/escena.json) en una página autocontenida con '
                'three.js, vista explosionada; --png la captura con un navegador sin cabeza.',
@@ -243,7 +337,16 @@ MODULOS = [
                'navegador sin cabeza en la máquina (msedge.exe/chrome.exe en Windows, google-chrome/'
                'chromium en Linux/macOS) — dependencia OPCIONAL del sistema, no de pip; sin uno, «sin dato: '
                'no hay navegador sin cabeza» y código 2 (la página HTML se escribe de todas formas). Es un '
-               'visor y editor de vistas, no un modelador: no repara mallas, no simplifica, no exporta.'),
+               'visor y editor de vistas, no un modelador: no repara mallas, no simplifica, no exporta.',
+         toca_en="no hook — manual use (`imagen.py render` delegates here); files: whatever HTML/PNG is "
+                 "requested, next to the input unless another path is given (nothing in mem/)",
+         aviso_en="three.js ships EMBEDDED in abyss/vendor/three.min.js (pinned version, MIT license in "
+                  "abyss/vendor/LICENSE-three.txt) — the page never touches the network to display. --png "
+                  "needs a headless browser on the machine (msedge.exe/chrome.exe on Windows, "
+                  "google-chrome/chromium on Linux/macOS) — an OPTIONAL system dependency, not a pip one; "
+                  "without one, \"no data: no headless browser\" and code 2 (the HTML page gets written "
+                  "either way). It's a viewer and view editor, not a modeler: it doesn't repair meshes, "
+                  "doesn't simplify, doesn't export."),
     dict(id='gestos', script='gestos.py', defecto=True,
          linea='La mano manda en el holograma: MediaPipe + vocabulario PROPIO del paquete (número de '
                'dedos aísla capas del despiece, pellizco desliza la explosión, pose de la palma orbita la '
@@ -256,7 +359,13 @@ MODULOS = [
          hooks=[],
          aviso='necesita mediapipe (y opencv-python para leer la cámara); sin ellos, dice exactamente qué '
                'instalar y sale con código 2 — nunca instala nada. Se queda corriendo (servidor + bucle de '
-               'cámara) hasta que se interrumpe: no es un comando que termina solo.'),
+               'cámara) hasta que se interrumpe: no es un comando que termina solo.',
+         toca_en="no hook — manual use (`ojo.py gestos` delegates here); serves HTTP ONLY on 127.0.0.1; "
+                 "doesn't touch mem, and doesn't resolve a Claude Code project",
+         aviso_en="needs mediapipe (and opencv-python to read the camera); without them, it says exactly "
+                  "what to install and exits with code 2 — it never installs anything itself. It keeps "
+                  "running (server + camera loop) until interrupted: it's not a command that finishes on "
+                  "its own."),
     dict(id='parentesis', script='parentesis.py', defecto=True,
          linea='Marca un tramo o una sesión entera para que no entre en la memoria futura; puede recortar el '
                'transcript local ya cerrado.',
@@ -266,7 +375,11 @@ MODULOS = [
               'ficheros mem/parentesis.json, mem/sesiones/.omitir',
          hooks=[],
          aviso='no puede deshacer lo que ya viajó a la API dentro de un turno: gobierna la memoria LOCAL de '
-               'este paquete (lo que el propio asistente vuelve a leer), no los servidores de Anthropic.'),
+               'este paquete (lo que el propio asistente vuelve a leer), no los servidores de Anthropic.',
+         toca_en="no hook — manual use (--abrir/--cerrar/--omitir-sesion/--recortar/--recortar-tramo); "
+                 "files mem/parentesis.json, mem/sesiones/.omitir",
+         aviso_en="it can't undo what already went to the API within a turn: it governs this package's "
+                  "LOCAL memory (what the assistant itself reads back), not Anthropic's servers."),
     dict(id='huella', script='huella.py', defecto=False,
          linea='Registra lo que un hilo toca fuera de su propia carpeta (ficheros escritos, procesos, puertos) '
                'y ayuda a limpiarlo al cerrar.',
@@ -280,9 +393,20 @@ MODULOS = [
              ('Stop', ['--fin'], 5),
          ],
          aviso='APAGADO por defecto: PostToolUse corre tras CADA herramienta, y la foto de puertos/procesos '
-               'tiene coste (medido en la máquina de desarrollo: ~950 ms por PowerShell combinado en Windows) '
+               'tiene coste (remedido el 8-sep-2026 en la máquina de desarrollo: 793 ms de mediana en 5 '
+               'llamadas del gancho ENTERO —proceso de Python incluido— tras un comando que parece '
+               'persistente, y 96 ms cuando no lo parece y no hay nada que fotografiar) '
                'hasta que el propio guion detecta que ese coste supera 1,5 s de mediana y pasa a fotografiar '
-               'solo tras comandos que parecen persistentes (heurística declarada, ver docstring de huella.py).'),
+               'solo tras comandos que parecen persistentes (heurística declarada, ver docstring de huella.py).',
+         toca_en="hooks SessionStart/PostToolUse/Stop → huella.py --arranque/--herramienta/--fin; files "
+                 "mem/huella/<session>.jsonl",
+         aviso_en="OFF by default: PostToolUse runs after EVERY tool call, and snapshotting "
+                  "ports/processes has a cost (re-measured on 2026-09-08 on the dev machine: 793 ms median over "
+                  "5 calls of the WHOLE hook —Python process included— after a command that looks "
+                  "persistent, and 96 ms when it doesn't and there is nothing to snapshot) until the "
+                  "script itself detects that cost exceeds a 1.5 s "
+                  "median and switches to snapshotting only after commands that look persistent (a "
+                  "declared heuristic — see huella.py's docstring)."),
     dict(id='cuerpo', script='cuerpo.py', defecto=True,
          linea='El cuerpo de la máquina (cpu, ram, disco, vram, temperatura de GPU, batería) con su propia '
                'normal por cuantiles.',
@@ -292,21 +416,28 @@ MODULOS = [
          hooks=[
              ('SessionStart', ['--arranque'], 15),
              ('UserPromptSubmit', ['--despertar'], 15),
-         ]),
+         ],
+         toca_en="hooks SessionStart/UserPromptSubmit → cuerpo.py --arranque/--despertar; files "
+                 "mem/cuerpo.jsonl"),
     dict(id='lector_pdf', script='lector_pdf.py', defecto=True,
          linea='Indexa un PDF por página y sección, busca por TF-IDF y mide cuánto ahorra leer solo lo que toca.',
          linea_en='Indexes a PDF by page and section, searches by TF-IDF, and measures how much is '
                   'saved by reading only what matters.',
          toca='sin gancho — uso manual (--indexar/--secciones/--buscar/--leer/--ahorro <pdf>); '
               'ficheros mem/pdf/<sha1 del fichero>.json',
-         hooks=[], aviso='necesita PyMuPDF (fitz) o pypdf; sin ninguna de las dos, «sin dato: pip install pymupdf».'),
+         hooks=[], aviso='necesita PyMuPDF (fitz) o pypdf; sin ninguna de las dos, «sin dato: pip install pymupdf».',
+         toca_en="no hook — manual use (--indexar/--secciones/--buscar/--leer/--ahorro <pdf>); files "
+                 "mem/pdf/<file's sha1>.json",
+         aviso_en="needs PyMuPDF (fitz) or pypdf; without either, \"no data: pip install pymupdf\"."),
     dict(id='mapa_codigo', script='mapa_codigo.py', defecto=True,
          linea='El índice greppable de un repo Python con `ast`: módulos, clases, funciones e imports con su línea.',
          linea_en='The greppable index of a Python repo with `ast`: modules, classes, functions and '
                   'imports with their line.',
          toca='sin gancho — uso manual (<carpeta> [--salida] [--json], --buscar <nombre>); '
               'ficheros mem/mapas/<carpeta>.txt(.json)',
-         hooks=[]),
+         hooks=[],
+         toca_en="no hook — manual use (<folder> [--salida] [--json], --buscar <name>); files "
+                 "mem/mapas/<folder>.txt(.json)"),
     dict(id='auditar', script='auditar.py', defecto=True,
          linea='Las cinco comprobaciones sobre un paquete antes de instalarlo: procedencia, comandos, '
                'permisos, qué sale de la máquina, y dominios para lectura manual.',
@@ -315,7 +446,39 @@ MODULOS = [
          toca='sin gancho — uso manual (`python auditar.py <ruta> [--json] [--markdown f.md]`, o vía la '
               'skill esceptico con --paquete); NUNCA ejecuta el código auditado (solo lee texto y, si hay '
               '.git, su historial LOCAL); no toca mem',
-         hooks=[]),
+         hooks=[],
+         toca_en="no hook — manual use (`python auditar.py <path> [--json] [--markdown f.md]`, or via "
+                 "the esceptico skill with --paquete); NEVER executes the audited code (only reads text "
+                 "and, if there's a .git, its LOCAL history); doesn't touch mem"),
+    dict(id='kinetica', script='kinetica.py', defecto=True, especial='skill',
+         carpeta_skill='kinetica',
+         linea='Despieza UNA foto de un objeto en sus componentes REALES y los deja flotando en 3D '
+               'sobre la mano, mirando la cámara.',
+         linea_en='Takes ONE photo of an object apart into its REAL components and floats them in 3D '
+                  'over your hand, using the camera.',
+         toca='copia skills/kinetica/ a <skills-dir>/kinetica/; el visor se sirve SOLO en 127.0.0.1 y la '
+              'cámara se enciende a petición explícita, nunca por gancho; no toca settings.json ni mem. '
+              'Necesita opencv-python, numpy y Pillow, y las manos piden `--manos`',
+         hooks=[],
+         toca_en="copies skills/kinetica/ to <skills-dir>/kinetica/; the viewer is served ONLY on "
+                 "127.0.0.1 and the camera is turned on by explicit request, never by a hook; doesn't "
+                 "touch settings.json or mem. Needs opencv-python, numpy and Pillow, and hands need "
+                 "`--manos`"),
+    dict(id='kinetico', script='kinetico.py', defecto=True, especial='skill',
+         carpeta_skill='kinetico',
+         linea='Recorre con la mano un CONJUNTO de cosas —una carpeta del disco, un grafo de módulos— '
+               'como un edificio 3D: entra en carpetas y abre ficheros con gestos.',
+         linea_en='Walk through a SET of things by hand — a folder on disk, a module graph — as a 3D '
+                  'building: step into folders and open files with gestures.',
+         toca='copia skills/kinetico/ a <skills-dir>/kinetico/; su servidor expone dos verbos (entrar y '
+              'abrir) SOLO sobre lo que esté en la escena montada y sin salir de la carpeta con la que '
+              'se abrió; LEE la carpeta que se le diga y no escribe nada en ella; la cámara se enciende '
+              'a petición explícita, nunca por gancho; no toca settings.json ni mem',
+         hooks=[],
+         toca_en="copies skills/kinetico/ to <skills-dir>/kinetico/; its server exposes two verbs (enter "
+                 "and open) ONLY over what is in the mounted scene and never outside the folder it was "
+                 "opened with; it READS the folder it is given and writes nothing into it; the camera is "
+                 "turned on by explicit request, never by a hook; doesn't touch settings.json or mem"),
     dict(id='esceptico', script=None, defecto=True, especial='skill', carpeta_skill='esceptico',
          linea='La ley «ningún plan sin escéptico» como comando: lanza un revisor con model Opus a tumbar un '
                'plan antes de ejecutarlo, o (--paquete) a leer por encima del informe de auditar.py.',
@@ -324,13 +487,18 @@ MODULOS = [
                   "auditar.py's report.",
          toca='copia skills/esceptico/ a <skills-dir>/esceptico/ (por defecto ~/.claude/skills/esceptico/, '
               'ver --skills-dir); no es Python, no toca settings.json ni mem',
-         hooks=[]),
+         hooks=[],
+         toca_en="copies skills/esceptico/ to <skills-dir>/esceptico/ (by default "
+                 "~/.claude/skills/esceptico/, see --skills-dir); not Python, doesn't touch "
+                 "settings.json or mem"),
     dict(id='infografia', script='infografia.py', defecto=True,
          linea='De un CSV o JSON a un SVG limpio (barras, barras horizontales, líneas, tabla), biblioteca estándar.',
          linea_en='From a CSV or JSON to a clean SVG (bars, horizontal bars, lines, table), standard '
                   'library only.',
          toca='sin gancho — uso manual; no resuelve proyecto, no toca mem: solo escribe el .svg que se le pida',
-         hooks=[]),
+         hooks=[],
+         toca_en="no hook — manual use; doesn't resolve a project, doesn't touch mem: it only writes the "
+                 ".svg you ask for"),
     dict(id='taller', script='taller.py', defecto=False,
          especial='taller',
          linea='Deja lista la configuración de un taller local de texto→imagen para lienzo.py/imagen.py; '
@@ -342,22 +510,33 @@ MODULOS = [
          hooks=[], plantilla='imagen_config.json',
          aviso='NO instala diffusers/torch ni arranca ningún proceso: solo escribe la URL por defecto y dice, '
                'por stdout, el comando exacto para arrancarlo tú y qué instalar antes (nunca con pip desde aquí). '
-               'El modelo se descarga de Hugging Face al PRIMER uso; en CPU, cada imagen tarda minutos, no segundos.'),
+               'El modelo se descarga de Hugging Face al PRIMER uso; en CPU, cada imagen tarda minutos, no segundos.',
+         toca_en="no hook; files mem/imagen_config.json (seeds/updates taller_url, taller_denoise, "
+                 "taller_pasos)",
+         aviso_en="Does NOT install diffusers/torch or start any process: it only writes the default URL "
+                  "and prints, on stdout, the exact command to start it yourself and what to install "
+                  "first (never with pip from here). The model downloads from Hugging Face on FIRST use; "
+                  "on CPU, each image takes minutes, not seconds."),
     dict(id='telegram', script=None, defecto=False, especial='telegram',
          linea='Aviso por Telegram cuando Claude Code necesita permiso o espera respuesta.',
          linea_en='Telegram notice when Claude Code needs permission or is waiting for a reply.',
          toca='gancho Notification → powershell + mem/notify_telegram.ps1 (nunca en el código)',
-         hooks=[], aviso='pide token de bot y chat id; los guarda solo en mem/notify_telegram.ps1.'),
+         hooks=[], aviso='pide token de bot y chat id; los guarda solo en mem/notify_telegram.ps1.',
+         toca_en="Notification hook → powershell + mem/notify_telegram.ps1 (never in the code)",
+         aviso_en="asks for a bot token and chat id; saves them only in mem/notify_telegram.ps1."),
     dict(id='permisos', script=None, defecto=False, especial='permisos',
          linea='Da permiso de Edit sobre tu settings.json (autoedición). APAGADO por defecto.',
          linea_en='Grants Edit permission over your settings.json (self-editing). OFF by default.',
          toca='clave permissions.allow += "Edit(<settings.json>)"',
-         hooks=[], aviso='deja que el propio asistente edite settings.json sin preguntar cada vez.'),
+         hooks=[], aviso='deja que el propio asistente edite settings.json sin preguntar cada vez.',
+         toca_en="key permissions.allow += \"Edit(<settings.json>)\"",
+         aviso_en="lets the assistant itself edit settings.json without asking each time."),
     dict(id='preferencias', script=None, defecto=True, especial='preferencias',
          linea='Preferencia showThinkingSummaries (ver los resúmenes de pensamiento).',
          linea_en='Preference showThinkingSummaries (show thinking summaries).',
          toca='clave showThinkingSummaries = true',
-         hooks=[], claves={'showThinkingSummaries': True}),
+         hooks=[], claves={'showThinkingSummaries': True},
+         toca_en="key showThinkingSummaries = true"),
 ]
 MODULOS_POR_ID = {m['id']: m for m in MODULOS}
 
@@ -459,6 +638,60 @@ TAMANOS_APROX_MB = {
     'pypdf': 0.4,
     'mediapipe': 19.2,
 }
+
+
+# ---------------------------------------------------------------------------------
+# T6 · MediaPipe Tasks Vision vendorizado para el visor cinético (kinetica.html +
+# gestos.py) — DISTINTO de la entrada 'gestos' de `DEPENDENCIAS` de arriba: aquella
+# es el paquete de PIP `mediapipe` (Python, para el resto de verbos de gestos.py);
+# esto es el paquete de NPM `@mediapipe/tasks-vision` (JavaScript + WebAssembly),
+# que corre DENTRO DEL NAVEGADOR y nunca se instala con pip. Los seis ficheros y
+# tamaños de abajo están MEDIDOS (descargados y comprobados el 8-sep-2026; ver el
+# informe de la tarea) — no se afina más de lo que ahí se midió. `destino` es
+# siempre con "/" (nunca `os.sep` a pelo): `_ruta_vendor_mp` lo pasa por
+# `os.path.join` para que valga en Windows y en POSIX por igual.
+# ---------------------------------------------------------------------------------
+COMANDO_DESCARGAR_MANOS = 'python instalar.py --manos'
+
+VENDOR_MP = [
+    dict(nombre='vision_bundle.mjs', destino='vision_bundle.mjs',
+         tam_txt='~137 KB', tam_mb=0.137,
+         url='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs'),
+    dict(nombre='wasm/vision_wasm_internal.js', destino='wasm/vision_wasm_internal.js',
+         tam_txt='~210 KB', tam_mb=0.210,
+         url='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_internal.js'),
+    dict(nombre='wasm/vision_wasm_internal.wasm', destino='wasm/vision_wasm_internal.wasm',
+         tam_txt='~9.4 MB', tam_mb=9.4,
+         url='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_internal.wasm'),
+    dict(nombre='wasm/vision_wasm_nosimd_internal.js', destino='wasm/vision_wasm_nosimd_internal.js',
+         tam_txt='~210 KB', tam_mb=0.210,
+         url='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_nosimd_internal.js'),
+    dict(nombre='wasm/vision_wasm_nosimd_internal.wasm', destino='wasm/vision_wasm_nosimd_internal.wasm',
+         tam_txt='~9.3 MB', tam_mb=9.3,
+         url='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_nosimd_internal.wasm'),
+    dict(nombre='hand_landmarker.task', destino='hand_landmarker.task',
+         tam_txt='~7.8 MB', tam_mb=7.8,
+         url='https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/'
+             'hand_landmarker.task'),
+]
+
+
+def _ruta_vendor_mp(destino):
+    """Ruta absoluta de `destino` (relativo, siempre con "/" — ver `VENDOR_MP`)
+    dentro de `abyss/vendor/mp/`."""
+    return os.path.join(PKG, 'vendor', 'mp', *destino.split('/'))
+
+
+def _estado_vendor_mp():
+    """`[{**entrada_de_VENDOR_MP, 'presente': bool, 'falta': bool}, ...]` —
+    'presente' es un `os.path.isfile` REAL sobre `abyss/vendor/mp/<destino>`,
+    nunca una lista fija (mismo criterio fail-closed que `_import_disponible`
+    con los paquetes de pip: se mira el disco, no se asume nada)."""
+    salida = []
+    for v in VENDOR_MP:
+        presente = os.path.isfile(_ruta_vendor_mp(v['destino']))
+        salida.append(dict(v, presente=presente, falta=not presente))
+    return salida
 
 
 def _import_disponible(nombre_import, python_exe=None):
@@ -585,6 +818,415 @@ def instalar_dependencias(modulos, *, python_exe=None, idioma='es'):
     return mensajes, ok
 
 
+# ---------------------------------------------------------------------------------
+# T6 · descarga de MediaPipe Tasks Vision (`--manos`) — ver `VENDOR_MP` arriba.
+# Se llama SOLO desde `--manos` en `__main__` (nunca desde un gancho, nunca al
+# arrancar, nunca desde `instalar()`/`desinstalar()`): mismo principio que
+# `instalar_dependencias()`, que tampoco corre sola. Regla dura 5 del encargo
+# (las pruebas NUNCA bajan nada real): todo lo que toca la red de verdad pasa
+# por `_descargar_uno`, el único punto que las pruebas sustituyen por
+# monkeypatch.
+# ---------------------------------------------------------------------------------
+class _SinRedError(Exception):
+    """`_descargar_uno` no pudo ni conectar (DNS, conexión rehusada, timeout de
+    conexión) — a diferencia de un `HTTPError` (SÍ hay red; el servidor
+    respondió con un error) o de un fallo al escribir en disco (tampoco es de
+    red). `descargar_vendor_mp()` la usa para parar el lote entero de golpe,
+    limpio y sin traza, en vez de repetir el mismo aviso de red con cada
+    fichero que quedara."""
+
+
+def _descargar_uno(url, destino_abs, *, timeout=30):
+    """Único punto que toca la red de verdad en `descargar_vendor_mp()` — las
+    pruebas lo sustituyen por monkeypatch (regla dura 5 del encargo: ninguna
+    prueba baja nada real). Escribe primero a `<destino>.tmp-abyss` y solo hace
+    `os.replace` al final (mismo patrón que `_escribir_json`): un corte a
+    medias nunca deja un fichero a medio escribir con el nombre bueno. Devuelve
+    los bytes escritos, medidos de verdad con `os.path.getsize` (nunca el
+    tamaño aproximado de `VENDOR_MP`, que es solo orientativo)."""
+    try:
+        respuesta = urllib.request.urlopen(url, timeout=timeout)
+    except urllib.error.HTTPError as e:
+        # sí hay red: el servidor respondió, pero con un error (404, 500...).
+        raise RuntimeError(f'HTTP {e.code}') from e
+    except (urllib.error.URLError, socket.timeout, ConnectionError) as e:
+        raise _SinRedError(str(getattr(e, 'reason', e))) from e
+    carpeta = os.path.dirname(destino_abs)
+    if carpeta:
+        os.makedirs(carpeta, exist_ok=True)
+    tmp = destino_abs + '.tmp-abyss'
+    try:
+        with respuesta, open(tmp, 'wb') as fh:
+            shutil.copyfileobj(respuesta, fh)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+    os.replace(tmp, destino_abs)
+    return os.path.getsize(destino_abs)
+
+
+# Metadatos + texto COMPLETO de la Apache License 2.0 (fuente:
+# https://www.apache.org/licenses/LICENSE-2.0.txt, comprobado 8-sep-2026, 11.358
+# bytes, sin modificar). Es la licencia que el propio paquete declara
+# ("license": "Apache-2.0" en el package.json de @mediapipe/tasks-vision@0.10.14,
+# comprobado ese mismo día) — mismo patrón que `abyss/vendor/LICENSE-three.txt`,
+# pero escrito por el instalador (estos ficheros nunca se commitean: no hay un
+# `LICENSE-mediapipe.txt` fijo en el repo, se genera cada vez que se corre
+# `--manos`, junto a lo que descarga).
+_LICENCIA_MEDIAPIPE_TEXTO = """MediaPipe Tasks Vision — vendorizado para abyss/gestos.py y
+abyss/plantillas/kinetica.html (T6)
+
+Paquete: @mediapipe/tasks-vision@0.10.14 (npm), servido por jsdelivr
+(cdn.jsdelivr.net); el modelo hand_landmarker.task viene de
+storage.googleapis.com/mediapipe-models (Google, proyecto MediaPipe). Ficheros
+vendorizados en abyss/vendor/mp/: vision_bundle.mjs, wasm/vision_wasm_internal.js,
+wasm/vision_wasm_internal.wasm, wasm/vision_wasm_nosimd_internal.js,
+wasm/vision_wasm_nosimd_internal.wasm, hand_landmarker.task — origen exacto de
+cada uno en VENDOR_MP (instalar.py) o en `python instalar.py --dependencias`.
+
+Licencia: Apache License 2.0 — declarada por el propio paquete ("license":
+"Apache-2.0" en su package.json, comprobado 8-sep-2026). Este fichero lo escribe
+`instalar.py --manos` cada vez que baja los ficheros de arriba; vive en
+abyss/vendor/mp/, que NUNCA se sube al repositorio (son ficheros de terceros
+descargados, no código propio de este paquete). Texto completo debajo, tal
+cual, sin modificar (fuente: https://www.apache.org/licenses/LICENSE-2.0.txt).
+
+────────────────────────────────────────────────────────────────────────────────
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+"""
+
+
+def _escribir_licencia_mediapipe():
+    """Escribe `abyss/vendor/mp/LICENSE-mediapipe.txt` (mismo patrón que
+    `abyss/vendor/LICENSE-three.txt`, pero GENERADO por el instalador en vez de
+    fijo en el repo — ver el comentario junto a `_LICENCIA_MEDIAPIPE_TEXTO`).
+    Se llama solo tras terminar `descargar_vendor_mp()` sin fallos; quien la
+    llama envuelve esto en su propio `try/except` — un fallo aquí (permiso,
+    disco lleno) no debe tirar una descarga que ya terminó bien."""
+    ruta = _ruta_vendor_mp('LICENSE-mediapipe.txt')
+    carpeta = os.path.dirname(ruta)
+    if carpeta:
+        os.makedirs(carpeta, exist_ok=True)
+    tmp = ruta + '.tmp-abyss'
+    with open(tmp, 'w', encoding='utf-8', newline='\n') as fh:
+        fh.write(_LICENCIA_MEDIAPIPE_TEXTO)
+    os.replace(tmp, ruta)
+
+
+# ---------------------------------------------------------------------------------
+# El modelo de recorte de fondo (`--modelo`). Mismo trato que MediaPipe y por la
+# misma razón: NUNCA en el repositorio de git. La URL y el destino se leen de
+# `abyss/fondo.py` (constantes `URL_MODELO` y `MODELO`) en vez de repetirlas aquí,
+# que es como se garantiza que el instalador baja EXACTAMENTE el fichero que el
+# módulo va a buscar — dos copias de una URL se desincronizan el día que una cambia.
+# La red la toca `_descargar_uno`, el único punto que las pruebas sustituyen.
+# ---------------------------------------------------------------------------------
+COMANDO_DESCARGAR_MODELO = 'python instalar.py --modelo'
+
+
+def _millares(n, idioma):
+    """El separador de millares es del IDIOMA, no del programa: 4.574.861 en castellano
+    y 4,574,861 en inglés. Escribir un número español dentro de una frase inglesa es un
+    descuido que se lee como una traducción a medias."""
+    return f'{n:,}' if idioma == 'en' else f'{n:,}'.replace(',', '.')
+
+
+def _datos_del_modelo():
+    """`(url, destino_abs)` leídos de `abyss/fondo.py`. Se carga el módulo por ruta y
+    no con `import`, para no arrastrar sus dependencias (numpy, Pillow) solo por
+    saber una URL: el instalador tiene que poder correr en una máquina pelada."""
+    ruta = _script('fondo.py')
+    url = destino = None
+    with open(ruta, encoding='utf-8') as fh:
+        for linea in fh:
+            if linea.startswith('URL_MODELO'):
+                url = linea.split('=', 1)[1].strip().strip("'" + '"')
+            elif linea.startswith('MODELO ='):
+                destino = os.path.join(RAIZ, 'abyss', 'vendor', 'modelos', 'u2netp.onnx')
+            if url and destino:
+                break
+    return url, destino
+
+
+def descargar_vendor_modelo(*, idioma='es', forzar=False, timeout=30):
+    """Descarga `abyss/vendor/modelos/u2netp.onnx` (unos 4,4 MB), el modelo que usa
+    `abyss/fondo.py` para quitarle el fondo a una foto. Se llama SOLO desde `--modelo`
+    en la CLI: nunca desde un gancho, nunca al arrancar, nunca en silencio. Enseña de
+    dónde y a dónde ANTES de tocar la red, y los bytes reales DESPUÉS.
+    Sin él, `fondo.py` no se queda muerto: usa el recorte del sistema o GrabCut, y
+    dice siempre con qué motor recortó. Devuelve `(mensajes, ok)`."""
+    url, destino = _datos_del_modelo()
+    mensajes = []
+    if not url or not destino:
+        mensajes.append(_texto(idioma, 'modelo_sin_url'))
+        return mensajes, False
+    if os.path.isfile(destino) and not forzar:
+        mensajes.append(_texto(idioma, 'modelo_ya_esta',
+                                bytes=_millares(os.path.getsize(destino), idioma)))
+        return mensajes, True
+    mensajes.append(_texto(idioma, 'modelo_previa', url=url, destino=destino))
+    mensajes.append(_texto(idioma, 'modelo_licencia'))
+    try:
+        n = _descargar_uno(url, destino, timeout=timeout)
+    except _SinRedError as e:
+        mensajes.append(_texto(idioma, 'vendor_mp_sin_red', url=url, motivo=str(e)))
+        return mensajes, False
+    except Exception as e:
+        mensajes.append(_texto(idioma, 'vendor_mp_fallo', fichero='u2netp.onnx', motivo=str(e)))
+        return mensajes, False
+    mensajes.append(_texto(idioma, 'modelo_bajado', bytes=_millares(n, idioma)))
+    return mensajes, True
+
+
+def descargar_vendor_mp(*, idioma='es', forzar=False, timeout=30):
+    """Descarga a `abyss/vendor/mp/` lo que le falte al visor cinético
+    (MediaPipe Tasks Vision: JS + wasm + el modelo de manos) — ~27 MB en total,
+    NUNCA en el repositorio de git. Se llama SOLO desde `--manos` en la CLI:
+    nunca desde un gancho, nunca al arrancar, nunca en silencio — enseña la
+    lista completa (de dónde, a dónde, cuánto ocupa) ANTES de tocar la red, y
+    el resultado de cada fichero DESPUÉS, igual que `instalar_dependencias()`.
+    Sin red: UN aviso limpio (nunca una traza de Python) y se PARA ahí — no
+    repite el mismo fallo con los ficheros que quedaran. `forzar=True` vuelve a
+    bajar también lo que ya estuviera presente (por defecto, se salta lo que ya
+    está). Devuelve `(mensajes, ok)`."""
+    estado = _estado_vendor_mp()
+    pendientes = estado if forzar else [v for v in estado if v['falta']]
+    mensajes = []
+    if not pendientes:
+        mensajes.append(_texto(idioma, 'vendor_mp_nada_que_bajar'))
+        return mensajes, True
+    total_mb = sum(v['tam_mb'] for v in pendientes)
+    mensajes.append(_texto(idioma, 'vendor_mp_previa_cabecera', total=f'{total_mb:.0f}'))
+    for v in pendientes:
+        mensajes.append(_texto(idioma, 'vendor_mp_previa_fila', url=v['url'], destino=v['destino'],
+                                tam=v['tam_txt']))
+    mensajes.append(_texto(idioma, 'vendor_mp_licencia_aviso'))
+    ok = True
+    for v in pendientes:
+        destino_abs = _ruta_vendor_mp(v['destino'])
+        try:
+            n = _descargar_uno(v['url'], destino_abs, timeout=timeout)
+        except _SinRedError as e:
+            mensajes.append(_texto(idioma, 'vendor_mp_sin_red', url=v['url'], motivo=str(e)))
+            return mensajes, False
+        except Exception as e:
+            mensajes.append(_texto(idioma, 'vendor_mp_fallo', fichero=v['nombre'], motivo=str(e)))
+            ok = False
+            continue
+        mensajes.append(_texto(idioma, 'vendor_mp_ok', fichero=v['nombre'], bytes=n))
+    if ok:
+        try:
+            _escribir_licencia_mediapipe()
+            mensajes.append(_texto(idioma, 'vendor_mp_licencia_escrita'))
+        except Exception:
+            pass  # documentación, no crítico — nunca revienta una descarga ya hecha
+    return mensajes, ok
+
+
 def _para_localizado(idioma, e):
     """El texto de la columna «para qué» en el idioma pedido (T5.2): con
     `idioma != 'es'` usa `e['para_en']` si la entrada la declara; si no (fail-
@@ -626,13 +1268,30 @@ def _texto_no_instalables(idioma):
     return '\n'.join(lineas)
 
 
+def _tabla_vendor_mp(idioma):
+    """T6: la fila de `--dependencias` para MediaPipe Tasks Vision (el vendor de
+    `abyss/vendor/mp/`, ver `VENDOR_MP`) — dice, fichero a fichero, si está o
+    falta (mismo `os.path.isfile` real de `_estado_vendor_mp`, nunca una
+    suposición). No son paquetes de pip: `--instalar-dependencias` no los toca;
+    se bajan aparte con `COMANDO_DESCARGAR_MANOS`."""
+    estado = _estado_vendor_mp()
+    total_mb = sum(v['tam_mb'] for v in estado)
+    filas = [_texto(idioma, 'vendor_mp_cabecera')]
+    for v in estado:
+        est = _texto(idioma, 'dep_falta_si') if v['falta'] else _texto(idioma, 'dep_falta_no')
+        filas.append(f'  {v["nombre"]:36} {est:8} {v["tam_txt"]:>8}')
+    return '\n'.join(filas) + '\n' + _texto(idioma, 'vendor_mp_pie', total=f'{total_mb:.0f}',
+                                             comando=COMANDO_DESCARGAR_MANOS)
+
+
 def _tabla_dependencias(idioma, modulos=None, python_exe=None):
     estado = _estado_dependencias(modulos, python_exe)
     filas = [_texto(idioma, 'dep_cabecera')]
     for mid, entradas in estado.items():
         for e in entradas:
             filas.append(_fila_dependencia(idioma, mid, e))
-    return '\n'.join(filas) + '\n\n' + _texto_no_instalables(idioma)
+    return ('\n'.join(filas) + '\n\n' + _texto_no_instalables(idioma) + '\n\n'
+            + _tabla_vendor_mp(idioma))
 
 
 # ---------------------------------------------------------------------------------
@@ -669,6 +1328,7 @@ TEXTOS = {
         'estado_no_instalado': 'no instalado',
         'estado_sin_gancho': 'sin gancho propio',
         'listar_detalle_nota': '',  # en castellano SÍ se imprime toca/aviso; no hace falta nota
+        'apagado_como': 'apagado por defecto; para encenderlo:',
         'toca_label': 'toca:',
         'aviso_label': 'aviso:',
         'falta_valor': 'falta el valor de {bandera}',
@@ -714,6 +1374,26 @@ TEXTOS = {
         'dep_error_excepcion': '{paquete}: no se pudo ejecutar pip ({error})',
         'dep_codigo_salida': 'código de salida {codigo}',
         'dep_modulo_desconocido': 'módulo sin dependencias registradas: {mod}',
+        'vendor_mp_cabecera': f'  {"fichero (MediaPipe Tasks Vision)":36} {"falta":8} {"tamaño":>8}',
+        'vendor_mp_pie': ('No son paquetes de pip — no van en el repositorio de git (~{total} MB en total si '
+                           'faltan todos). Se bajan aparte con: {comando} — licencia Apache License 2.0 '
+                           '(proyecto MediaPipe, Google); se escribe una copia en '
+                           'abyss/vendor/mp/LICENSE-mediapipe.txt.'),
+        'vendor_mp_nada_que_bajar': 'nada que descargar: ya estaban todos los ficheros de MediaPipe Tasks Vision',
+        'modelo_sin_url': 'sin dato: no se pudo leer URL_MODELO de abyss/fondo.py',
+        'modelo_ya_esta': 'nada que descargar: el modelo ya estaba ({bytes} bytes)',
+        'modelo_previa': 'se va a descargar el modelo de recorte de fondo:\n  de:    {url}\n  a:     {destino}\n  pesa:  unos 4,4 MB',
+        'modelo_licencia': 'licencias: el fichero .onnx lo distribuye rembg (MIT) y la red que lleva dentro es U^2-Net (Apache-2.0). Las dos, enteras, en abyss/vendor/modelos/LICENSE-u2netp.txt',
+        'modelo_bajado': 'modelo descargado: {bytes} bytes (medidos en disco, no estimados)',
+        'vendor_mp_previa_cabecera': 'Se va a descargar (MediaPipe Tasks Vision, para el visor 3D — ~{total} MB en total):',
+        'vendor_mp_previa_fila': '  {url} -> abyss/vendor/mp/{destino} ({tam})',
+        'vendor_mp_licencia_aviso': ('Licencia: Apache License 2.0 (proyecto MediaPipe, Google) — se escribe una '
+                                      'copia en abyss/vendor/mp/LICENSE-mediapipe.txt junto con la descarga.'),
+        'vendor_mp_ok': '{fichero}: descargado ({bytes} bytes)',
+        'vendor_mp_fallo': '{fichero}: FALLÓ ({motivo})',
+        'vendor_mp_sin_red': ('sin red: no se pudo conectar con {url} ({motivo}); se para aquí, sin intentar el '
+                               'resto — vuelve a intentarlo con conexión'),
+        'vendor_mp_licencia_escrita': 'licencia escrita en abyss/vendor/mp/LICENSE-mediapipe.txt',
         'uso': (
             "Uso:\n"
             "  python instalar.py --listar\n"
@@ -721,6 +1401,7 @@ TEXTOS = {
             "  python instalar.py --desinstalar mod1[,mod2] [--borrar-datos] [--sin-preguntar]\n"
             "  python instalar.py --dependencias\n"
             "  python instalar.py --instalar-dependencias [mod1,mod2]\n"
+            "  python instalar.py --manos                     (baja MediaPipe Tasks Vision para el visor 3D)\n"
             "  python instalar.py --sin-ventana                (equivale a --listar)\n"
             "  python instalar.py                              (ventana Tk; sin entorno gráfico, --listar)\n"
             "Comunes: --settings <ruta>  --python <exe>  --proyecto <cwd>  --skills-dir <ruta>  --idioma es|en\n"
@@ -732,6 +1413,19 @@ TEXTOS = {
         'boton_instalar': 'Instalar',
         'boton_desinstalar': 'Desinstalar',
         'boton_dependencias': 'Dependencias...',
+        'boton_claves': 'Claves...',
+        'claves_titulo': 'Claves opcionales',
+        'claves_intro': ('Todo funciona sin ninguna. Lo que necesita clave lo dice y no '
+                         'toca la red. Se guardan SOLO en tu carpeta de memoria; nunca '
+                         'viajan con el paquete.'),
+        'claves_puesta': 'puesta',
+        'claves_vacia': 'vacía',
+        'claves_dejar': '(déjalo en blanco para no tocarla)',
+        'claves_guardar': 'Guardar',
+        'claves_cancelar': 'Cancelar',
+        'claves_guardadas': 'Guardadas %d clave(s) en %s',
+        'claves_sin_cambios': 'No has escrito ninguna: no se ha tocado nada.',
+        'claves_sin_proyecto': 'Sin proyecto resuelto: no sé dónde guardarlas.',
         'boton_cerrar': 'Cerrar',
         'titulo_abyss': 'Abyss',
         'titulo_aviso': 'Abyss · aviso',
@@ -756,7 +1450,8 @@ TEXTOS = {
         'estado_sin_gancho': 'no hook of its own',
         'listar_detalle_nota': ('  (details omitted here: they carry untranslated Spanish control '
                                  'vocabulary; run --idioma es --listar, or see README.en.md)'),
-        'toca_label': 'touches:',  # not shown today (English --listar omits the detail lines); kept for completeness
+        'apagado_como': 'off by default; to turn it on:',
+        'toca_label': 'touches:',
         'aviso_label': 'note:',
         'falta_valor': 'missing value for {bandera}',
         'argumento_no_reconocido': 'unrecognized argument: {bandera}',
@@ -801,6 +1496,27 @@ TEXTOS = {
         'dep_error_excepcion': '{paquete}: could not run pip ({error})',
         'dep_codigo_salida': 'exit code {codigo}',
         'dep_modulo_desconocido': 'module with no registered dependencies: {mod}',
+        'vendor_mp_cabecera': f'  {"file (MediaPipe Tasks Vision)":36} {"missing":8} {"size":>8}',
+        'vendor_mp_pie': ('Not pip packages — they do not go in the git repository (~{total} MB total if all '
+                           'are missing). Fetch them separately with: {comando} — Apache License 2.0 '
+                           '(MediaPipe project, Google); a copy is written to '
+                           'abyss/vendor/mp/LICENSE-mediapipe.txt.'),
+        'vendor_mp_nada_que_bajar': 'nothing to download: every MediaPipe Tasks Vision file was already there',
+        'modelo_sin_url': "no data: couldn't read URL_MODELO from abyss/fondo.py",
+        'modelo_ya_esta': 'nothing to download: the model was already there ({bytes} bytes)',
+        'modelo_previa': 'about to download the background-removal model:\n  from: {url}\n  to:   {destino}\n  size: about 4.4 MB',
+        'modelo_licencia': 'licences: the .onnx file is distributed by rembg (MIT) and the network inside it is U^2-Net (Apache-2.0). Both in full in abyss/vendor/modelos/LICENSE-u2netp.txt',
+        'modelo_bajado': 'model downloaded: {bytes} bytes (measured on disk, not estimated)',
+        'vendor_mp_previa_cabecera': 'About to download (MediaPipe Tasks Vision, for the 3D viewer — ~{total} MB total):',
+        'vendor_mp_previa_fila': '  {url} -> abyss/vendor/mp/{destino} ({tam})',
+        'vendor_mp_licencia_aviso': ('License: Apache License 2.0 (MediaPipe project, Google) — a copy is '
+                                      'written to abyss/vendor/mp/LICENSE-mediapipe.txt together with the '
+                                      'download.'),
+        'vendor_mp_ok': '{fichero}: downloaded ({bytes} bytes)',
+        'vendor_mp_fallo': '{fichero}: FAILED ({motivo})',
+        'vendor_mp_sin_red': ('no network: could not connect to {url} ({motivo}); stopping here, the rest was '
+                               'not attempted — try again once you have a connection'),
+        'vendor_mp_licencia_escrita': 'license written to abyss/vendor/mp/LICENSE-mediapipe.txt',
         'uso': (
             "Usage:\n"
             "  python instalar.py --listar\n"
@@ -808,6 +1524,7 @@ TEXTOS = {
             "  python instalar.py --desinstalar mod1[,mod2] [--borrar-datos] [--sin-preguntar]\n"
             "  python instalar.py --dependencias\n"
             "  python instalar.py --instalar-dependencias [mod1,mod2]\n"
+            "  python instalar.py --manos                     (downloads MediaPipe Tasks Vision for the 3D viewer)\n"
             "  python instalar.py --sin-ventana                (same as --listar)\n"
             "  python instalar.py                              (Tk window; no display -> --listar)\n"
             "Common: --settings <path>  --python <exe>  --proyecto <cwd>  --skills-dir <path>  --idioma es|en\n"
@@ -819,6 +1536,19 @@ TEXTOS = {
         'boton_instalar': 'Install',
         'boton_desinstalar': 'Uninstall',
         'boton_dependencias': 'Dependencies...',
+        'boton_claves': 'Keys...',
+        'claves_titulo': 'Optional keys',
+        'claves_intro': ('Everything works without any of them. What needs a key says so '
+                         'and never touches the network. They are stored ONLY in your '
+                         'memory folder; they never travel with the package.'),
+        'claves_puesta': 'set',
+        'claves_vacia': 'empty',
+        'claves_dejar': '(leave blank to keep it)',
+        'claves_guardar': 'Save',
+        'claves_cancelar': 'Cancel',
+        'claves_guardadas': 'Saved %d key(s) in %s',
+        'claves_sin_cambios': "You didn't type any: nothing was touched.",
+        'claves_sin_proyecto': "No project resolved: I don't know where to save them.",
         'boton_cerrar': 'Close',
         'titulo_abyss': 'Abyss',
         'titulo_aviso': 'Abyss · notice',
@@ -1376,6 +2106,20 @@ def estado_modulo(settings, mod, settings_ruta=None, skills_dir=None):
     # ojo, imagen, lector_pdf, mapa_codigo, infografia, parentesis, taller (solo mem/plantilla)
 
 
+def _campo_localizado(idioma, mod, campo):
+    """`mod[campo]` en el idioma pedido, con el mismo criterio que `_linea_localizada`:
+    en inglés usa `<campo>_en` si el módulo la declara y, si no, cae al castellano antes
+    que dejar el hueco vacío. Antes esto no existía y `--listar --idioma en` ESCONDÍA
+    `toca` y `aviso` en vez de traducirlos: quien instalaba en inglés no llegaba a leer
+    qué toca cada módulo ni su aviso de coste, que es justo lo que hay que leer antes de
+    decidir. Dos pruebas del propio paquete lo cazan (test_instalador_idioma)."""
+    if idioma != 'es':
+        otro = mod.get(campo + '_en')
+        if otro:
+            return otro
+    return mod.get(campo) or ''
+
+
 def _linea_localizada(idioma, mod):
     """El texto de una frase de `mod` en el idioma pedido (T5.2), mismo criterio
     que `_para_localizado()`: con `idioma != 'es'` usa `mod['linea_en']` si el
@@ -1386,6 +2130,59 @@ def _linea_localizada(idioma, mod):
         if en:
             return en
     return mod['linea']
+
+
+def _claves(argv, idioma='es'):
+    """Qué claves opcionales hay, cuáles tienes puestas y qué desbloquea cada una.
+
+    Las claves NO viajan con el paquete y no van a viajar nunca: distribuir una credencial
+    ajena incumple los términos de casi todos estos servicios aunque no cueste dinero, y
+    publicarla bajo una licencia abierta es concederle a todo el mundo el derecho a
+    redistribuirla — una concesión que ya no se puede retirar. La única que sí viaja es la
+    de AI Horde, `0000000000`, porque su propio proyecto la publica para uso anónimo.
+
+    Este comando no pide ni escribe ninguna clave: dice qué hay, qué falta y dónde se saca.
+    Rellenarlas es abrir `imagen_config.json` en tu carpeta de memoria.
+    """
+    import json as _json
+    plantilla = os.path.join(RAIZ, 'plantillas', 'imagen_config.json')
+    try:
+        with open(os.path.abspath(plantilla), encoding='utf-8') as fh:
+            base = _json.load(fh)
+    except (OSError, ValueError) as e:
+        print('sin dato: no puedo leer la plantilla de claves (%s)' % e)
+        return
+    ayuda = base.get('_ayuda') or {}
+    try:
+        _proj, mem = _resolver_mem(argv)
+    except Exception:
+        mem = None
+    puesto = {}
+    ruta_cfg = os.path.join(mem, 'imagen_config.json') if mem else None
+    if ruta_cfg and os.path.isfile(ruta_cfg):
+        try:
+            with open(ruta_cfg, encoding='utf-8') as fh:
+                puesto = _json.load(fh)
+        except (OSError, ValueError):
+            puesto = {}
+    en = idioma != 'es'
+    print('claves opcionales' if not en else 'optional keys')
+    print(('tu fichero: %s' if not en else 'your file: %s')
+          % (ruta_cfg if ruta_cfg else ('sin proyecto' if not en else 'no project')))
+    print()
+    for campo, info in ayuda.items():
+        valor = puesto.get(campo) or base.get(campo) or ''
+        # NUNCA se imprime el valor: solo si hay algo o no
+        marca = ('puesta' if not en else 'set') if valor else ('vacía' if not en else 'empty')
+        print('  %-24s [%s]  %s' % (campo, marca, info.get('desbloquea', '')))
+        print('  %-24s     sin ella: %s' % ('', info.get('sin_ella', '')))
+        print('  %-24s     dónde: %s' % ('', info.get('donde', '')))
+        if info.get('nota'):
+            print('  %-24s     ojo: %s' % ('', info['nota']))
+        print()
+    print('Ninguna clave sale de tu máquina por instalar el paquete, y ninguna viaja dentro de él.'
+          if not en else
+          'No key leaves your machine by installing the package, and none travels inside it.')
 
 
 def _listar(settings_ruta, skills_dir=None, idioma='es'):
@@ -1403,10 +2200,17 @@ def _listar(settings_ruta, skills_dir=None, idioma='es'):
         st = estado_modulo(settings, mod, settings_ruta, skills_dir)
         etiqueta = _texto(idioma, _ETIQUETA_ESTADO_CLAVE[st])
         print(f'  {mod["id"]:14} [{etiqueta:16}] {_linea_localizada(idioma, mod)}')
-        if idioma == 'es':
-            print(f'  {"":14}   {_texto(idioma, "toca_label")} {mod["toca"]}')
-            if mod.get('aviso'):
-                print(f'  {"":14}   {_texto(idioma, "aviso_label")} {mod["aviso"]}')
+        # El detalle sale en los DOS idiomas. Estaba tras un `if idioma == 'es'`, así que
+        # quien instalaba en inglés no llegaba a leer qué toca cada módulo ni su aviso de
+        # coste — justo lo que hay que leer antes de decidir. Las dos etiquetas inglesas
+        # ya existían sin usarse.
+        print(f'  {"":14}   {_texto(idioma, "toca_label")} {_campo_localizado(idioma, mod, "toca")}')
+        if mod.get('aviso'):
+            print(f'  {"":14}   {_texto(idioma, "aviso_label")} {_campo_localizado(idioma, mod, "aviso")}')
+        # Y si viene apagado, el comando literal para encenderlo, ahí mismo.
+        if not mod.get('defecto', True):
+            print(f'  {"":14}   {_texto(idioma, "apagado_como")} '
+                  f'python instalar.py --instalar {mod["id"]}')
     nota = _texto(idioma, 'listar_detalle_nota')
     if nota:
         print(nota)
@@ -1458,8 +2262,8 @@ def _lista_flag_opcional(argv, nombre):
 # ---------------------------------------------------------------------------------
 _FLAGS_CON_VALOR = ('--settings', '--python', '--proyecto', '--instalar', '--desinstalar',
                     '--telegram-token', '--telegram-chat', '--skills-dir', '--idioma')
-_FLAGS_SIN_VALOR = ('--listar', '--sin-ventana', '--borrar-datos', '--sin-preguntar', '-h', '--help',
-                    '--dependencias')
+_FLAGS_SIN_VALOR = ('--listar', '--claves', '--sin-ventana', '--borrar-datos', '--sin-preguntar', '-h', '--help',
+                    '--dependencias', '--manos', '--modelo')
 # T5.1: `--instalar-dependencias` lleva un valor OPCIONAL ("[mod1,mod2]" en el uso:
 # sin lista, se comprueban/instalan TODOS los módulos de `DEPENDENCIAS`) — a
 # diferencia de `_FLAGS_CON_VALOR`, que siempre exige un valor detrás.
@@ -1532,6 +2336,128 @@ def _pedir_telegram_cli(argv, idioma='es'):
 # ---------------------------------------------------------------------------------
 # Ventana Tk: la misma lógica que la CLI (llama a instalar()/desinstalar() de arriba).
 # ---------------------------------------------------------------------------------
+
+def _ventana_claves(padre, mem, idioma='es'):
+    """Pedir las claves opcionales, una a una, con lo que desbloquea cada una delante.
+
+    Tres reglas, y las tres se ven en el código:
+      · NUNCA se muestra el valor de una clave que ya está puesta. Solo si está o no está.
+        Una ventana que enseña un secreto es una ventana que lo filtra a la primera captura.
+      · Solo se escribe lo que el usuario haya TECLEADO. Un campo en blanco no borra nada:
+        es «déjala como estaba», que es lo que espera quien abre esto solo a mirar.
+      · Se escribe en la carpeta de memoria del proyecto, jamás en el repositorio.
+    """
+    import json as _json
+    import tkinter as tk
+    from tkinter import messagebox
+    if not mem:
+        messagebox.showinfo(_texto(idioma, 'claves_titulo'),
+                            _texto(idioma, 'claves_sin_proyecto'))
+        return
+    plantilla = os.path.join(RAIZ, 'plantillas', 'imagen_config.json')
+    try:
+        with open(plantilla, encoding='utf-8') as fh:
+            base = _json.load(fh)
+    except (OSError, ValueError) as e:
+        messagebox.showinfo(_texto(idioma, 'claves_titulo'), 'sin dato: %s' % e)
+        return
+    ayuda = base.get('_ayuda') or {}
+    ruta = os.path.join(mem, 'imagen_config.json')
+    actual = {}
+    if os.path.isfile(ruta):
+        try:
+            with open(ruta, encoding='utf-8') as fh:
+                actual = _json.load(fh)
+        except (OSError, ValueError):
+            actual = {}
+
+    v = tk.Toplevel(padre)
+    v.title(_texto(idioma, 'claves_titulo'))
+    v.configure(bg=C_FONDO)
+    v.transient(padre)
+    tk.Label(v, text=_texto(idioma, 'claves_intro'), bg=C_FONDO, fg=C_TINTA,
+             justify='left', anchor='w').pack(fill='x', padx=12, pady=(12, 4))
+    tk.Label(v, text=ruta, bg=C_FONDO, fg=C_ACENTO, anchor='w',
+             justify='left').pack(fill='x', padx=12, pady=(0, 8))
+    tk.Frame(v, bg=C_BORDE, height=1).pack(fill='x', padx=12)
+
+    barra_v = tk.Frame(v, bg=C_FONDO)
+    barra_v.pack(side='bottom', fill='x', padx=12, pady=12)
+    cuerpo = tk.Frame(v, bg=C_FONDO)
+    cuerpo.pack(side='top', fill='both', expand=True)
+    lienzo = tk.Canvas(cuerpo, bg=C_FONDO, highlightthickness=0, bd=0)
+    barra = tk.Scrollbar(cuerpo, orient='vertical', command=lienzo.yview,
+                         bg=C_PANEL, troughcolor=C_FONDO, activebackground=C_ACENTO,
+                         highlightthickness=0, bd=0)
+    lienzo.configure(yscrollcommand=barra.set)
+    barra.pack(side='right', fill='y')
+    lienzo.pack(side='left', fill='both', expand=True, padx=(12, 0), pady=8)
+    dentro = tk.Frame(lienzo, bg=C_FONDO)
+    ventana_i = lienzo.create_window((0, 0), window=dentro, anchor='nw')
+    dentro.bind('<Configure>', lambda e: lienzo.configure(scrollregion=lienzo.bbox('all')))
+    lienzo.bind('<Configure>', lambda e: lienzo.itemconfigure(ventana_i, width=e.width))
+
+    campos = {}
+    for fila, (campo, info) in enumerate(ayuda.items()):
+        caja = tk.Frame(dentro, bg=C_FONDO)
+        caja.pack(fill='x', pady=(0, 10))
+        puesta = bool(actual.get(campo) or base.get(campo))
+        tk.Label(caja, text=campo, bg=C_FONDO, fg=C_TINTA_VIVA, anchor='w',
+                 width=24).grid(row=0, column=0, sticky='w')
+        tk.Label(caja, text='[%s]' % _texto(idioma, 'claves_puesta' if puesta else 'claves_vacia'),
+                 bg=C_FONDO, fg=(C_OK if puesta else C_ACENTO),
+                 anchor='w', width=10).grid(row=0, column=1, sticky='w')
+        e = tk.Entry(caja, bg=C_PANEL, fg=C_TINTA_VIVA, insertbackground=C_ACENTO,
+                     relief='flat', highlightthickness=1, highlightbackground=C_BORDE,
+                     highlightcolor=C_ACENTO, show='•', width=34)
+        e.grid(row=0, column=2, sticky='we', padx=(8, 0))
+        caja.columnconfigure(2, weight=1)
+        campos[campo] = e
+        tk.Label(caja, text=info.get('desbloquea', ''), bg=C_FONDO, fg=C_TINTA,
+                 anchor='w', justify='left', wraplength=620).grid(row=1, column=0, columnspan=3, sticky='w')
+        detalle = info.get('donde', '')
+        if info.get('nota'):
+            detalle += '   ⚠ ' + info['nota']
+        tk.Label(caja, text=detalle, bg=C_FONDO, fg=C_ACENTO, anchor='w',
+                 justify='left', wraplength=620).grid(row=2, column=0, columnspan=3, sticky='w')
+
+    def guardar():
+        nuevos = {c: e.get().strip() for c, e in campos.items() if e.get().strip()}
+        if not nuevos:
+            messagebox.showinfo(_texto(idioma, 'claves_titulo'),
+                                _texto(idioma, 'claves_sin_cambios'))
+            v.destroy()
+            return
+        datos = dict(base)
+        datos.update(actual)
+        datos.update(nuevos)
+        datos.pop('_ayuda', None)          # la ayuda vive en la plantilla, no en tu fichero
+        os.makedirs(mem, exist_ok=True)
+        with open(ruta, 'w', encoding='utf-8') as fh:
+            _json.dump(datos, fh, ensure_ascii=False, indent=2)
+        # se dice CUÁNTAS, nunca cuáles ni su valor
+        messagebox.showinfo(_texto(idioma, 'claves_titulo'),
+                            _texto(idioma, 'claves_guardadas') % (len(nuevos), ruta))
+        v.destroy()
+
+    tk.Button(barra_v, text=_texto(idioma, 'claves_guardar'), command=guardar,
+              bg=C_PANEL, fg=C_TINTA_VIVA, activebackground=C_ACENTO, activeforeground=C_FONDO,
+              relief='flat', bd=0, highlightthickness=1, highlightbackground=C_BORDE,
+              padx=14, pady=6, cursor='hand2').pack(side='left')
+    tk.Button(barra_v, text=_texto(idioma, 'claves_cancelar'), command=v.destroy,
+              bg=C_PANEL, fg=C_TINTA_VIVA, activebackground=C_ACENTO, activeforeground=C_FONDO,
+              relief='flat', bd=0, highlightthickness=1, highlightbackground=C_BORDE,
+              padx=14, pady=6, cursor='hand2').pack(side='right')
+
+    v.update_idletasks()
+    lienzo.configure(height=min(dentro.winfo_reqheight(), int(v.winfo_screenheight() * 0.55)),
+                     width=dentro.winfo_reqwidth())
+    v.update_idletasks()
+    v.geometry('%dx%d' % (v.winfo_reqwidth(), min(v.winfo_reqheight(),
+                                                  int(v.winfo_screenheight() * 0.84))))
+    return v
+
+
 def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma='es'):
     skills_dir = skills_dir or SKILLS_DIR_POR_DEFECTO
     import tkinter as tk
@@ -1539,16 +2465,69 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
 
     root = tk.Tk()
     root.title(_texto(idioma, 'ventana_titulo'))
-    root.resizable(False, False)
+    root.configure(bg=C_FONDO)
+
+    # ── que quepa, antes que nada ───────────────────────────────────────────
+    # MEDIDO el 9-sep-2026: con 22 módulos la ventana pedía 682x1594 px en una pantalla de
+    # 1920x1080 y estaba fijada con resizable(False, False). Los cuatro botones quedaban
+    # 514 px POR DEBAJO del borde inferior: la ventana no se podía usar y nadie lo había
+    # visto porque nada lo medía. La lista va ahora dentro de un lienzo con barra, la
+    # ventana crece a lo alto, y el alto de arranque se limita a lo que dé la pantalla.
+    root.resizable(False, True)
+
+    # los colores por defecto de TODO widget clásico que se cree a partir de aquí; los
+    # `messagebox` son de Windows y no obedecen: eso se queda gris y se dice
+    for patron, valor in (('*background', C_FONDO), ('*foreground', C_TINTA),
+                          ('*Label.background', C_FONDO), ('*Label.foreground', C_TINTA),
+                          ('*Checkbutton.background', C_FONDO),
+                          ('*Checkbutton.foreground', C_TINTA),
+                          ('*Checkbutton.activeBackground', C_FONDO),
+                          ('*Checkbutton.activeForeground', C_ACENTO),
+                          ('*Checkbutton.selectColor', C_ACENTO),
+                          ('*Button.background', C_PANEL),
+                          ('*Button.foreground', C_TINTA_VIVA),
+                          ('*Button.activeBackground', C_ACENTO),
+                          ('*Button.activeForeground', C_FONDO),
+                          ('*Button.highlightBackground', C_BORDE),
+                          ('*Frame.background', C_FONDO),
+                          ('*Canvas.background', C_FONDO)):
+        root.option_add(patron, valor)
 
     tk.Label(root, text=_texto(idioma, 'settings_prefix') + str(settings_ruta),
-             anchor='w').pack(fill='x', padx=8, pady=(8, 0))
+             anchor='w', bg=C_FONDO, fg=C_TINTA_VIVA).pack(fill='x', padx=10, pady=(10, 0))
     proyecto_txt = proj or _texto(idioma, 'ventana_proyecto_sin_resolver')
     tk.Label(root, text=_texto(idioma, 'ventana_proyecto_label', proj=proyecto_txt),
-             anchor='w', fg='gray').pack(fill='x', padx=8)
+             anchor='w', bg=C_FONDO, fg=C_ACENTO).pack(fill='x', padx=10)
 
-    marco = tk.Frame(root)
-    marco.pack(fill='both', expand=True, padx=8, pady=8)
+    # El cuerpo va en su propio marco. Sin él, el lienzo y su barra se reparten TODO el
+    # espacio que queda y la fila de botones acaba flotando arriba a la derecha — que es
+    # exactamente lo que pasó al primer intento.
+    # En Tk, lo que va abajo se empaqueta ANTES que lo que se expande: si el cuerpo se
+    # lleva primero todo el hueco, la fila de botones se queda con 1 px y sus botones ni
+    # llegan a mapearse. Medido: `visible=0` en los cuatro. Así que el marco de los botones
+    # se crea aquí, vacío, y más abajo se le meten dentro cuando existen sus funciones.
+    tk.Frame(root, bg=C_BORDE, height=1).pack(side='bottom', fill='x')
+    botones = tk.Frame(root, bg=C_FONDO)
+    botones.pack(side='bottom', fill='x', padx=10, pady=10)
+
+    cuerpo = tk.Frame(root, bg=C_FONDO)
+    cuerpo.pack(side='top', fill='both', expand=True)
+    lienzo = tk.Canvas(cuerpo, bg=C_FONDO, highlightthickness=0, bd=0)
+    barra = tk.Scrollbar(cuerpo, orient='vertical', command=lienzo.yview,
+                         bg=C_PANEL, troughcolor=C_FONDO, activebackground=C_ACENTO,
+                         highlightthickness=0, bd=0)
+    lienzo.configure(yscrollcommand=barra.set)
+    barra.pack(side='right', fill='y')
+    lienzo.pack(side='left', fill='both', expand=True, padx=(10, 0), pady=8)
+    marco = tk.Frame(lienzo, bg=C_FONDO)
+    _ventana_interior = lienzo.create_window((0, 0), window=marco, anchor='nw')
+    marco.bind('<Configure>',
+               lambda e: lienzo.configure(scrollregion=lienzo.bbox('all')))
+    lienzo.bind('<Configure>',
+                lambda e: lienzo.itemconfigure(_ventana_interior, width=e.width))
+    # la rueda del ratón, que en Windows llega con delta de 120 por muesca
+    lienzo.bind_all('<MouseWheel>',
+                    lambda e: lienzo.yview_scroll(int(-e.delta / 120), 'units'))
 
     variables = {}
     etiquetas_estado = {}
@@ -1627,14 +2606,44 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
         msjs, _ok = instalar_dependencias(ids, python_exe=python_exe, idioma=idioma)
         messagebox.showinfo(_texto(idioma, 'titulo_abyss'), '\n'.join(msjs) or _texto(idioma, 'msg_nada_que_hacer'))
 
-    botones = tk.Frame(root)
-    botones.pack(fill='x', padx=8, pady=(0, 8))
-    tk.Button(botones, text=_texto(idioma, 'boton_instalar'), command=hacer_instalar).pack(side='left')
-    tk.Button(botones, text=_texto(idioma, 'boton_desinstalar'), command=hacer_desinstalar).pack(side='left', padx=6)
-    tk.Button(botones, text=_texto(idioma, 'boton_dependencias'), command=hacer_dependencias).pack(side='left', padx=6)
-    tk.Button(botones, text=_texto(idioma, 'boton_cerrar'), command=root.destroy).pack(side='right')
+    def _boton(padre, texto, orden_):
+        """El color de un botón no llega por `option_add` en Windows: hay que dárselo.
+        Medido: con solo option_add salían grises de sistema sobre el fondo oscuro."""
+        return tk.Button(padre, text=texto, command=orden_,
+                         bg=C_PANEL, fg=C_TINTA_VIVA,
+                         activebackground=C_ACENTO, activeforeground=C_FONDO,
+                         relief='flat', bd=0, highlightthickness=1,
+                         highlightbackground=C_BORDE, highlightcolor=C_ACENTO,
+                         padx=14, pady=6, cursor='hand2')
+
+    _boton(botones, _texto(idioma, 'boton_instalar'), hacer_instalar).pack(side='left')
+    _boton(botones, _texto(idioma, 'boton_desinstalar'), hacer_desinstalar).pack(side='left', padx=6)
+    _boton(botones, _texto(idioma, 'boton_dependencias'), hacer_dependencias).pack(side='left', padx=6)
+    _boton(botones, _texto(idioma, 'boton_claves'),
+           lambda: _ventana_claves(root, mem, idioma)).pack(side='left', padx=6)
+    _boton(botones, _texto(idioma, 'boton_cerrar'), root.destroy).pack(side='right')
 
     refrescar()
+
+    # El alto de arranque: lo que pida, pero nunca más de lo que hay de pantalla. Se calcula
+    # DESPUÉS de montar todo y se comprueba contra la pantalla de verdad; nunca se escribe un
+    # geometry() con números a mano, que se rompe en cuanto cambie una fuente o el idioma.
+    root.update_idletasks()
+    # Un lienzo no pide el alto de lo que lleva dentro: hay que decírselo. Se le da el alto
+    # de la lista entera, y luego la ventana se topa a lo que dé la pantalla; lo que no
+    # quepa se alcanza con la barra o con la rueda.
+    alto_lista = marco.winfo_reqheight()
+    alto_util = int(root.winfo_screenheight() * 0.84)
+    lienzo.configure(height=alto_lista, width=marco.winfo_reqwidth())
+    root.update_idletasks()
+    ancho = root.winfo_reqwidth()
+    alto = min(root.winfo_reqheight(), alto_util)
+    # y COLOCADA donde quepa: con el tamaño arreglado pero puesta en +239, su borde inferior
+    # caía en 1146 de una pantalla de 1080. Centrada horizontal, y arriba con un margen.
+    x = max(0, (root.winfo_screenwidth() - ancho) // 2)
+    y = max(0, min(60, root.winfo_screenheight() - alto - 40))
+    root.geometry('%dx%d+%d+%d' % (ancho, alto, x, y))
+    root.minsize(min(ancho, 560), 360)
     return root
 
 
@@ -1672,6 +2681,10 @@ if __name__ == '__main__':
         _listar(settings_ruta, skills_dir=skills_dir, idioma=idioma)
         sys.exit(0)
 
+    if '--claves' in argv:
+        _claves(argv, idioma)
+        sys.exit(0)
+
     if '--dependencias' in argv:
         print(_tabla_dependencias(idioma, python_exe=python_exe))
         sys.exit(0)
@@ -1684,6 +2697,18 @@ if __name__ == '__main__':
                 sys.stderr.write(_texto(idioma, 'dep_modulo_desconocido', mod=m) + '\n')
             sys.exit(2)
         mensajes, ok = instalar_dependencias(modulos_dep, python_exe=python_exe, idioma=idioma)
+        for msj in mensajes:
+            print(msj)
+        sys.exit(0 if ok else 1)
+
+    if '--modelo' in argv:
+        mensajes, ok = descargar_vendor_modelo(idioma=idioma)
+        for msj in mensajes:
+            print(msj)
+        sys.exit(0 if ok else 1)
+
+    if '--manos' in argv:
+        mensajes, ok = descargar_vendor_mp(idioma=idioma)
         for msj in mensajes:
             print(msj)
         sys.exit(0 if ok else 1)

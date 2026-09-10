@@ -254,6 +254,11 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/lienzo.py" numeros <foto> \
 python "${CLAUDE_PLUGIN_ROOT}/abyss/lienzo.py" borrar <img> \
     (--caja x,y,w,h | --mascara m.png | --color #rrggbb[,tolerancia]) \
     [--metodo telea|ns|taller] [--salida f.png]
+python "${CLAUDE_PLUGIN_ROOT}/abyss/lienzo.py" cubista <foto> \
+    [--facetas 220] [--desplazamiento 0.07] [--giro 7] [--sin-contorno] \
+    [--pasos N --pasos-dir DIR] [--salida f.png]
+python "${CLAUDE_PLUGIN_ROOT}/abyss/lienzo.py" surrealista <foto> \
+    [--fuerza 26] [--escala 90] [--viraje 42] [--pasos N --pasos-dir DIR] [--salida f.png]
 ```
 
 - **`fundir`**: `b` al tamaño de `a`, combinada con un modo de mezcla clásico;
@@ -302,12 +307,43 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/lienzo.py" borrar <img> \
   más textura que el resto, avisa («borrón probable…», y lo deja en el JSON
   como `aviso`) y hace falta `--metodo taller` (ver abajo) — con `--metodo
   taller` no avisa, porque ya es el recomendado.
+- **`cubista`/`surrealista`** (petición del usuario, 9-sep: "dos estilos
+  pictóricos nuevos" — cubismo y surrealismo NO son otra pincelada de
+  `pintor.py`, son otra COMPOSICIÓN de la imagen entera; ver el docstring de
+  `lienzo.py` para el porqué viven aquí y no ahí). `cubista`: triangulación
+  de Delaunay sembrada en los bordes reales de la foto (`cv2.Canny` +
+  `cv2.Subdiv2D`), cada faceta aplanada a su color medio y desplazada/girada
+  un poco alrededor de su centro, de mayor a menor área, sobre un fondo
+  difuminado (sin OpenCV, cae a una rejilla triangular con jitter — declarado
+  como lo que es, no una Delaunay real). `surrealista`: campo de
+  deformación de baja frecuencia (deshace las formas sin romperlas) más un
+  viraje de tono HSV. Los dos aceptan `--pasos N --pasos-dir DIR` para
+  escribir una progresión de fotogramas (facetas reveladas de mayor a menor,
+  o el campo/viraje interpolado de 0 a su fuerza completa) que
+  `video_composicion.py` convierte en `.mp4` — ver más abajo.
 
 `lienzo.py` no toca `memory/` ni resuelve un proyecto para `fundir`/`doble`/
-`collage`/`degradado`/`restaurar`/`numeros`/`borrar --metodo telea|ns`: nada
-sale de la máquina. Solo `borrar --metodo taller` lee `taller_url` de
-`memory/imagen_config.json` y manda imagen+máscara a esa URL (local: no sale
-de la máquina) — sin esa clave configurada, «sin dato».
+`collage`/`degradado`/`restaurar`/`numeros`/`borrar --metodo telea|ns`/
+`cubista`/`surrealista`: nada sale de la máquina. Solo `borrar --metodo
+taller` lee `taller_url` de `memory/imagen_config.json` y manda
+imagen+máscara a esa URL (local: no sale de la máquina) — sin esa clave
+configurada, «sin dato».
+
+### `video_composicion.py`: el vídeo del proceso de `cubista`/`surrealista`
+
+```
+python "${CLAUDE_PLUGIN_ROOT}/abyss/video_composicion.py" <pasos_dir> <salida.mp4> \
+    [--segundos 8] [--fps 30] [--hold-ini 0.6] [--hold-fin 1.6] [--ancho N]
+```
+
+Hermano de `video_pintura.py` (que hace lo mismo para los trazos de
+`pintor.py`) pero para las carpetas de `paso_*.png` que escriben `lienzo.py
+cubista`/`surrealista --pasos`: como cada paso ya es una imagen entera (no
+una pincelada con un radio que pesar), el ritmo es sencillo — reparto igual
+entre pasos, con un `hold` fijo al principio y al final. Depende de
+`imageio_ffmpeg` (la misma dependencia opcional que ya necesita
+`video_pintura.py`); sin ella, o sin ningún `paso_*.png` en `pasos_dir`,
+«sin video: ...» y código 2.
 
 ## `taller.py`: un servidor local de texto→imagen (opcional, pesado)
 

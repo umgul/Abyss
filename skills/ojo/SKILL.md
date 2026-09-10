@@ -51,7 +51,7 @@ encamina el mismo argv que recibiría ese módulo si se invocara directo:
 | `manual` | OCR de varias fotos, ordenadas y limpias, en markdown (sin resumir) | `lectura_visual.py` |
 | `despiece` | separa el objeto del fondo y lo reparte en capas (2,5D) para `render3d.py` | `volumen.py` |
 | `prompt3d` | mide paleta/proporción/horizonte/formas y escribe un prompt three.js ES/EN | `volumen.py` |
-| `gestos` | sirve dedos/pellizco/pose/escala por HTTP local, para manejar un holograma | `gestos.py` |
+| `gestos` | sirve dedos/pellizco/pose/escala por HTTP local — el estado de la mano, ya traducido. Es el ESPEJO en Python de `abyss/plantillas/gestos_comun.js`, que es la copia que manda; los visores kinéticos usan ese módulo en el navegador y **no** este servidor, que hoy no lo consume nadie | `gestos.py` |
 
 ## `mirar`: un fotograma de la webcam (autónomo, sin delegar)
 
@@ -119,7 +119,12 @@ reconstrucción 3D**: todo sale de heurísticas declaradas sobre una sola foto
   luminoso suele estar delante en una foto bien compuesta — nunca una medida
   de distancia real); escribe una `escena.json` de planos texturizados que
   `render3d.py` abre con su deslizador de explosión. `--html` además escribe
-  esa página, con un aviso fijo de que es 2,5D, no 3D.
+  esa página, con un aviso fijo de que es 2,5D, no 3D. **Esto es lo VIEJO y lo
+  PEOR**: separa por nitidez, no por componente real, así que dos piezas
+  igual de enfocadas quedan en la misma capa aunque sean objetos distintos.
+  Para separar los COMPONENTES REALES de una foto (regiones puestas a mano +
+  GrabCut, sin adivinar por nitidez) y manejarlos en 3D con la mano por la
+  cámara, ver la skill `kinetica` — no esta.
 - **`prompt3d`**: mide paleta dominante (k-medias), proporción del objeto,
   horizonte (si hay uno claro) y formas dominantes por circularidad de
   contorno, y escribe un prompt de diseño ES/EN para three.js con esos
@@ -137,13 +142,28 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/ojo.py" gestos [--camara 0] [--puerto 8799] 
 Delega entero en `gestos.py` (`ESPECIFICACION_TANDA4.md` T4.5). MediaPipe lee
 21 puntos por mano; el vocabulario es **propio de este paquete**, no el de
 ningún tutorial ajeno: número de dedos aísla capas del despiece, pellizco
-desliza la explosión, pose de la palma orbita la cámara, mano abierta y
-quieta un segundo captura PNG, dos manos escalan. Sirve el estado por HTTP
+desliza la explosión, pose de la palma orbita la cámara, la palma abierta y
+sin moverse durante `segundos_captura_quieta` (**1,0 s** por defecto,
+cambiable con `--vocabulario`) marca `gesto_completado` = `"captura"`, dos
+manos escalan. Ojo con la de la palma quieta: `gestos.py` **publica ese campo
+en su JSON y nada más** — no escribe imagen alguna, y hoy ningún programa lee
+ese estado (la página de `render3d.py` no lo sondea). Sirve el estado por HTTP
 **SOLO en `127.0.0.1`** — nunca fuera de la máquina. **DEPENDENCIA**:
 `mediapipe` (y `opencv-python` para la cámara); sin ellas, dice exactamente
 qué instalar y sale con código 2. Este verbo se queda corriendo hasta que se
-interrumpe (`Ctrl+C`): úsalo solo cuando el usuario quiera de verdad manejar
-el holograma con la mano, no como paso intermedio de otra tarea.
+interrumpe (`Ctrl+C`): úsalo solo cuando el usuario quiera de verdad leer el
+estado de su mano, no como paso intermedio de otra tarea.
+
+**Dónde SÍ mueve algo este vocabulario**: en el visor de la skill `kinetica`,
+que lo reimplementa aparte, dentro del navegador (MediaPipe Tasks Vision
+servido en local), sin llamar a `gestos.py`. Allí los dos vocabularios ya han
+divergido: la mano abierta y quieta 3 s abre un **holograma** del producto
+montado sobre la propia palma, con fondo transparente y anclado a tres puntos
+de la mano — la pantalla dice que es un montaje sobre el vídeo, no una medida
+del espacio — y, dentro de él, cerrar la mano 0,6 s abre
+el sitio oficial del producto **solo si la ficha trae reconocimiento con
+evidencia**: sin reconocimiento no hay enlace, y el visor escribe el motivo.
+Para eso, `kinetica`, no este verbo.
 
 ## Cómo se ejecuta
 
@@ -173,10 +193,19 @@ sirve HTTP solo en `127.0.0.1`: nadie fuera de la máquina puede leerlo.
   `volumen.py` y `gestos.py` (y sus skills, si hace falta más detalle).
 - `despiece`/`prompt3d` no reconocen objetos: miden geometría y color de la
   silueta 2D, nunca dicen "esto es una taza".
+- `despiece` separa por nitidez+luminancia, NO por componente real — es la
+  vía vieja y peor para "quiero ver las piezas reales de esto"; esa tarea es
+  de la skill `kinetica` (regiones puestas a mano + GrabCut + mano por la
+  cámara), no de `ojo`.
 - `manual` no resume: entrega texto limpio y ordenado, no una síntesis.
 - `gestos` se queda corriendo (servidor HTTP + bucle de cámara) hasta que se
   interrumpe — no es un comando que "termina y devuelve un resultado" como
   los demás verbos.
+- `gestos` sirve el estado, pero **nada lo consume**: la página de
+  `render3d.py` no lee `/estado` ni reacciona, y `gestos.py` no escribe
+  ninguna imagen — el campo `gesto_completado` es una etiqueta, no un efecto.
+  El único sitio donde este vocabulario mueve algo de verdad hoy es el visor
+  de la skill `kinetica`, que lo reimplementa en el navegador por su cuenta.
 
 ## Reglas SGICP de esta pieza
 

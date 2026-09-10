@@ -72,6 +72,22 @@ Eso sí, `memory/huella/<sesión>.jsonl` guarda el TEXTO LITERAL de cada comando
 de Bash/PowerShell (recortado a 200 caracteres): si sueles pasar un token o
 una cabecera `Authorization` por línea de comandos, quedará ahí en local.
 
+## Cómo activarla
+
+Viene **apagada**, y encenderla es un comando:
+
+```
+python instalar.py --instalar huella
+```
+
+`python instalar.py --listar` la muestra con su estado, lo que toca y su aviso de coste
+antes de que decidas. Para apagarla otra vez: `python instalar.py --desinstalar huella`.
+
+Está apagada por el gancho `PostToolUse`, que corre **tras cada herramienta**: la foto de
+puertos y procesos cuesta cerca de un segundo cada vez, y eso se paga en todos los comandos
+del hilo, no solo en los que abren algo. Encenderla es una decisión sobre ese peaje, y por
+eso no se toma por ti.
+
 ## Límites honestos
 
 - **APAGADO por defecto** (`instalar.py`): el gancho `PostToolUse` corre tras

@@ -2,6 +2,10 @@
   "name": "abyss",
   "version": "0.1.0",
   "description": "Skills and self-instrumentation for Claude Code that measure instead of decree.",
+  "author": {
+    "name": "Jordi Figueras Casas",
+    "url": "https://github.com/umgul"
+  },
   "homepage": "https://github.com/umgul/abyss",
   "repository": "https://github.com/umgul/abyss",
   "license": "Apache-2.0",

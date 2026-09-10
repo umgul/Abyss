@@ -56,3 +56,7 @@
 #   ninguna otra pieza de este paquete las necesita.
 # diffusers
 # torch
+
+# fondo.py, motor `modelo` (recorte de fondo en local). Opcional: sin el,
+# fondo.py cae a GrabCut y lo avisa.
+onnxruntime

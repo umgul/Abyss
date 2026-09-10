@@ -61,6 +61,13 @@ EXCLUIR_DIRS = {'__pycache__', '.git'}
 # `.gitignore` cambiara de forma o no se pudiera leer (ESPECIFICACION.md §1/§4):
 # la única excepción documentada es este fichero, que escribe el propio instalador.
 SIEMPRE_IGNORADOS = {'abyss/config.json'}
+# Y los tres sitios donde el autor SE DECLARA, que es lo contrario de un dato personal
+# colado: un paquete sin autor con nombre real es un hallazgo de su propio auditor
+# (`auditar.py`, comprobación 1: «ningún manifiesto declara un autor con nombre real»),
+# y la licencia Apache-2.0 pide un titular de copyright o no protege a nadie. La regla
+# general no se toca: el nombre va AQUÍ y en ningún otro fichero del repositorio, y esta
+# lista es corta a propósito para que ampliarla sea una decisión, no un descuido.
+DONDE_SE_FIRMA = {'LICENSE', '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'}
 
 
 def _patrones_gitignore(raiz):
@@ -81,7 +88,7 @@ def _ignorado(ruta, patrones, raiz):
     (anclado a la raíz si lleva `/` que no sea solo el final, `**/` = cualquier
     profundidad, sin `/` = nombre en cualquier sitio, `/` final = directorio)."""
     rel = ruta.relative_to(raiz).as_posix()
-    if rel in SIEMPRE_IGNORADOS:
+    if rel in SIEMPRE_IGNORADOS or rel in DONDE_SE_FIRMA:
         return True
     partes = rel.split('/')
     for pat in patrones:
