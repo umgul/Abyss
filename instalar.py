@@ -1429,6 +1429,8 @@ TEXTOS = {
         'boton_cerrar': 'Cerrar',
         'titulo_abyss': 'Abyss',
         'titulo_aviso': 'Abyss · aviso',
+        'falta_paquetes': 'Instalado. Pero faltan {n} paquete(s) de Python para que todo funcione: {cuales}. Sin ellos, esos módulos avisan y siguen, no revientan. ¿Miramos las dependencias ahora?',
+        'falta_claves': 'Quedan {n} clave(s) sin poner. Cada una desbloquea una fuente distinta y sin ella esa fuente sencillamente no aporta; nada se rompe. ¿Las pones ahora?',
         'titulo_telegram': 'Abyss · Telegram',
         'msg_sin_modulos': 'No hay módulos marcados.',
         'msg_confirmar_permisos': ('El módulo «permisos» deja que el propio asistente edite settings.json '
@@ -1552,6 +1554,8 @@ TEXTOS = {
         'boton_cerrar': 'Close',
         'titulo_abyss': 'Abyss',
         'titulo_aviso': 'Abyss · notice',
+        "falta_paquetes": "Installed. But {n} Python package(s) are missing for everything to work: {cuales}. Without them those modules warn and carry on, they do not break. Shall we look at dependencies now?",
+        'falta_claves': 'There are {n} key(s) still unset. Each one unlocks a different source, and without it that source simply contributes nothing; nothing breaks. Set them now?',
         'titulo_telegram': 'Abyss · Telegram',
         'msg_sin_modulos': 'No modules are checked.',
         'msg_confirmar_permisos': ('The "permisos" module lets the assistant itself edit settings.json without '

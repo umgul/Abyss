@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="es" data-lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abyss</title>
+<style>
+/* ==========================================================================
+   Instalador web de Abyss.
+
+   La paleta de abajo NO se ha elegido a ojo: son los mismos tonos, con el
+   mismo criterio de contraste MEDIDO, que ya usa la interfaz hermana de este
+   proyecto (WCAG, sRGB relativo). Verificado aquí con la fórmula real antes
+   de escribir una sola regla (fondo #0a0a0f, el mismo "negro de panel" que ya
+   usa `instalar.py` para sus propios colores de ventana, en vez del negro
+   puro del vestíbulo — este instalador es un panel de control, no una
+   portada de bienvenida):
+
+     iris-vivo #8fbdd1 -> 9.75:1      tinta #f2f4f6      -> 17.91:1
+     piel      #bf8c73 -> 6.79:1      tinta-alta (.72)   ->  9.32:1
+     ok        #00b894 -> 7.79:1      tinta-baja (.52)   ->  5.28:1
+     iris      #567a8b -> 4.28:1      tinta-nula (.48)   ->  4.61:1
+     labio     #a4564d -> 3.78:1  (bajo 4,5:1: JAMÁS como texto, solo adorno)
+     iris-hondo#39596b -> 2.65:1  (idem: nunca texto)
+
+   El suelo legal es 4,5:1. `labio` e `iris-hondo` se quedan fuera de eso, así
+   que aquí no llevan ni una letra encima: solo una línea decorativa bajo el
+   logotipo, donde el contraste no importa.
+   ========================================================================== */
+:root{
+  --fondo:      #0a0a0f;
+  --panel:      #12121a;
+  --panel-alta: #171821;
+  --iris:       #567a8b;
+  --iris-hondo: #39596b;
+  --iris-vivo:  #8fbdd1;
+  --piel:       #bf8c73;
+  --labio:      #a4564d;
+  --tinta:      #f2f4f6;
+  --tinta-alta: rgba(242,244,246,.72);
+  --tinta-baja: rgba(242,244,246,.52);
+  --tinta-nula: rgba(242,244,246,.48);
+  --linea:      rgba(242,244,246,.14);
+  --ok:         #00b894;
+  --ok-fondo:   rgba(0,184,148,.10);
+  --ok-borde:   rgba(0,184,148,.38);
+  --piel-fondo: rgba(191,140,115,.10);
+  --piel-borde: rgba(191,140,115,.38);
+  --tipo: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+          system-ui, sans-serif;
+  --mono: Consolas, "Cascadia Mono", "Courier New", monospace;
+  color-scheme: dark;
+}
+
+*, *::before, *::after{ box-sizing:border-box; }
+
+html, body{
+  height:100%;
+  margin:0;
+  background:var(--fondo);
+  overflow:hidden;                 /* pantalla completa: solo la lista interior se desplaza */
+  overscroll-behavior:none;
+}
+body{
+  font-family:var(--tipo);
+  color:var(--tinta);
+  font-size:15px;                  /* tamaño medio a propósito: ni diminuto ni gigante */
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+button, input{ font:inherit; color:inherit; }
+h1,h2,h3,p,ul{ margin:0; padding:0; list-style:none; }
+:focus-visible{ outline:2px solid var(--iris-vivo); outline-offset:2px; border-radius:4px; }
+@media (prefers-reduced-motion:reduce){ *{ transition-duration:.01ms !important; animation-duration:.01ms !important; } }
+
+/* ==========================================================================
+   ESQUELETO — cabecera / cuerpo (con scroll propio) / pie, los tres a lo
+   ancho de una ventana que nunca se desplaza entera.
+   ========================================================================== */
+#app{ position:fixed; inset:0; display:flex; flex-direction:column; }
+
+/* ==========================================================================
+   LA PORTADA — el logotipo, reproducido en CSS (nunca un PNG: así escala sin
+   empaquetar nada). Fondo casi negro, "Abyss" grande y de peso fino en el
+   azul claro, y debajo el lema con "Claude" en el naranja cálido — igual en
+   los dos idiomas salvo la frase que lo precede.
+   ========================================================================== */
+#portada{
+  position:relative;
+  flex:none;
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:1.5rem;
+  padding:clamp(1.3rem,3vh,2.2rem) clamp(1.2rem,4vw,2.8rem);
+  border-bottom:1px solid var(--linea);
+  background:
+    radial-gradient(ellipse 70% 140% at 50% -20%, rgba(86,122,139,.22), transparent 60%),
+    var(--fondo);
+}
+#marca{ grid-column:2; text-align:center; }
+#logo{
+  font-size:clamp(2.5rem,5.4vw,3.8rem);
+  font-weight:300;
+  letter-spacing:.03em;
+  color:var(--iris-vivo);
+  line-height:1;
+}
+#logo::after{
+  content:"";
+  display:block;
+  width:2.6em;
+  height:2px;
+  margin:.55em auto 0;
+  border-radius:2px;
+  background:linear-gradient(90deg, transparent, var(--labio), var(--iris-hondo), transparent);
+  opacity:.6;
+}
+#eslogan{
+  margin-top:.7rem;
+  font-size:clamp(.86rem,1.6vw,1rem);
+  letter-spacing:.02em;
+  color:var(--tinta-alta);
+  white-space:normal;
+}
+#marca-claude{ color:var(--piel); font-weight:600; }
+
+#meta-rutas{
+  grid-column:1;
+  font-size:.72rem;
+  color:var(--tinta-baja);
+  line-height:1.6;
+  overflow-wrap:anywhere;
+}
+#meta-rutas .meta-etq{ color:var(--tinta-nula); }
+#meta-rutas .meta-falta{ color:var(--piel); }
+
+#controles-derecha{
+  grid-column:3;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:.6rem;
+}
+#selector-idioma{ display:flex; border:1px solid var(--linea); border-radius:999px; padding:2px; gap:2px; }
+.idioma-btn{
+  border:none; background:none; cursor:pointer;
+  padding:.28rem .68rem; border-radius:999px;
+  font-size:.72rem; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--tinta-baja);
+  transition:background .2s ease, color .2s ease;
+}
+.idioma-btn:hover{ color:var(--tinta); }
+.idioma-btn.activo{ background:rgba(143,189,209,.16); color:var(--iris-vivo); }
+#btn-cerrar-x{
+  width:1.9rem; height:1.9rem; border-radius:999px; border:1px solid transparent;
+  background:none; color:var(--tinta-baja); cursor:pointer; font-size:1.1rem; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  transition:color .2s ease, border-color .2s ease, background .2s ease;
+}
+#btn-cerrar-x:hover{ color:var(--tinta); border-color:var(--linea); background:rgba(255,255,255,.05); }
+
+@media (max-width:760px){
+  #portada{ grid-template-columns:1fr; text-align:center; }
+  #marca{ grid-column:1; order:1; }
+  #meta-rutas{ grid-column:1; order:2; text-align:center; }
+  #controles-derecha{ grid-column:1; order:3; justify-content:center; }
+}
+
+/* ==========================================================================
+   EL CUERPO — la lista de módulos, con su propia barra de desplazamiento
+   (nunca la página entera: mismo principio que la ventana Tk, que mete la
+   lista en un lienzo con barra en vez de dejar que la ventana crezca sin
+   límite — medido allí: con 22+ módulos sin esto los botones quedaban fuera
+   de la pantalla).
+   ========================================================================== */
+#cuerpo{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
+#lista-envoltorio{
+  flex:1 1 auto; min-height:0; overflow-y:auto;
+  padding:1.1rem clamp(1.2rem,4vw,2.8rem);
+  scrollbar-width:thin; scrollbar-color:var(--iris-hondo) transparent;
+}
+#lista-envoltorio::-webkit-scrollbar{ width:9px; }
+#lista-envoltorio::-webkit-scrollbar-thumb{ background:var(--iris-hondo); border-radius:6px; }
+#lista-envoltorio::-webkit-scrollbar-track{ background:transparent; }
+
+#lista-modulos{ display:flex; flex-direction:column; gap:.6rem; max-width:960px; margin:0 auto; }
+
+.modulo{
+  display:flex; gap:.85rem;
+  padding:.85rem 1rem;
+  border:1px solid var(--linea);
+  border-radius:12px;
+  background:var(--panel);
+  transition:border-color .2s ease, background .2s ease;
+}
+.modulo:hover{ border-color:rgba(143,189,209,.3); background:var(--panel-alta); }
+.modulo.marcado{ border-color:rgba(143,189,209,.45); }
+
+.modulo-check{ flex:none; padding-top:.15rem; }
+.modulo-check input{
+  width:1.05rem; height:1.05rem; accent-color:var(--iris-vivo); cursor:pointer;
+}
+.modulo-cuerpo{ flex:1; min-width:0; }
+.modulo-cabecera{ display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; margin-bottom:.3rem; }
+.modulo-id{
+  font-family:var(--mono); font-size:.86rem; font-weight:600; color:var(--tinta);
+  letter-spacing:.01em;
+}
+.pill{
+  font-size:.66rem; letter-spacing:.05em; text-transform:uppercase;
+  padding:.16rem .55rem; border-radius:999px; border:1px solid var(--linea);
+  color:var(--tinta-baja); white-space:nowrap;
+}
+.pill.ok{ color:var(--ok); background:var(--ok-fondo); border-color:var(--ok-borde); }
+.pill.apagado{ color:var(--piel); background:var(--piel-fondo); border-color:var(--piel-borde); }
+.pill.sin-gancho{ border-style:dashed; }
+
+.modulo-linea{ font-size:.86rem; color:var(--tinta-alta); }
+.modulo-linea .aviso{ color:var(--piel); }
+.modulo-toca{ margin-top:.25rem; font-size:.75rem; color:var(--tinta-baja); }
+.modulo-toca b{ color:var(--tinta-nula); font-weight:600; }
+.modulo-encender{
+  margin-top:.35rem; font-size:.72rem; font-family:var(--mono); color:var(--iris-vivo);
+  background:rgba(143,189,209,.08); border:1px solid rgba(143,189,209,.2);
+  border-radius:6px; padding:.3rem .55rem; display:inline-block;
+}
+
+/* ==========================================================================
+   EL PIE — los botones. El mismo orden que la ventana Tk: Instalar,
+   Desinstalar, Dependencias, Claves, Cerrar.
+   ========================================================================== */
+#acciones{
+  flex:none; display:flex; align-items:center; justify-content:space-between; gap:1rem;
+  padding:1rem clamp(1.2rem,4vw,2.8rem);
+  border-top:1px solid var(--linea);
+  background:var(--fondo);
+}
+#botones{ display:flex; gap:.6rem; flex-wrap:wrap; }
+.btn{
+  padding:.6rem 1.1rem; border-radius:9px; border:1px solid var(--linea);
+  background:var(--panel); color:var(--tinta);
+  cursor:pointer; font-size:.86rem; font-weight:500;
+  transition:border-color .2s ease, background .2s ease, transform .08s ease;
+}
+.btn:hover{ border-color:rgba(143,189,209,.4); background:var(--panel-alta); }
+.btn:active{ transform:scale(.98); }
+.btn-primario{ background:var(--iris-vivo); border-color:var(--iris-vivo); color:#08141b; font-weight:600; }
+.btn-primario:hover{ background:#a3cbdd; border-color:#a3cbdd; }
+.btn-fantasma{ background:none; color:var(--tinta-baja); }
+.btn-fantasma:hover{ color:var(--tinta); background:rgba(255,255,255,.04); }
+#conteo{ font-size:.76rem; color:var(--tinta-nula); white-space:nowrap; }
+
+/* ==========================================================================
+   MODALES — un único sistema reutilizado por avisos, confirmaciones,
+   dependencias y claves (nunca los diálogos grises del sistema: el motivo
+   entero de este encargo).
+   ========================================================================== */
+#velo{
+  position:fixed; inset:0; background:rgba(3,4,6,.72);
+  backdrop-filter:blur(2px); z-index:20;
+}
+#modal{ position:fixed; inset:0; z-index:21; display:flex; align-items:center; justify-content:center; padding:2rem; }
+#modal-caja{
+  width:min(640px,100%); max-height:min(82vh,720px);
+  display:flex; flex-direction:column;
+  background:var(--panel); border:1px solid var(--linea); border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.55);
+  animation:aparecer .18s ease;
+}
+#modal-caja.ancho{ width:min(940px,94vw); }
+@keyframes aparecer{ from{ opacity:0; transform:translateY(6px) scale(.98);} to{ opacity:1; transform:none; } }
+#modal-cabecera{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:1rem 1.3rem; border-bottom:1px solid var(--linea); flex:none;
+}
+#modal-titulo{ font-size:1rem; font-weight:600; color:var(--tinta); }
+#modal-cerrar{
+  width:1.8rem; height:1.8rem; border-radius:999px; border:none; background:none;
+  color:var(--tinta-baja); cursor:pointer; font-size:1.1rem;
+}
+#modal-cerrar:hover{ color:var(--tinta); }
+#modal-cuerpo{ padding:1.1rem 1.3rem; overflow-y:auto; flex:1; }
+#modal-pie{
+  flex:none; padding:.9rem 1.3rem; border-top:1px solid var(--linea);
+  display:flex; justify-content:flex-end; gap:.6rem; flex-wrap:wrap;
+}
+.modal-texto{ white-space:pre-line; font-size:.88rem; color:var(--tinta-alta); }
+
+/* Las líneas de `_tabla_dependencias()` rondan 140-160 columnas (la columna
+   "para qué" es prosa, no una etiqueta corta) — ni encogiendo la letra ni
+   partiendo el texto (`pre-wrap` rompería la alineación de las demás
+   columnas) cabe eso en un modal sin desplazamiento horizontal. Se acepta el
+   scroll propio (mismo criterio que cualquier tabla ancha) pero NUNCA en
+   silencio: barra de color visible + el mismo velo de desvanecido en el
+   borde derecho que ya usa la cinta de pestañas de la interfaz hermana para
+   avisar de que "aquí sobra contenido" — sin él, la primera vista del modal
+   parecía texto cortado a media frase, no una tabla que se puede desplazar. */
+.tabla-dependencias{
+  font-family:var(--mono); font-size:.72rem; line-height:1.6;
+  color:var(--tinta-alta); white-space:pre; overflow-x:auto;
+  background:var(--fondo); border:1px solid var(--linea); border-radius:8px;
+  padding:.8rem .9rem; margin:0;
+  scrollbar-width:thin; scrollbar-color:var(--iris-hondo) transparent;
+  -webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
+  mask-image:linear-gradient(90deg,#000 calc(100% - 22px),transparent);
+}
+.tabla-dependencias::-webkit-scrollbar{ height:9px; }
+.tabla-dependencias::-webkit-scrollbar-thumb{ background:var(--iris-hondo); border-radius:6px; }
+.tabla-dependencias::-webkit-scrollbar-track{ background:transparent; }
+
+/* La ventana de claves */
+.claves-intro{ font-size:.82rem; color:var(--tinta-alta); margin-bottom:.4rem; }
+.claves-ruta{ font-size:.76rem; color:var(--iris-vivo); overflow-wrap:anywhere; margin-bottom:.9rem; }
+.clave{ padding:.8rem 0; border-top:1px solid var(--linea); }
+.clave:first-of-type{ border-top:none; }
+.clave-cab{ display:flex; align-items:center; gap:.6rem; margin-bottom:.4rem; }
+.clave-nombre{ font-family:var(--mono); font-size:.84rem; color:var(--tinta); flex:none; min-width:13rem; }
+.clave input[type="password"]{
+  flex:1; min-width:8rem; background:var(--fondo); border:1px solid var(--linea);
+  border-radius:7px; padding:.4rem .6rem; color:var(--tinta);
+}
+.clave input[type="password"]:focus{ border-color:var(--iris-vivo); }
+.clave p{ font-size:.78rem; color:var(--tinta-baja); margin-top:.2rem; overflow-wrap:anywhere; }
+.clave p b{ color:var(--tinta-nula); font-weight:600; }
+.clave .nota{ color:var(--piel); }
+
+/* ==========================================================================
+   CARGANDO — un velo mínimo mientras se espera al servidor local (nunca más
+   de unos segundos: comprobar dependencias hace un `import` real por
+   paquete, nada de red).
+   ========================================================================== */
+#cargando{
+  position:fixed; inset:0; z-index:30; display:flex; align-items:center; justify-content:center;
+  background:rgba(3,4,6,.55);
+}
+#cargando-caja{ display:flex; align-items:center; gap:.7rem; color:var(--tinta-alta); font-size:.86rem; }
+.spinner{
+  width:1.1rem; height:1.1rem; border-radius:50%;
+  border:2px solid var(--linea); border-top-color:var(--iris-vivo);
+  animation:girar .7s linear infinite;
+}
+@keyframes girar{ to{ transform:rotate(360deg); } }
+
+[hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header id="portada">
+    <div id="meta-rutas">
+      <div><span class="meta-etq" id="meta-settings-etq"></span><span id="meta-settings"></span></div>
+      <div><span id="meta-proyecto"></span></div>
+    </div>
+
+    <div id="marca">
+      <div id="logo">Abyss</div>
+      <div id="eslogan"><span id="eslogan-pre"></span> <span id="marca-claude">Claude</span></div>
+    </div>
+
+    <div id="controles-derecha">
+      <div id="selector-idioma" role="group" aria-label="idioma / language">
+        <button type="button" class="idioma-btn" data-idioma="es">ES</button>
+        <button type="button" class="idioma-btn" data-idioma="en">EN</button>
+      </div>
+      <button type="button" id="btn-cerrar-x" aria-label="cerrar">&times;</button>
+    </div>
+  </header>
+
+  <main id="cuerpo">
+    <div id="lista-envoltorio">
+      <ul id="lista-modulos" aria-live="polite"></ul>
+    </div>
+  </main>
+
+  <footer id="acciones">
+    <div id="botones">
+      <button type="button" class="btn btn-primario" id="b-instalar"></button>
+      <button type="button" class="btn" id="b-desinstalar"></button>
+      <button type="button" class="btn" id="b-dependencias"></button>
+      <button type="button" class="btn" id="b-claves"></button>
+      <button type="button" class="btn btn-fantasma" id="b-cerrar"></button>
+    </div>
+    <div id="conteo"></div>
+  </footer>
+</div>
+
+<div id="velo" hidden></div>
+<div id="modal" hidden>
+  <div id="modal-caja" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div id="modal-cabecera">
+      <h2 id="modal-titulo"></h2>
+      <button type="button" id="modal-cerrar" aria-label="cerrar">&times;</button>
+    </div>
+    <div id="modal-cuerpo"></div>
+    <div id="modal-pie"></div>
+  </div>
+</div>
+
+<div id="cargando" hidden>
+  <div id="cargando-caja"><div class="spinner"></div><span id="cargando-texto"></span></div>
+</div>
+
+<script>
+"use strict";
+
+/* Cadenas que NO viven en instalar.py (TEXTOS) porque son propias de esta
+   página: el lema de la portada, y un puñado de etiquetas de propósito
+   general (Sí/No/Cargando…) que ningún diálogo de Tk necesitaba tener en un
+   diccionario porque los pintaba el propio sistema operativo. Todo lo
+   demás — cada botón, cada aviso, la descripción de cada módulo — llega por
+   `fetch()` desde `_texto()`/`MODULOS`: no hay ninguna traducción duplicada
+   aquí. */
+const UI_EXTRA = {
+  es: { eslogan:"una suite de habilidades para", si:"Sí", no:"No", aceptar:"Aceptar",
+        cargando:"Cargando…", desbloquea:"Desbloquea", sin_ella:"Sin ella",
+        donde:"Dónde se saca", marcados:"marcados", cerrando:"Cerrando… ya puedes cerrar esta ventana.",
+        error_conexion:"No se pudo hablar con el servidor local del instalador." },
+  en: { eslogan:"a suite of skills for", si:"Yes", no:"No", aceptar:"OK",
+        cargando:"Loading…", desbloquea:"Unlocks", sin_ella:"Without it",
+        donde:"Where to get it", marcados:"checked", cerrando:"Closing… you can close this window now.",
+        error_conexion:"Could not reach the installer's local server." },
+};
+
+const estado = { idioma:"es", textos:{}, modulos:[], settingsRuta:"", settingsExiste:true,
+                 proyecto:null, memResuelto:true, seleccion:null };
+
+const $ = (sel) => document.querySelector(sel);
+const el = (tag, props) => Object.assign(document.createElement(tag), props || {});
+
+function ui(clave){ return (UI_EXTRA[estado.idioma] || UI_EXTRA.es)[clave] || clave; }
+function t(clave, vars){
+  let s = estado.textos[clave];
+  if (s == null) return clave;
+  if (vars) for (const k in vars) s = s.split("{" + k + "}").join(vars[k]);
+  return s;
+}
+/* Sustituye %s/%d en orden, al estilo printf — solo lo usa `claves_guardadas`
+   ("Guardadas %d clave(s) en %s"), que ya viene así de `instalar.TEXTOS`. */
+function tPrintf(clave, ...args){
+  let s = estado.textos[clave] || clave, i = 0;
+  return s.replace(/%[ds]/g, () => (i < args.length ? args[i++] : ""));
+}
+
+/* ── petición al servidor local ─────────────────────────────────────────── */
+async function llamar(ruta, opciones){
+  try{
+    const r = await fetch(ruta, opciones);
+    return await r.json();
+  }catch(e){
+    avisar("Abyss", ui("error_conexion"));
+    throw e;
+  }
+}
+function mostrarCargando(si){
+  $("#cargando-texto").textContent = ui("cargando");
+  $("#cargando").hidden = !si;
+}
+
+/* ── el módulo de modales: todo pasa por aquí, nunca por confirm()/alert()
+   del navegador — esos SÍ salen grises de sistema, igual que los de Tk. ── */
+function cerrarModal(){
+  $("#modal").hidden = true; $("#velo").hidden = true;
+  $("#modal-cuerpo").innerHTML = ""; $("#modal-pie").innerHTML = "";
+  $("#modal-caja").classList.remove("ancho");
+}
+function abrirModal(titulo, ancho){
+  $("#modal-titulo").textContent = titulo;
+  $("#modal-caja").classList.toggle("ancho", !!ancho);
+  $("#modal").hidden = false; $("#velo").hidden = false;
+}
+$("#modal-cerrar").addEventListener("click", cerrarModal);
+$("#velo").addEventListener("click", cerrarModal);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#modal").hidden) cerrarModal(); });
+
+function avisar(titulo, texto){
+  return new Promise((resolve) => {
+    abrirModal(titulo);
+    $("#modal-cuerpo").innerHTML = "";
+    $("#modal-cuerpo").appendChild(el("p", {className:"modal-texto", textContent:texto}));
+    const btn = el("button", {className:"btn btn-primario", textContent:ui("aceptar")});
+    btn.addEventListener("click", () => { cerrarModal(); resolve(); });
+    $("#modal-pie").innerHTML = ""; $("#modal-pie").appendChild(btn);
+    btn.focus();
+  });
+}
+
+function confirmar(titulo, texto, opciones){
+  opciones = opciones || {};
+  return new Promise((resolve) => {
+    abrirModal(titulo);
+    $("#modal-cuerpo").innerHTML = "";
+    $("#modal-cuerpo").appendChild(el("p", {className:"modal-texto", textContent:texto}));
+    const no = el("button", {className:"btn", textContent:ui("no")});
+    const si = el("button", {className:"btn", textContent:ui("si")});
+    no.addEventListener("click", () => { cerrarModal(); resolve(false); });
+    si.addEventListener("click", () => { cerrarModal(); resolve(true); });
+    $("#modal-pie").innerHTML = "";
+    // Mismo criterio que `askyesno(..., default=messagebox.NO)` de la ventana Tk
+    // cuando `opciones.no_por_defecto` lo pide: el foco inicial va en "No" — y,
+    // a diferencia del diálogo gris de Tk, aquí el botón resaltado en azul tiene
+    // que ser EL MISMO que el del foco: dos botones que se contradicen (el
+    // resaltado invita a un lado, el tabulador dispara el otro) es peor que no
+    // resaltar ninguno.
+    if (opciones.no_por_defecto){ no.classList.add("btn-primario"); $("#modal-pie").append(si, no); no.focus(); }
+    else { si.classList.add("btn-primario"); $("#modal-pie").append(no, si); si.focus(); }
+  });
+}
+
+function pedirTelegram(){
+  return new Promise((resolve) => {
+    abrirModal(t("titulo_telegram"));
+    const cuerpo = $("#modal-cuerpo"); cuerpo.innerHTML = "";
+    const campoToken = el("input", {type:"password"});
+    const campoChat  = el("input", {type:"password"});
+    [ [t("dlg_telegram_token"), campoToken], [t("dlg_telegram_chat"), campoChat] ].forEach(([etq, campo]) => {
+      const fila = el("div", {className:"clave"});
+      fila.appendChild(el("p", {innerHTML:"<b>" + etq + "</b>"}));
+      campo.style.width = "100%"; campo.style.marginTop = ".3rem";
+      fila.appendChild(campo);
+      cuerpo.appendChild(fila);
+    });
+    const cancelar = el("button", {className:"btn", textContent:t("claves_cancelar")});
+    const aceptar  = el("button", {className:"btn btn-primario", textContent:ui("aceptar")});
+    cancelar.addEventListener("click", () => { cerrarModal(); resolve(null); });
+    aceptar.addEventListener("click", () => {
+      const token = campoToken.value.trim(), chat = campoChat.value.trim();
+      cerrarModal(); resolve({token, chat});
+    });
+    $("#modal-pie").innerHTML = ""; $("#modal-pie").append(cancelar, aceptar);
+    campoToken.focus();
+  });
+}
+
+/* ── portada, meta y textos de los botones ──────────────────────────────── */
+function pintarPortada(){
+  $("#eslogan-pre").textContent = ui("eslogan");
+  $("#meta-settings-etq").textContent = t("settings_prefix");
+  $("#meta-settings").textContent = estado.settingsRuta + (estado.settingsExiste ? "" : t("no_existe_aun"));
+  const proyTxt = estado.proyecto || t("ventana_proyecto_sin_resolver");
+  $("#meta-proyecto").textContent = t("ventana_proyecto_label", {proj: proyTxt});
+
+  $("#b-instalar").textContent = t("boton_instalar");
+  $("#b-desinstalar").textContent = t("boton_desinstalar");
+  $("#b-dependencias").textContent = t("boton_dependencias");
+  $("#b-claves").textContent = t("boton_claves");
+  $("#b-cerrar").textContent = t("boton_cerrar");
+
+  document.querySelectorAll(".idioma-btn").forEach((b) => {
+    b.classList.toggle("activo", b.dataset.idioma === estado.idioma);
+  });
+  document.documentElement.lang = estado.idioma;
+  document.documentElement.dataset.lang = estado.idioma;
+}
+
+function pintarConteo(){
+  const n = estado.seleccion.size;
+  $("#conteo").textContent = n + " " + ui("marcados");
+}
+
+/* ── la lista de módulos ─────────────────────────────────────────────────── */
+function pintarLista(){
+  const ul = $("#lista-modulos");
+  ul.innerHTML = "";
+  for (const mod of estado.modulos){
+    const li = el("li", {className:"modulo"});
+    li.dataset.id = mod.id;
+
+    const casilla = el("label", {className:"modulo-check"});
+    const input = el("input", {type:"checkbox"});
+    input.checked = estado.seleccion.has(mod.id);
+    input.addEventListener("change", () => {
+      if (input.checked) estado.seleccion.add(mod.id); else estado.seleccion.delete(mod.id);
+      li.classList.toggle("marcado", input.checked);
+      pintarConteo();
+    });
+    casilla.appendChild(input);
+    li.appendChild(casilla);
+    li.classList.toggle("marcado", input.checked);
+
+    const cuerpo = el("div", {className:"modulo-cuerpo"});
+    const cab = el("div", {className:"modulo-cabecera"});
+    cab.appendChild(el("span", {className:"modulo-id", textContent:mod.id}));
+    const pillClase = mod.estado_clave === "estado_instalado" ? "ok"
+                     : mod.estado_clave === "estado_sin_gancho" ? "sin-gancho" : "";
+    cab.appendChild(el("span", {className:"pill " + pillClase, textContent:mod.etiqueta_estado}));
+    if (!mod.defecto) cab.appendChild(el("span", {className:"pill apagado", textContent:t("apagado_como").split(";")[0]}));
+    cuerpo.appendChild(cab);
+
+    const p = el("p", {className:"modulo-linea"});
+    p.appendChild(document.createTextNode(mod.linea + " "));
+    if (mod.aviso) p.appendChild(el("span", {className:"aviso", textContent:"⚠ " + mod.aviso}));
+    cuerpo.appendChild(p);
+
+    if (mod.toca){
+      const ptoca = el("p", {className:"modulo-toca"});
+      ptoca.appendChild(el("b", {textContent:t("toca_label")}));
+      ptoca.appendChild(document.createTextNode(" " + mod.toca));
+      cuerpo.appendChild(ptoca);
+    }
+
+    if (!mod.defecto){
+      cuerpo.appendChild(el("div", {className:"modulo-encender",
+        textContent:t("apagado_como") + " python instalar.py --instalar " + mod.id}));
+    }
+
+    li.appendChild(cuerpo);
+    ul.appendChild(li);
+  }
+}
+
+/* ── cargar / refrescar estado desde el servidor ────────────────────────── */
+async function cargarEstado(idioma){
+  const datos = await llamar("/api/estado?idioma=" + encodeURIComponent(idioma || estado.idioma));
+  estado.idioma = datos.idioma;
+  estado.textos = datos.textos;
+  estado.modulos = datos.modulos;
+  estado.settingsRuta = datos.settings_ruta;
+  estado.settingsExiste = datos.settings_existe;
+  estado.proyecto = datos.proyecto;
+  estado.memResuelto = datos.mem_resuelto;
+  if (estado.seleccion === null){
+    // Selección inicial = los marcados por defecto (mismo criterio que
+    // `tk.BooleanVar(value=mod['defecto'])` en la ventana Tk). En los
+    // refrescos siguientes (cambiar de idioma, tras instalar/desinstalar) se
+    // conserva lo que la persona ya había tocado.
+    estado.seleccion = new Set(estado.modulos.filter((m) => m.defecto).map((m) => m.id));
+  }
+  pintarPortada();
+  pintarLista();
+  pintarConteo();
+}
+
+/* ── Instalar ────────────────────────────────────────────────────────────── */
+async function accionInstalar(){
+  const ids = Array.from(estado.seleccion);
+  if (ids.length === 0) return avisar(t("titulo_abyss"), t("msg_sin_modulos"));
+  if (!estado.memResuelto) return avisar(t("titulo_abyss"), t("msg_sin_proyecto"));
+
+  let idsFinal = ids.slice();
+  if (idsFinal.includes("permisos")){
+    const ok = await confirmar(t("titulo_aviso"), t("msg_confirmar_permisos"));
+    if (!ok) idsFinal = idsFinal.filter((i) => i !== "permisos");
+  }
+  let telegram = null;
+  if (idsFinal.includes("telegram")){
+    const cred = await pedirTelegram();
+    if (!cred || !cred.token || !cred.chat){
+      await avisar(t("titulo_abyss"), t("msg_telegram_incompleto"));
+      idsFinal = idsFinal.filter((i) => i !== "telegram");
+    } else telegram = cred;
+  }
+
+  mostrarCargando(true);
+  let datos;
+  try{
+    datos = await llamar("/api/instalar", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ids: idsFinal, telegram, idioma: estado.idioma})});
+  } finally { mostrarCargando(false); }
+  if (datos.error === "sin_proyecto") return avisar(t("titulo_abyss"), t("msg_sin_proyecto"));
+  await avisar(t("titulo_abyss"), (datos.mensajes || []).join("\n") || t("msg_nada_que_hacer"));
+  await cargarEstado();
+  await ofrecerLoQueFalta(datos.pendiente);
+}
+
+/* Lo que queda por hacer DESPUES de instalar, y por que se OFRECE en vez de abrirse solo.
+   Los botones de dependencias y de claves estan ahi abajo, pero quien acaba de clonar esto
+   no sabe que tiene que pulsarlos: el instalador terminaba, decia que todo fue bien, y
+   dejaba a medias lo que hace falta para que varios modulos funcionen de verdad.
+   Encadenar dos ventanas a quien acaba de pulsar un boton seria un paquete que da ordenes,
+   y ademas mentiria por exceso: si no falta nada, abrirlas es hacerle perder el tiempo. El
+   servidor MIDE que falta -paquetes que de verdad no estan, claves de verdad vacias- y
+   aqui solo se ofrece, con el numero delante. Si no falta nada, no se dice nada. */
+async function ofrecerLoQueFalta(p){
+  if (!p) return;
+  const paquetes = p.paquetes || [], claves = p.claves_vacias || [];
+  if (paquetes.length && await confirmar(t("titulo_aviso"),
+        t("falta_paquetes").replace("{n}", paquetes.length)
+                           .replace("{cuales}", paquetes.join(", ")))){
+    await accionDependencias();
+  }
+  if (claves.length && await confirmar(t("titulo_aviso"),
+        t("falta_claves").replace("{n", "{n").replace("{n}", claves.length))){
+    await accionClaves();
+  }
+}
+
+/* ── Desinstalar ─────────────────────────────────────────────────────────── */
+async function accionDesinstalar(){
+  const ids = Array.from(estado.seleccion);
+  if (ids.length === 0) return avisar(t("titulo_abyss"), t("msg_sin_modulos"));
+  if (!estado.memResuelto) return avisar(t("titulo_abyss"), t("msg_sin_proyecto"));
+
+  const borrar = await confirmar(t("titulo_abyss"), t("msg_confirmar_borrar_datos"), {no_por_defecto:true});
+  mostrarCargando(true);
+  let datos;
+  try{
+    datos = await llamar("/api/desinstalar", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ids, borrar_datos: borrar, idioma: estado.idioma})});
+  } finally { mostrarCargando(false); }
+  if (datos.error === "sin_proyecto") return avisar(t("titulo_abyss"), t("msg_sin_proyecto"));
+  await avisar(t("titulo_abyss"), (datos.mensajes || []).join("\n") || t("msg_nada_que_hacer"));
+  await cargarEstado();
+}
+
+/* ── Dependencias ────────────────────────────────────────────────────────── */
+async function accionDependencias(){
+  const marcados = Array.from(estado.seleccion);
+  mostrarCargando(true);
+  let datos;
+  try{
+    datos = await llamar("/api/dependencias?idioma=" + encodeURIComponent(estado.idioma)
+      + "&modulos=" + encodeURIComponent(marcados.join(",")));
+  } finally { mostrarCargando(false); }
+
+  abrirModal(t("boton_dependencias").replace(/\.\.\.$/, "").replace(/…$/, ""), true);
+  $("#modal-cuerpo").innerHTML = "";
+  $("#modal-cuerpo").appendChild(el("pre", {className:"tabla-dependencias", textContent:datos.tabla}));
+  const cancelar = el("button", {className:"btn", textContent:t("claves_cancelar")});
+  const instalar = el("button", {className:"btn btn-primario", textContent:t("boton_instalar")});
+  cancelar.addEventListener("click", cerrarModal);
+  instalar.addEventListener("click", async () => {
+    cerrarModal();
+    mostrarCargando(true);
+    let r2;
+    try{
+      r2 = await llamar("/api/instalar_dependencias", {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({modulos: datos.modulos_resueltos, idioma: estado.idioma})});
+    } finally { mostrarCargando(false); }
+    await avisar(t("titulo_abyss"), (r2.mensajes || []).join("\n") || t("msg_nada_que_hacer"));
+  });
+  $("#modal-pie").innerHTML = "";
+  $("#modal-pie").appendChild(el("p", {className:"modal-texto", textContent:datos.confirmar,
+    style:"flex:1 1 100%;margin:0 0 .2rem"}));
+  $("#modal-pie").append(cancelar, instalar);
+}
+
+/* ── Claves ──────────────────────────────────────────────────────────────── */
+async function accionClaves(){
+  mostrarCargando(true);
+  let datos;
+  try{ datos = await llamar("/api/claves?idioma=" + encodeURIComponent(estado.idioma)); }
+  finally { mostrarCargando(false); }
+  if (datos.error) return avisar(t("claves_titulo"), datos.error);
+  if (!estado.memResuelto) return avisar(t("claves_titulo"), t("claves_sin_proyecto"));
+
+  abrirModal(t("claves_titulo"), true);
+  const cuerpo = $("#modal-cuerpo"); cuerpo.innerHTML = "";
+  cuerpo.appendChild(el("p", {className:"claves-intro", textContent:t("claves_intro")}));
+  cuerpo.appendChild(el("p", {className:"claves-ruta", textContent:datos.ruta || ""}));
+
+  const campos = {};
+  for (const info of datos.campos){
+    const bloque = el("div", {className:"clave"});
+    const cab = el("div", {className:"clave-cab"});
+    cab.appendChild(el("span", {className:"clave-nombre", textContent:info.campo}));
+    cab.appendChild(el("span", {className:"pill " + (info.puesta ? "ok" : ""),
+      textContent: info.puesta ? t("claves_puesta") : t("claves_vacia")}));
+    const campo = el("input", {type:"password", placeholder:t("claves_dejar")});
+    campo.style.flex = "1"; campo.style.marginLeft = ".6rem"; campo.style.minWidth = "8rem";
+    cab.style.flexWrap = "wrap";
+    cab.appendChild(campo);
+    campos[info.campo] = campo;
+    bloque.appendChild(cab);
+    if (info.desbloquea) bloque.appendChild(el("p", {innerHTML:"<b>" + ui("desbloquea") + ":</b> " + info.desbloquea}));
+    if (info.sin_ella)  bloque.appendChild(el("p", {innerHTML:"<b>" + ui("sin_ella") + ":</b> " + info.sin_ella}));
+    if (info.donde)     bloque.appendChild(el("p", {innerHTML:"<b>" + ui("donde") + ":</b> " + info.donde}));
+    if (info.nota)      bloque.appendChild(el("p", {className:"nota", textContent:"⚠ " + info.nota}));
+    cuerpo.appendChild(bloque);
+  }
+
+  const cancelar = el("button", {className:"btn", textContent:t("claves_cancelar")});
+  const guardar  = el("button", {className:"btn btn-primario", textContent:t("claves_guardar")});
+  cancelar.addEventListener("click", cerrarModal);
+  guardar.addEventListener("click", async () => {
+    const valores = {};
+    for (const campo in campos) if (campos[campo].value.trim()) valores[campo] = campos[campo].value.trim();
+    mostrarCargando(true);
+    let r;
+    try{
+      r = await llamar("/api/claves", {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({valores, idioma: estado.idioma})});
+    } finally { mostrarCargando(false); }
+    cerrarModal();
+    if (r.ok) await avisar(t("claves_titulo"), tPrintf("claves_guardadas", r.guardadas, r.ruta));
+    else if (r.motivo === "sin_cambios") await avisar(t("claves_titulo"), t("claves_sin_cambios"));
+    else await avisar(t("claves_titulo"), t("claves_sin_proyecto"));
+  });
+  $("#modal-pie").innerHTML = ""; $("#modal-pie").append(cancelar, guardar);
+}
+
+/* ── Cerrar ──────────────────────────────────────────────────────────────── */
+async function accionCerrar(){
+  try{ await fetch("/api/cerrar", {method:"POST"}); }catch(e){ /* el servidor ya puede haber colgado */ }
+  document.body.innerHTML = "";
+  document.body.style.background = "var(--fondo)";
+  document.body.style.display = "flex";
+  document.body.style.alignItems = "center";
+  document.body.style.justifyContent = "center";
+  document.body.style.color = "var(--tinta-alta)";
+  document.body.textContent = ui("cerrando");
+  setTimeout(() => { try{ window.close(); }catch(e){} }, 250);
+}
+
+/* ── arranque ────────────────────────────────────────────────────────────── */
+document.querySelectorAll(".idioma-btn").forEach((b) => {
+  b.addEventListener("click", async () => {
+    if (b.dataset.idioma === estado.idioma) return;
+    cerrarModal();
+    await cargarEstado(b.dataset.idioma);
+  });
+});
+$("#b-instalar").addEventListener("click", accionInstalar);
+$("#b-desinstalar").addEventListener("click", accionDesinstalar);
+$("#b-dependencias").addEventListener("click", accionDependencias);
+$("#b-claves").addEventListener("click", accionClaves);
+$("#b-cerrar").addEventListener("click", accionCerrar);
+$("#btn-cerrar-x").addEventListener("click", accionCerrar);
+
+// El idioma de arranque es el del sistema (por eso `navigator.language`, no el
+// que decidiera el servidor: dos personas abriendo el MISMO instalador en dos
+// máquinas deben verlo cada una en el suyo). `?idioma=es|en` en la URL lo
+// fuerza — pensado para volver a capturar una pantalla en un idioma concreto
+// sin tener que hacer clic primero; una persona normal nunca necesita tocarlo.
+const idiomaForzado = new URLSearchParams(location.search).get("idioma");
+cargarEstado(idiomaForzado === "es" || idiomaForzado === "en" ? idiomaForzado
+  : (navigator.language || "en").toLowerCase().startsWith("es") ? "es" : "en");
+</script>
+</body>
+</html>
