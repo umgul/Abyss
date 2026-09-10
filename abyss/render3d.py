@@ -5,7 +5,31 @@ Uso:
     python render3d.py <modelo.glb|.gltf|.obj|.stl|escena.json> [--html [salida.html]]
                         [--png [salida.png]] [--explosion 0.5] [--camara x,y,z] [--mirar x,y,z]
                         [--fondo #rrggbb] [--luz calida|fria|neutra] [--ancho 1600] [--alto 900]
-                        [--holograma]
+                        [--holograma] [--acabado mate|estudio]
+
+`--acabado` (por defecto `mate`, para no cambiarle el resultado a nadie que ya use este guion):
+`mate` es el material plano de siempre (roughness 0.85/metalness 0.05, tres luces planas,
+rejilla debajo). `estudio` reproduce, en un guion GENÉRICO (no sabe qué es un tornillo), la
+receta que trae embebida `pintor_demo/tornillo/tornillo.html` (verificada leyendo ese fichero,
+no de memoria): tono ACES (`toneMappingExposure=1.05`), sombras suaves (`PCFSoftShadowMap`),
+un entorno de reflejo PROCEDURAL (un cubo con dos caras que llevan "ventanas" claras, dos
+`<canvas>` 2D generados en la propia página — cero texturas cargadas de fuera), material
+metálico (`metalness:1.0`), un suelo oscuro que recibe sombra, y SIN rejilla (se sigue
+creando pero arranca oculta — el control de la página la puede volver a encender).
+
+Las posiciones/tamaños de luces y suelo de esa receta están pensadas para SU tornillo, que
+mide RADIO≈24,1538 (mismo CENTRO/RADIO que calcula `_bbox_escena()` de este propio guion,
+aplicado a mano a los vértices que decodifiqué del `PIEZAS` embebido en ese HTML, con las
+mismas transformaciones que aplica su guion: `grupo.position.z=-16.350` y
+`tumbado.rotation.{y,z}`). Por eso aquí NO se copian esos números a pelo: se guarda cada
+posición como `(posición_vieja − CENTRO_viejo) / RADIO_viejo` y, al renderizar, se multiplica
+por el RADIO de la escena que se cargue — así una luz direccional (sin atenuación: lo único
+que le importa es su DIRECCIÓN, que un reescalado uniforme no toca) queda en el mismo ángulo
+sin importar el tamaño del modelo. El roughness 0,34/0,27 por pieza (plana/curva) del original
+no se replica pieza a pieza: ese dato (qué grupo es una cara plana) no existe en el esquema
+genérico de `render3d.py` — aquí todas las piezas del acabado `estudio` llevan un único
+roughness intermedio (0,30); el aspecto facetado o liso de cada grupo lo sigue dando, igual
+que en `mate`, el propio normal que trae el fichero de entrada, no el material.
 
 `--html` es el modo normal (SIEMPRE se escribe la página, con o sin la bandera; ésta solo
 sirve para elegir la ruta — a diferencia de `pintor.py`, aquí la página no es un extra
@@ -644,6 +668,20 @@ function crearEtiqueta(texto, tam, color) {
   spr.scale.set(t * 4, t, 1);
   return spr;
 }
+function crearMaterial(color) {
+  // acabado "estudio": metal pulido (metalness 1.0) que ademas recibe el entorno de reflejo
+  // procedural montado en principal() -- receta calcada de tornillo.html. El original
+  // distinguia roughness 0.34 (pieza plana) / 0.27 (pieza curva) con un dato de pieza que
+  // este guion GENERICO no declara (no sabe que un grupo es una cara plana): aqui se usa un
+  // unico roughness intermedio (0.30) para todas las piezas del acabado "estudio". El
+  // aspecto facetado o liso de cada grupo sigue viniendo, igual que en "mate", del propio
+  // normal que trae el fichero de entrada (o de computeVertexNormals si no trae ninguno) --
+  // no de este material.
+  if (ESCENA.acabado === 'estudio') {
+    return new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide, metalness: 1.0, roughness: 0.30, envMapIntensity: 1.15 });
+  }
+  return new THREE.MeshStandardMaterial({ color: color, side: THREE.DoubleSide, roughness: 0.85, metalness: 0.05 });
+}
 function construirPieza(p) {
   let obj;
   const tam = p.tam || [1, 1, 1];
@@ -653,7 +691,8 @@ function construirPieza(p) {
     if (p.normales_b64) geo.setAttribute('normal', new THREE.BufferAttribute(b64ToFloat32(p.normales_b64), 3));
     if (p.indices_b64) geo.setIndex(new THREE.BufferAttribute(b64ToUint32(p.indices_b64), 1));
     if (!p.normales_b64) geo.computeVertexNormals();
-    obj = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, side: THREE.DoubleSide, roughness: 0.85, metalness: 0.05 }));
+    obj = new THREE.Mesh(geo, crearMaterial(p.color));
+    obj.castShadow = true; obj.receiveShadow = true;  // sin efecto si shadowMap va apagado (acabado "mate")
     obj.userData.basePos = new THREE.Vector3(0, 0, 0);
   } else if (p.tipo === 'texto') {
     obj = crearEtiqueta(p.nombre, tam[0], p.color);
@@ -673,7 +712,8 @@ function construirPieza(p) {
     } else {
       geo = new THREE.PlaneGeometry(tam[0] || 1, tam[1] != null ? tam[1] : (tam[0] || 1));
     }
-    obj = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: p.color, side: THREE.DoubleSide, roughness: 0.85, metalness: 0.05 }));
+    obj = new THREE.Mesh(geo, crearMaterial(p.color));
+    obj.castShadow = true; obj.receiveShadow = true;  // sin efecto si shadowMap va apagado (acabado "mate")
     obj.position.set(p.pos[0], p.pos[1], p.pos[2]);
     obj.userData.basePos = obj.position.clone();
   }
@@ -716,24 +756,94 @@ function calcularDirecciones(piezasObjs, centroV) {
   renderer.setPixelRatio(1);
   renderer.setSize(ESCENA.ancho, ESCENA.alto);
   if ('outputColorSpace' in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  if (ESCENA.acabado === 'estudio') {
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  }
 
-  const LUCES = {
-    calida: { ambiente: 0x40332a, dir: 0xffdcae },
-    fria: { ambiente: 0x222a33, dir: 0xcfe6ff },
-    neutra: { ambiente: 0x333333, dir: 0xffffff },
-  };
-  const lp = LUCES[ESCENA.luz] || LUCES.neutra;
-  escena3d.add(new THREE.AmbientLight(lp.ambiente, 1.0));
-  const luzClave = new THREE.DirectionalLight(lp.dir, 1.2);
-  luzClave.position.set(CENTRO[0] + RADIO * 1.5, CENTRO[1] + RADIO * 2.2, CENTRO[2] + RADIO * 1.1);
-  escena3d.add(luzClave);
-  const luzRelleno = new THREE.DirectionalLight(0xffffff, 0.35);
-  luzRelleno.position.set(CENTRO[0] - RADIO * 1.5, CENTRO[1] + RADIO * 0.6, CENTRO[2] - RADIO * 1.5);
-  escena3d.add(luzRelleno);
+  if (ESCENA.acabado === 'estudio') {
+    // Entorno de reflejo PROCEDURAL (receta de tornillo.html): un cubo con dos caras que
+    // llevan "ventanas" claras -> el metal pulido refleja luz de estudio en vez de un gris
+    // plano. Dos <canvas> 2D generados aqui mismo, nada cargado de fuera.
+    const caraEstudio = function (esVentana) {
+      const c = document.createElement('canvas'); c.width = c.height = 256;
+      const x = c.getContext('2d');
+      const g = x.createLinearGradient(0, 0, 0, 256);
+      g.addColorStop(0, '#3a4048'); g.addColorStop(1, '#0e1013');
+      x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+      if (esVentana) {
+        x.fillStyle = '#ffffff'; x.fillRect(30, 40, 196, 60);
+        x.fillStyle = '#cfd6dd'; x.fillRect(60, 150, 140, 40);
+      }
+      return c;
+    };
+    const cubo = new THREE.CubeTexture([caraEstudio(false), caraEstudio(false), caraEstudio(true),
+      caraEstudio(false), caraEstudio(false), caraEstudio(false)]);
+    cubo.needsUpdate = true;
+    cubo.mapping = THREE.CubeReflectionMapping;
+    cubo.colorSpace = THREE.SRGBColorSpace;
+    escena3d.environment = cubo;
+  }
+
+  if (ESCENA.acabado === 'estudio') {
+    // Tres luces + ambiente, calcadas de tornillo.html, en vez de las dos planas de "mate"
+    // (--luz calida/fria/neutra no se usa aqui: este acabado trae su propia luz fija, la de
+    // la receta). Las POSICIONES no son las del viejo a pelo: son (posicion_vieja menos su
+    // CENTRO) dividido por su RADIO (~24,1538, calculado con la MISMA formula de
+    // _bbox_escena aplicada a mano a los vertices que decodifique de tornillo.html -- ver el
+    // docstring del modulo), multiplicadas aqui por el RADIO de ESTA escena: una luz
+    // direccional no se atenua con la distancia, asi que lo unico que le importa es su
+    // DIRECCION, y un reescalado uniforme de su posicion no la toca.
+    escena3d.add(new THREE.AmbientLight(0xffffff, 0.22));
+    const key = new THREE.DirectionalLight(0xffffff, 3.1);
+    key.position.set(CENTRO[0] + RADIO * 1.1679, CENTRO[1] + RADIO * 1.7311, CENTRO[2] + RADIO * 1.0764);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    const extSombra = RADIO * 1.6561;
+    key.shadow.camera.left = -extSombra; key.shadow.camera.right = extSombra;
+    key.shadow.camera.top = extSombra; key.shadow.camera.bottom = -extSombra;
+    key.shadow.bias = -0.0008 * (RADIO / 24.1538);
+    escena3d.add(key);
+    const fill = new THREE.DirectionalLight(0x9fb6d0, 1.0);
+    fill.position.set(CENTRO[0] - RADIO * 1.2334, CENTRO[1] + RADIO * 0.4890, CENTRO[2] - RADIO * 0.7452);
+    escena3d.add(fill);
+    const rim = new THREE.DirectionalLight(0xdfe8f5, 1.6);
+    rim.position.set(CENTRO[0] - RADIO * 0.6538, CENTRO[1] + RADIO * 0.6546, CENTRO[2] + RADIO * 1.7389);
+    escena3d.add(rim);
+  } else {
+    const LUCES = {
+      calida: { ambiente: 0x40332a, dir: 0xffdcae },
+      fria: { ambiente: 0x222a33, dir: 0xcfe6ff },
+      neutra: { ambiente: 0x333333, dir: 0xffffff },
+    };
+    const lp = LUCES[ESCENA.luz] || LUCES.neutra;
+    escena3d.add(new THREE.AmbientLight(lp.ambiente, 1.0));
+    const luzClave = new THREE.DirectionalLight(lp.dir, 1.2);
+    luzClave.position.set(CENTRO[0] + RADIO * 1.5, CENTRO[1] + RADIO * 2.2, CENTRO[2] + RADIO * 1.1);
+    escena3d.add(luzClave);
+    const luzRelleno = new THREE.DirectionalLight(0xffffff, 0.35);
+    luzRelleno.position.set(CENTRO[0] - RADIO * 1.5, CENTRO[1] + RADIO * 0.6, CENTRO[2] - RADIO * 1.5);
+    escena3d.add(luzRelleno);
+  }
 
   const grid = new THREE.GridHelper(Math.max(2, RADIO * 4), 24, 0x555a5f, 0x33383c);
   grid.position.set(CENTRO[0], CENTRO[1] - RADIO * 1.05, CENTRO[2]);
+  grid.visible = (ESCENA.acabado !== 'estudio');  // "estudio" pide NADA de rejilla al arrancar; el control de la pagina la puede volver a encender
   escena3d.add(grid);
+
+  if (ESCENA.acabado === 'estudio') {
+    // Suelo oscuro que RECIBE sombra (receta: PlaneGeometry(400,400), y=-9.0, sobre una
+    // escena de RADIO~24,1538 -- ver el comentario de las luces, arriba, para de donde sale
+    // ese numero). Aqui, escalado: lado = RADIO*16,5605, y = CENTRO.y - RADIO*0,2976.
+    const suelo = new THREE.Mesh(new THREE.PlaneGeometry(RADIO * 16.5605, RADIO * 16.5605),
+      new THREE.MeshStandardMaterial({ color: 0x111318, roughness: 0.55, metalness: 0.0 }));
+    suelo.rotation.x = -Math.PI / 2;
+    suelo.position.set(CENTRO[0], CENTRO[1] - RADIO * 0.2976, CENTRO[2]);
+    suelo.receiveShadow = true;
+    escena3d.add(suelo);
+  }
 
   const piezasObjs = ESCENA.piezas.map(construirPieza);
   for (const o of piezasObjs) escena3d.add(o);
@@ -887,7 +997,7 @@ canvas{display:block}
   <h1>__TITULO_PANEL__</h1>
   <label>vista explosionada <span id="valExplosion"></span></label>
   <input id="sldExplosion" type="range" min="0" max="2" step="0.01" value="__EXPLOSION__">
-  <div class="fila"><input id="chkRejilla" type="checkbox" checked> <label for="chkRejilla" style="margin:0">rejilla</label></div>
+  <div class="fila"><input id="chkRejilla" type="checkbox" __REJILLA_CHECKED__> <label for="chkRejilla" style="margin:0">rejilla</label></div>
   <div class="fila"><input id="chkAlambre" type="checkbox"> <label for="chkAlambre" style="margin:0">alambre</label></div>
   <label>recorte X</label>
   <div class="fila"><input id="chkX" type="checkbox"><input id="sldX" type="range" style="flex:1"></div>
@@ -927,6 +1037,9 @@ def _construir_html(escena_embebida, titulo, explosion_inicial):
     html = html.replace("__TITULO_PANEL__", titulo)
     html = html.replace("__FONDO__", escena_embebida["fondo"])
     html = html.replace("__EXPLOSION__", repr(float(explosion_inicial)))
+    # el acabado "estudio" arranca SIN rejilla (ver docstring del módulo); la casilla del
+    # panel arranca a juego con eso, no siempre marcada, para no mentirle al que la mira.
+    html = html.replace("__REJILLA_CHECKED__", "" if escena_embebida["acabado"] == "estudio" else "checked")
     html = html.replace("__THREE_JS__", _texto_three_embebido())
     html = html.replace("__ORBITA_JS__", _leer_vendor("orbita_minima.js"))
     html = html.replace("__ESCENA_JSON__", json.dumps(escena_embebida, ensure_ascii=False))
@@ -986,6 +1099,31 @@ def _capturar_png(ruta_html, ruta_png, ancho, alto, avisar=print, navegador=None
     ruta_png = os.path.abspath(ruta_png)
     ultimo_aviso = None
     t0 = time.time()
+
+    # ── primero, por el protocolo del navegador ─────────────────────────────
+    # La bandera `--screenshot` dejó de servir para esta página. Medido el 9-sep-2026 con
+    # Edge 152.0.4191.66: sobre la escena WebGL da 0 bytes en `--headless`, `--headless=old`
+    # y `--headless=new`, con y sin `--disable-gpu` y con SwiftShader — tres intentos, todos
+    # vacíos; y sobre una página trivial alterna 0 y 1.981 bytes entre intentos, que es una
+    # carrera, no una avería. Por el protocolo, la misma escena sale a la primera.
+    # La bandera se conserva DEBAJO como respaldo: en otra máquina o con otra versión puede
+    # seguir siendo el camino bueno, y quitarla sería cambiar una suposición por otra.
+    try:
+        from navegador_cdp import captura as _captura_cdp
+    except ImportError:
+        try:
+            from abyss.navegador_cdp import captura as _captura_cdp
+        except ImportError:
+            _captura_cdp = None
+    if _captura_cdp is not None:
+        datos = _captura_cdp(exe, url, ruta_png, ancho, alto, avisar=avisar)
+        if datos and len(datos) >= UMBRAL_PNG_OK:
+            return {"segundos": round(time.time() - t0, 2), "intentos": 1,
+                    "bytes": len(datos), "via": "protocolo del navegador"}
+        ultimo_aviso = ("por el protocolo salió un PNG de %d bytes"
+                        % (len(datos) if datos else 0))
+        avisar("  %s; probando con la bandera de siempre" % ultimo_aviso)
+
     for intento in range(1, 4):
         if os.path.exists(ruta_png):
             try:
@@ -1004,7 +1142,8 @@ def _capturar_png(ruta_html, ruta_png, ancho, alto, avisar=print, navegador=None
             continue
         tam = os.path.getsize(ruta_png) if os.path.exists(ruta_png) else 0
         if tam >= UMBRAL_PNG_OK:
-            return {"segundos": round(time.time() - t0, 2), "intentos": intento, "bytes": tam}
+            return {"segundos": round(time.time() - t0, 2), "intentos": intento,
+                "bytes": tam, "via": "bandera --screenshot"}
         ultimo_aviso = f"PNG de {tam} bytes (por debajo de {UMBRAL_PNG_OK}: puede estar en blanco)"
         avisar(f"  intento {intento}/3: {ultimo_aviso}")
         if intento < 3:
@@ -1019,7 +1158,7 @@ def _capturar_png(ruta_html, ruta_png, ancho, alto, avisar=print, navegador=None
 
 def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900,
                camara=None, mirar=None, fondo=None, luz="neutra", holograma=False,
-               avisar=print, navegador=None):
+               acabado="mate", avisar=print, navegador=None):
     """Lee `entrada` (glb/gltf/obj/stl/escena.json), escribe SIEMPRE una página HTML
     autocontenida (`html`: ruta exacta si es una cadena; si no — `None` o `True`, para la
     bandera `--html` sin valor — `<carpeta_de_entrada>/<base>_render3d.html`) y, si `png`
@@ -1030,7 +1169,9 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
     `escena.json` (si la trae) y si tampoco, un encuadre automático a 3/4 sobre el centro
     de toda la escena. `fondo`: `"#rrggbb"` (por defecto `#15151a`; ignorado, forzado a
     `#000000`, si `holograma=True` — ver docstring del módulo). `luz`: calida/fria/neutra.
-    `holograma`: cuatro cuadrantes espejados sobre negro (Pepper's ghost, T4.4).
+    `holograma`: cuatro cuadrantes espejados sobre negro (Pepper's ghost, T4.4). `acabado`:
+    `mate` (por defecto) o `estudio` (metal con reflejos, entorno procedural, sombras suaves,
+    suelo oscuro, sin rejilla al arrancar — ver docstring del módulo).
 
     Devuelve un dict con `html`, `png` (o `None`), `piezas`, `grupos`, `centro`, `radio`, y
     -si hubo `--png`- `segundos_png`/`intentos_png`/`bytes_png` (y `aviso` si el PNG final
@@ -1056,6 +1197,7 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
     fov = (camara_json or {}).get("fov", 50)
     fondo_final = "#000000" if holograma else (fondo or "#15151a")
     luz_final = luz if luz in ("calida", "fria", "neutra") else "neutra"
+    acabado_final = acabado if acabado in ("mate", "estudio") else "mate"
 
     base = os.path.splitext(os.path.basename(ruta_entrada))[0]
     carpeta = os.path.dirname(ruta_entrada) or "."
@@ -1063,6 +1205,7 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
 
     escena_embebida = {
         "ancho": int(ancho), "alto": int(alto), "fondo": fondo_final, "luz": luz_final,
+        "acabado": acabado_final,
         "centro": centro, "radio": radio, "holograma": bool(holograma),
         "camara": {"pos": pos_cam, "mirar": mirar_v, "fov": fov} if (pos_cam or mirar_v) else None,
         "piezas": [_pieza_embebible(p) for p in piezas],
@@ -1099,7 +1242,8 @@ def _cli(argv):
         return 1
     entrada = argv[0]
     opts = {"html": None, "png": None, "explosion": 0.0, "ancho": 1600, "alto": 900,
-            "camara": None, "mirar": None, "fondo": None, "luz": "neutra", "holograma": False}
+            "camara": None, "mirar": None, "fondo": None, "luz": "neutra", "holograma": False,
+            "acabado": "mate"}
     i = 1
     while i < len(argv):
         a = argv[i]
@@ -1132,6 +1276,12 @@ def _cli(argv):
                 print(f'--luz debe ser calida/fria/neutra, no "{argv[i]}"')
                 return 1
             opts["luz"] = argv[i]
+        elif a == "--acabado" and i + 1 < len(argv):
+            i += 1
+            if argv[i] not in ("mate", "estudio"):
+                print(f'--acabado debe ser mate/estudio, no "{argv[i]}"')
+                return 1
+            opts["acabado"] = argv[i]
         else:
             print("argumento no reconocido:", a)
             return 1
@@ -1149,8 +1299,9 @@ def _cli(argv):
 
 
 if __name__ == "__main__":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    try:                       # la consola de Windows y la salida tienen que hablar
+        from . import consola  # el mismo idioma: ver abyss/consola.py
+    except ImportError:
+        import consola
+    consola.preparar()
     sys.exit(_cli(sys.argv[1:]))

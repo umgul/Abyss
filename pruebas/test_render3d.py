@@ -116,6 +116,69 @@ class EscenaJsonCLI(unittest.TestCase):
         self.assertIn("sin render", r.stdout)
 
 
+class AcabadoEstudioCLI(unittest.TestCase):
+    """`--acabado estudio|mate` (ver docstring de `render3d.py`): `mate` por defecto, para no
+    cambiarle el resultado a nadie que ya use este guion; `estudio` calca la receta de
+    `pintor_demo/tornillo/tornillo.html`. El JS de la página es UNO SOLO para los dos modos
+    (`ESCENA.acabado` decide en el navegador, ver `AcabadoEstudioFuente` más abajo) así que
+    aquí, a nivel de CLI, solo se comprueba lo que SÍ cambia en el HTML escrito: el propio
+    dato `acabado` embebido y la casilla de rejilla (que sale de una plantilla distinta según
+    el modo, `__REJILLA_CHECKED__`) — no cadenas que estén siempre presentes por narices."""
+
+    def test_mate_por_defecto_y_rejilla_marcada(self):
+        tmp = tempfile.mkdtemp(prefix="abyss_render3d_acabado_")
+        ruta_html = os.path.join(tmp, "s.html")
+        r = ay.ejecutar(ay.script("render3d.py"), [str(ESCENA_PRUEBA), "--html", ruta_html],
+                        dict(os.environ), timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(ruta_html, encoding="utf-8") as fh:
+            html = fh.read()
+        self.assertIn('"acabado": "mate"', html)
+        self.assertIn('id="chkRejilla" type="checkbox" checked', html, "mate: la rejilla sigue marcada por defecto, como siempre")
+
+    def test_estudio_acabado_embebido_y_sin_rejilla_marcada(self):
+        tmp = tempfile.mkdtemp(prefix="abyss_render3d_acabado_")
+        ruta_html = os.path.join(tmp, "s.html")
+        r = ay.ejecutar(ay.script("render3d.py"), [str(ESCENA_PRUEBA), "--html", ruta_html, "--acabado", "estudio"],
+                        dict(os.environ), timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(ruta_html, encoding="utf-8") as fh:
+            html = fh.read()
+        self.assertIn('"acabado": "estudio"', html)
+        self.assertIn('id="chkRejilla" type="checkbox" >', html, "estudio: SIN rejilla al arrancar (pide el encargo)")
+        # sigue sin haber ninguna URL externa: el entorno es 100% procedural (dos <canvas> 2D)
+        self.assertTrue(_sin_url_externa(html), "el acabado estudio no debe traer ninguna URL externa")
+
+    def test_acabado_invalido_error_y_no_revienta(self):
+        tmp = tempfile.mkdtemp(prefix="abyss_render3d_acabado_")
+        r = ay.ejecutar(ay.script("render3d.py"),
+                        [str(ESCENA_PRUEBA), "--html", os.path.join(tmp, "s.html"), "--acabado", "brillante"],
+                        dict(os.environ), timeout=30)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("--acabado debe ser mate/estudio", r.stdout)
+
+
+class AcabadoEstudioFuente(unittest.TestCase):
+    """El JS de `_MAIN_JS` es COMPARTIDO por "mate" y "estudio" (decide `ESCENA.acabado` en
+    tiempo de ejecución, en el navegador, no `_construir_html()` en Python) — así que la
+    prueba de verdad de que la receta de estudio está DE VERDAD ahí es leer el propio
+    `_MAIN_JS`, igual que hace `DocumentacionFrenteACodigo` más abajo con otras dos piezas de
+    este mismo guion."""
+
+    def test_receta_de_estudio_presente_y_guardada_tras_el_if(self):
+        js = render3d._MAIN_JS
+        for pieza in ("ACESFilmicToneMapping", "PCFSoftShadowMap", "CubeReflectionMapping",
+                      "metalness: 1.0", "shadowMap.enabled", "receiveShadow = true"):
+            self.assertIn(pieza, js, f"falta {pieza!r} en _MAIN_JS: la receta de estudio no está")
+        # las cinco piezas de la receta cuelgan del mismo guardián -- si alguna se escapara
+        # fuera del `if`, "mate" heredaría metal/sombras/tono ACES sin pedirlo.
+        self.assertEqual(js.count("ESCENA.acabado === 'estudio'"), 5,
+                          "material/renderer/entorno/luces/suelo: cinco guardianes, ni uno menos")
+        # la rejilla se sigue creando siempre (el control de la página la puede reencender);
+        # lo que cambia con el acabado es solo su visibilidad inicial.
+        self.assertIn("grid.visible = (ESCENA.acabado !== 'estudio')", js)
+
+
 class SinNavegadorCLI(unittest.TestCase):
     def test_sin_navegador_codigo_2_y_mensaje(self):
         """`ABYSS_RENDER3D_NAVEGADOR=''` fuerza la rama "no encontrado" sin depender de qué
