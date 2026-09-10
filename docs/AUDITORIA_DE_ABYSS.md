@@ -2,6 +2,50 @@
 
 *[English version](AUDITORIA_DE_ABYSS.en.md)*
 
+---
+
+## Segunda pasada, 9-sep-2026: de «rompe» a «sin hallazgos»
+
+El informe de abajo es el PRIMERO, y se queda como está: es lo que el auditor encontró la
+primera vez y borrarlo sería borrar la historia. Esto es lo que dice hoy, sobre el mismo
+repositorio, después de arreglar lo que él mismo señaló.
+
+**Veredicto: `sin hallazgos`.** Ninguno de los cuatro que puntúan. La cuarta comprobación
+—la que de verdad importa, qué sale de la máquina— sale limpia, y la primera también desde
+que el paquete lleva autor declarado.
+
+Conviene decir qué significa y qué no: es «hasta donde esta vara mira, no encontré nada», y
+la vara mira cinco cosas concretas. No es un certificado de que el paquete sea bueno.
+
+Qué cambió, y por qué el número bajó tanto:
+
+- **Los hosts, declarados.** Los 35 que el código usa y ningún README nombraba están ahora
+  en `README.md` y `README.en.md`, agrupados por qué habilidad los llama, cuándo, y cuáles
+  no tocan la red sin clave. Los ocho de fabricantes (`vivo.com`, `zeiss.com`, `nikon.com`…)
+  no se llaman nunca: son destinos a los que el visor puede ABRIR el navegador.
+- **Las pruebas dejaron de acusarse a sí mismas.** Un fichero que prueba a un auditor tiene
+  que inventarse dominios para que los cace, y este los contaba como llamadas reales:
+  `api.declarado.com`, `api.oculto.net`, `api.sinesquema.io`, `copia-sospechosa.example`…
+  Ahora hay una tercera categoría, `hosts_en_pruebas`, con el mismo criterio que ya se
+  aplicaba a `vendor/dist/build`: **se declaran, no se acusan**. Son 37.
+- **Un perfil de navegador de 782 MB** se había quedado dentro del paquete y aportaba él solo
+  3.082 hallazgos, con dominios que salían de una lista de bloqueo de Brave. Fuera, y con el
+  perfil viviendo ya en la caché del sistema.
+- **El informe publicable ya no lleva la ruta absoluta** de la máquina donde se ejecutó: un
+  documento que se publica no tiene por qué decir en qué carpeta de quién se generó.
+
+- **El autor, declarado.** Era el último hallazgo vivo y no era un defecto de código:
+  faltaba decir quién firma. Ahora está en `LICENSE` (el titular del copyright), en
+  `.claude-plugin/plugin.json` (el campo que lee esta comprobación) y en
+  `.claude-plugin/marketplace.json` (lo que ve quien instala). En ningún otro sitio del
+  repositorio: la prueba que lo vigila tiene esos tres ficheros como única excepción.
+
+Lo que NO cambió: las comprobaciones 2 y 3 seguían en cero antes y siguen en cero ahora.
+Este paquete nunca escondió un comando ni escribió fuera de su sitio sin declararlo.
+
+---
+
+
 Primer informe de `abyss/auditar.py` sobre el propio repositorio, generado con:
 
 ```

@@ -2,6 +2,51 @@
 
 *[Versión en castellano](AUDITORIA_DE_ABYSS.md)*
 
+---
+
+## Second pass, 2026-09-09: from `rompe` to `sin hallazgos`
+
+The report below is the FIRST one, and it stays as it is: it's what the auditor found the
+first time, and deleting it would delete the history. This is what it says today, on the same
+repository, after fixing what it pointed at itself.
+
+**Verdict: `sin hallazgos` (no findings).** None of the four checks that score. The fourth
+one — the one that really matters, what leaves the machine — comes out clean, and so does the
+first one now that the package declares an author.
+
+Worth saying what that means and what it doesn't: it's "as far as this yardstick looks, I
+found nothing", and the yardstick looks at five specific things. It is not a certificate that
+the package is good.
+
+What changed, and why the number dropped so far:
+
+- **The hosts, declared.** The 35 the code uses and no README named are now in `README.md`
+  and `README.en.md`, grouped by which skill calls them, when, and which ones never touch the
+  network without a key. The eight vendor ones (`vivo.com`, `zeiss.com`, `nikon.com`…) are
+  never called: they're destinations the viewer may OPEN a browser at.
+- **The tests stopped accusing themselves.** A file that tests an auditor has to invent
+  domains so the auditor catches them, and this one counted them as real calls:
+  `api.declarado.com`, `api.oculto.net`, `api.sinesquema.io`, `copia-sospechosa.example`…
+  There's now a third category, `hosts_en_pruebas`, with the same rule already applied to
+  `vendor/dist/build`: **they get declared, not accused**. There are 37.
+- **A 782 MB browser profile** had been left inside the package and accounted on its own for
+  3.082 findings, with domains coming out of a Brave block list. Gone, and the profile now
+  lives in the system cache.
+- **The publishable report no longer carries the absolute path** of the machine it ran on: a
+  document meant to be published needn't say in whose folder it was generated.
+
+- **The author, declared.** It was the last finding standing, and it wasn't a code defect:
+  it was missing who signs. It's now in `LICENSE` (the copyright holder), in
+  `.claude-plugin/plugin.json` (the field this check reads) and in
+  `.claude-plugin/marketplace.json` (what whoever installs sees). Nowhere else in the
+  repository: the test that guards it has those three files as its only exception.
+
+What did NOT change: checks 2 and 3 were at zero before and are at zero now. This package
+never hid a command nor wrote outside its own folder without declaring it.
+
+---
+
+
 English mirror of [`docs/AUDITORIA_DE_ABYSS.md`](AUDITORIA_DE_ABYSS.md): the first report of
 `abyss/auditar.py` on the repository itself, generated with:
 

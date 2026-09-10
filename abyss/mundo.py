@@ -528,9 +528,10 @@ def _cli(argv, mem, pedir_fn=None):
 
 
 if __name__ == "__main__":
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+    try:                       # la consola de Windows y la salida tienen que hablar
+        from . import consola  # el mismo idioma: ver abyss/consola.py
+    except ImportError:
+        import consola
+    consola.preparar()
     _proj, _mem = rutas.resolver(sys.argv[1:], {})
     sys.exit(_cli(sys.argv[1:], _mem))

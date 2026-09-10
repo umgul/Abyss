@@ -9,6 +9,15 @@ of hands to generate and paint images. No state kept by eyeballing it —
 everything each piece says comes from measuring something real or applying a
 fixed rule.
 
+**The short path, if you have Claude Code**: clone this repository, open
+Claude Code in that folder and tell it "install this for me". There's a
+[`CLAUDE.md`](CLAUDE.md) at the root written FOR Claude, not for you: it says
+this is a skills package that gets installed (not a project you develop),
+teaches it to run `python instalar.py --listar` before touching anything, and
+lists the three things it can't do without asking you first. Keep reading if
+you'd rather install it yourself, by hand — everything below is exactly what
+`CLAUDE.md` summarizes for Claude, with the full detail.
+
 ## Philosophy, in five lines
 
 1. **Law or measurement, never state**: each piece measures something from the
@@ -65,6 +74,10 @@ map.
   plan before it runs, with a verdict by severity and evidence. `--paquete
   <path>` runs `auditar.py` on a package and hands the report to that same
   Opus to read past what the automated checks can't see.
+- `abyss/plantillas/gestos_comun.js` — **the copy that rules** for the hand vocabulary
+  (no mirroring, deliberately slow, one fist brakes and two stop). `kinetica.html`
+  imports it and `gestos.py` is its Python mirror, kept in step by hand; until
+  2026-09-08 the same grammar was written three times and all three had drifted.
 - `auditar.py` — the five checks on a package BEFORE installing it
   (provenance, commands, permissions, what leaves the machine, domains),
   with file:line evidence; never executes the audited code. No skill of its
@@ -80,9 +93,48 @@ map.
   via a hook: `mirar` (a single webcam frame), `texto`/`fotocopia`/`tarjeta`/
   `manual` (OCR via Windows's engine or `tesseract`, delegates to
   `lectura_visual.py`), `despiece`/`prompt3d` (2.5D layer split and a
-  measured 3D design prompt, delegates to `volumen.py`), and `gestos` (the
-  hand drives the scene via MediaPipe with its own vocabulary, serves HTTP
-  only on `127.0.0.1`, delegates to `gestos.py`).
+  measured 3D design prompt, delegates to `volumen.py`), and `gestos`
+  (MediaPipe + its own vocabulary: serves the hand's state over HTTP, only on
+  `127.0.0.1`, already translated — isolated layer, explosion opening, orbit,
+  scale, completed gesture — but nothing consumes it yet, delegates to
+  `gestos.py`).
+- [`kinetica`](skills/kinetica/SKILL.md) — splits a photographed compound
+  object into its REAL components (hand-placed regions + `cv2.grabCut`, never
+  sharpness layers; without regions, automatic connected-components split,
+  flagged as worse and with no real names) and explodes them in 3D inside an
+  invisible cube with three.js, driven by the hand through the camera — real
+  hand tracking needs `python instalar.py --manos` (MediaPipe Tasks Vision,
+  ~27 MB, not shipped in the repo); without it the viewer still serves, just
+  with no hands, with an on-screen warning. Replaces the quality of the old
+  2.5D split from `ojo despiece`/`volumen.py`. The viewer's camera only turns
+  on when asked, never from a hook. In the viewer, an open hand held still for
+  3 s opens a hologram of the assembled product ON YOUR OWN PALM, with a
+  transparent background and anchored to three hand landmarks (the screen itself
+  says it is a composite over the video, not a measurement of space) and, inside it, closing the hand opens the product's official
+  site, but only if the record carries a recognition backed by evidence read
+  or seen IN THE PHOTO; without that there is no link, and the viewer writes
+  down why.
+- [`kinetico`](skills/kinetico/SKILL.md) — walks through a SET of things that
+  relate to each other by hand — a folder on disk (`arbol`: file = sphere,
+  folder = cube, floor = depth) or a generic graph of nodes (`datos
+  <nodos.json>`, one adapter per source) — as a 3D building: a fist opens the
+  card for whatever is in front of you, and a second fist over that same
+  thing steps into the folder or opens the file. It differs from `kinetica`
+  (which takes ONE photo of an object apart): there is no photo here, there
+  is a set. Its server (`kinetico_servidor.py`) only acts on what is already
+  in the mounted scene, never outside the folder it was opened with. Without
+  a camera it's still usable with the mouse; with one, real hand tracking
+  needs the same `python instalar.py --manos` as `kinetica`.
+- `fondo.py` — no *skill* of its own (same case as `auditar.py`): removes a
+  photo's background locally, with three engines that always say which one ran
+  (`sistema`, macOS 14+'s own Vision framework with no downloads, WRITTEN BUT
+  NOT TESTED because this package has been measured on Windows; `modelo`, a
+  small ONNX network of 4,574,861 bytes MEASURED, on `onnxruntime`; and
+  `grabcut`, crude and flagged as such). It exists because `kinetica.py
+  --quitar-fondo` cuts out far better with it: with the background gone, the
+  silhouette is MEASURED instead of estimated (MEASURED with the same photo in
+  both versions: 78,947 pixels invented by inpainting with the background, 55
+  without it).
 - [`cuerpo`](skills/cuerpo/SKILL.md) — the machine's own body (cpu, ram, disk,
   vram, GPU temperature, battery) with its own quantile baseline; never
   orders anything, only measures.
@@ -175,7 +227,14 @@ there's `instalar.py`.
 ```
 python instalar.py --listar                       # which modules exist and whether they're installed
 python instalar.py                                 # Tk window: checkbox per module + Install/Uninstall/Close
-python instalar.py --instalar continuidad,vigia    # installs only those modules, no window
+python instalar.py --instalar continuidad,vigia
+
+# The four that ship OFF by default, each with the command that turns it on.
+# None turns itself on: each one costs something, and that call belongs to whoever installs.
+python instalar.py --instalar huella      # records what the thread touches outside its folder (toll: PostToolUse on every tool)
+python instalar.py --instalar taller      # local text-to-image server (heavy)
+python instalar.py --instalar telegram    # Telegram notice when something finishes
+python instalar.py --instalar permisos    # tool permission settings    # installs only those modules, no window
 python instalar.py --desinstalar vigia             # uninstalls one module
 python instalar.py --sin-ventana                   # forces CLI mode even if Tk is available
 ```
@@ -258,6 +317,36 @@ hand what was touched.
 
 </details>
 
+### What downloads separately, and why it isn't inside the repository
+
+This repository carries no third-party binaries inside it, with a single
+declared exception: [`abyss/vendor/three.min.js`](abyss/vendor/three.min.js)
+(three.js r160, **669,884 bytes** MEASURED with `os.path.getsize`, MIT
+license). It stays because it was already in this repository's history
+before this rule existed — removing it from the index now wouldn't remove it
+from a clone, that would need rewriting history — and because without it the
+package's three 3D viewers (`render3d.py`, and the viewers `kinetica`/
+`kinetico` mount) don't start on a fresh clone: a skill with no code to show
+isn't an installable skill. Everything else downloads separately, with an
+explicit command, after cloning, never at install time and never silently:
+
+```
+python instalar.py --manos       # MediaPipe Tasks Vision, ~27 MB: hand tracking for kinetica/kinetico/ojo gestos
+python instalar.py --modelo      # U^2-Net p (u2netp.onnx), 4,574,861 bytes MEASURED: removing a photo's background
+```
+
+The reason isn't a fussy detail: this same package offers `auditar.py` to
+look at a package BEFORE installing it, and that promise only holds up for a
+repository that can be READ in full — a third-party binary isn't read, it's
+trusted. The file-by-file detail of what downloads, from where, and why
+`three.min.js`'s case is different is in [`.gitignore`](.gitignore) and in
+[`CLAUDE.md`](CLAUDE.md); the licence of all three third-party works — three.js,
+the only one that ships inside, plus MediaPipe and U²-Net p, which are downloaded
+later — is in [`NOTICE.md`](NOTICE.md). Without `--manos`, the kinetic viewers still serve,
+just with no hands, with an on-screen warning; without `--modelo`, `fondo.py`
+falls back to the system's cutout or `grabcut` and always says which engine
+it used.
+
 ## Where the data lives
 
 Abyss's code installs once (as a plugin, or wherever `instalar.py` puts it).
@@ -285,7 +374,10 @@ another's.
 | `ojo.py` | Eight verbs, one entry point, none via a hook: `mirar` (a single webcam frame, self-contained) and, delegating entirely to its module, `texto`/`fotocopia`/`tarjeta`/`manual` (→ `lectura_visual.py`), `despiece`/`prompt3d` (→ `volumen.py`), and `gestos` (→ `gestos.py`). | None — never via a hook | `ojo.log` (verbs `mirar`/`texto`/`fotocopia`/`tarjeta`/`manual`) plus whatever file each verb asks for; `despiece`/`prompt3d`/`gestos` touch nothing in `memory/` |
 | `lectura_visual.py` | OCR of an image via Windows's own engine (WinRT, nothing to install) or `tesseract` (second path, PATH): `texto` (plain text, optionally to the clipboard), `fotocopia` (straightens/corrects lighting on a photographed or camera-captured document, PNG or multi-page PDF — a WIA scanner is one MORE optional source, never the path), `tarjeta` (patterns + position heuristic → `.vcf` and `.png`), `manual` (orders several photos, without summarizing). Used by `ojo.py`. | None | `lectura_visual.log`; whatever output file each verb asks for (next to the input, or in `memory/` if it came from `--camara`/`--escaner`) |
 | `volumen.py` | `despiece`: separates the subject from the background (GrabCut) and splits it into 2.5D layers by sharpness+luminance, for `render3d.py`'s exploded-view slider. `prompt3d`: measures palette (k-means), proportion, horizon, and shapes (contour circularity) and writes an ES/EN three.js design prompt. Used by `ojo.py`. | None | Nothing in `memory/`: doesn't resolve a project (a file-to-file script, like `render3d.py`) — writes wherever asked |
-| `gestos.py` | MediaPipe (21 points per hand) + a vocabulary of this package's OWN: number of fingers isolates despiece layers, pinch slides the explosion (normalized by the session's own percentiles), palm pose orbits the camera, an open still hand for one second captures a PNG, two hands scale. Serves its state over HTTP ONLY on `127.0.0.1`. Used by `ojo.py gestos`. | None | Nothing in `memory/`: doesn't resolve a project (lives/serves while running, like `taller.py`) |
+| `gestos.py` | MediaPipe (21 points per hand) + a vocabulary of this package's OWN: number of fingers isolates despiece layers, pinch slides the explosion (normalized by the session's own percentiles), palm pose orbits the camera, an open hand held still for one second sets `gesto_completado` to `"captura"`, two hands scale. Serves its state over HTTP ONLY on `127.0.0.1`. Nothing consumes that state yet: `render3d.py`'s page doesn't read `/estado` or react to it, and no PNG gets captured this way — that field is a label, not an effect, and wiring the server to a page is still declared, unfinished work. What DOES use this vocabulary is `kinetica.py`'s viewer, but it implements it on its own INSIDE the browser (MediaPipe Tasks Vision served locally from `mp/`), without calling `gestos.py` or its `/estado` — and the two have already diverged there: the still palm opens a hologram, not a capture. Used by `ojo.py gestos`. | None | Nothing in `memory/`: doesn't resolve a project (lives/serves while running, like `taller.py`) |
+| `kinetica.py` | Turns ONE photo of a compound object into a 3D viewer driven by hand: splits it into real components (`--regiones` by hand + `cv2.grabCut`, or automatic and flagged as worse without `--regiones`), mounts a hologram of the assembled product over your own palm, and, with `--reconocer`/`--reconocimiento`, records where each recognized brand came from (never from the `titulo` dictated in `fichas.json`). `--quitar-fondo` delegates to `fondo.py` before splitting. | None — manual use | Nothing in `memory/`: mounts a self-contained folder next to the photo (or under `--salida DIR`) and serves it over HTTP ONLY on `127.0.0.1`; real hand tracking needs `python instalar.py --manos` separately |
+| `kinetico.py` | Turns a SET of things — a folder on disk (`arbol`) or a generic node contract (`datos <nodos.json>`, one adapter per source) — into a 3D building navigable by hand or mouse; its server (`kinetico_servidor.py`) exposes `entrar`/`abrir` ONLY over what the mounted scene already declares, never outside the folder it was opened with. | None — manual use | Nothing in `memory/`: READS the folder or node file it's given and writes nothing into it; mounts a self-contained folder (or under `--salida DIR`) and serves it over HTTP ONLY on `127.0.0.1` |
+| `fondo.py` | Removes a photo's background locally, with three engines that always say which one ran: `sistema` (macOS 14+'s own Vision framework, no downloads — WRITTEN BUT NOT TESTED: this package has been measured on Windows), `modelo` (a small ONNX network of 4,574,861 bytes MEASURED, in `abyss/vendor/modelos/`, running on `onnxruntime`, the same on Windows, Linux and macOS) and `grabcut` (no downloads, crude, warns every time). `auto` tries them in that order and ALWAYS prints which one it used. On Windows nothing from the system is used because nothing can be: the Photos app's «Remove background» button exposes no public interface, and the Windows App SDK's segmentation is restricted to machines with an NPU. `kinetica.py --quitar-fondo` calls it before splitting: with the background gone the silhouette is MEASURED instead of estimated, and every pixel ends up in some piece (MEASURED with the same photo in both versions: 78,947 pixels invented by inpainting with the background, 55 without it). | None | Nothing in `memory/`: writes the cutout next to the input image (`<name>_sin_fondo.png`), or wherever asked |
 | `auditar.py` | The five checks on a package BEFORE installing it: provenance (manifests + local `.git`), commands (hooks that run on every message or tool call, undeclared), permissions (what it writes outside its own folder), what leaves the machine (hosts in the code not named in the README — the check no antivirus makes), and domain (gathered for manual reading, no verdict). NEVER executes the audited code. Used directly or via `esceptico --paquete`. | None — manual use | Nothing in `memory/`: doesn't resolve a project (audits a third-party package, doesn't measure this thread) |
 | `huella.py` | Logs files written, processes, and ports a thread opens outside its folder; `--informe`/`--limpiar` say what's still alive and close it if asked. `--limpiar --si` only deletes files under the system temp directory or under a subfolder THIS package generates in `mem` (`huella/`, `mapas/`, `pdf/`) — never `MEMORY.md`, a `*.md` note, or anything loose at the root of `mem`, even if a session `Write` landed there. **Off by default** (`PostToolUse` cost). | `SessionStart` (`--arranque`) · `PostToolUse` (`--herramienta`) · `Stop` (`--fin`) | `huella/<session>.jsonl` (includes the TEXT of every Bash/PowerShell command, truncated to 200 characters — if you tend to pass secrets on the command line, they'll end up there locally) · `huella/<session>.snapshot.json` · `huella/_costes.json` |
 | `cuerpo.py` | The machine's own body (cpu, ram, disk, vram, GPU temperature, battery) with its own quantile baseline; `UserPromptSubmit` stays silent if everything is within its own range. All six channels show up at `SessionStart`; `UserPromptSubmit` only watches five — not the battery, since its own normal swing (charging/discharging) would push it out of its own p5 every time the charger is plugged or unplugged. | `SessionStart` (`--arranque`) · `UserPromptSubmit` (`--despertar`) | `cuerpo.jsonl` |
@@ -296,7 +388,7 @@ another's.
 | `imagen.py` | `crear`: provider cascade — your own local server (the only path that keeps the prompt on the machine) → providers with a key, in the order set in `imagen_config.json` (Pollinations, Cloudflare Workers AI, Together, Hugging Face) → anonymous AI Horde. `pintar`: photo → fully local brush-stroke canvas in several styles (delegates to `pintor.py`). `video`: animates those brush strokes into `.mp4` (delegates to `video_pintura.py`). `buscar`: finds an already-made freely-licensed image (Openverse/Wikimedia Commons) — doesn't assemble or compose. `render`: 3D scene/model → a three.js page, chains into `pintor.pintar` with `--pintar` (delegates to `render3d.py`). `mundo`: real-world subjects — museums, Street View, webcams (delegates to `mundo.py`). `vias`: which providers are configured and responding. | None — on request only | `imagenes/*.png` (and, with `buscar`/`mundo --descargar`, its attribution `.txt`) · `imagen.log` (provider, bytes, path, trimmed prompt for `crear`; input/output for `render` and `render --pintar`) · `imagen_config.json` (each provider's key, all optional) |
 | `pintor.py` | The brush-stroke engine (simplified Hertzmann) in several styles (oil, impressionist, watercolor, pastel, charcoal, ink: same engine, a different parameter dict) used by `imagen.py pintar`; also a standalone CLI. | None | Nothing of its own: writes wherever the caller says |
 | `video_pintura.py` | Animates `pintor.py`'s strokes into `.mp4` with variable pacing, honoring the painting's style and paper color; used by `imagen.py video`. | None | Nothing of its own |
-| `render3d.py` | 3D scenes and models (`escena.json`, `.glb`/`.gltf`/`.obj`/`.stl`) as a self-contained page with three.js embedded (MIT), exploded view; `--png` captures it with a headless browser. Used by `imagen.py render`. | None | Nothing in `memory/`: the HTML/PNG is written next to the input, or wherever asked |
+| `render3d.py` | 3D scenes and models (`escena.json`, `.glb`/`.gltf`/`.obj`/`.stl`) as a self-contained page with three.js embedded (MIT), exploded view; `--acabado` picks between `mate` (the default — doesn't change the result for anyone already using this script: the usual flat material, three flat lights) and `estudio` (metal with reflections, a PROCEDURAL reflection environment with no textures loaded from outside, ACES tone mapping, soft shadows); `--png` captures it with a headless browser. Used by `imagen.py render`. | None | Nothing in `memory/`: the HTML/PNG is written next to the input, or wherever asked |
 | `mundo.py` | Real-world subjects to paint: The Met/Art Institute of Chicago/Wikimedia Commons with no key, Street View/Mapillary/Windy webcams with their own key/token. `contexto()` derives lat/lon from Wikidata+Wikipedia. Used by `imagen.py mundo`. | None | `imagenes/*` (with `--descargar`, next to its attribution `.txt`); reads `imagen_config.json` (`google_maps_key`, `mapillary_token`, `windy_key`) |
 | `lienzo.py` | Operates on real images with no model: blend, double exposure, collage, gradient, restore, paint by numbers, remove an object (`cv2.inpaint`, or `--metodo taller` for large objects). | None | Nothing in `memory/` except `borrar --metodo taller`, which only READS `imagen_config.json` (`taller_url`) |
 | `taller.py` | Minimal local text-to-image server (A1111 nozzle: `/health`, `/sdapi/v1/txt2img`) for `crear`'s `local` path. Never starts on its own: the user launches it by hand. | None | Nothing in `memory/`: the model is cached in Hugging Face's own folder, not in the repo |
@@ -335,6 +427,16 @@ another's.
   are local computation (GrabCut, k-means) on the input file; `gestos` serves
   its state over HTTP ONLY on `127.0.0.1` — no one outside the machine can
   read it.
+- **`kinetica.py`**: nothing leaves the machine while mounting the folder
+  (GrabCut, inpainting, and `fondo.py`'s cutout, all local computation on the
+  input file); the server only listens on `127.0.0.1`. One exception: closing
+  the hand inside the hologram opens the recognized brand's or model's
+  official site in a new tab — a normal web visit, and only if the record
+  carries a `reconocimiento` with a `url`.
+- **`kinetico.py`**: nothing leaves the machine — it reads the folder or node
+  file it's given and serves the result over HTTP ONLY on `127.0.0.1`; its
+  two verbs (`entrar`/`abrir`) never act outside the mounted scene or the
+  folder it was opened with.
 - **`lienzo.py`**: nothing leaves the machine except `borrar --metodo taller`,
   which sends the image and mask to the URL YOU set in `imagen_config.json`
   (`taller_url`) — empty by default, so without setting it that method fails
@@ -483,7 +585,28 @@ another's.
   this machine yet; pinch and scale normalize against the session's OWN
   percentiles and say "no measure yet" below 30 samples instead of faking a
   cutoff. It keeps running (server + camera loop) until interrupted: it's
-  not a verb that "finishes and returns a result" like the others.
+  not a verb that "finishes and returns a result" like the others. And nothing
+  consumes that state yet: the page `render3d.py` generates doesn't read
+  `/estado` or react to it, and no gesture ends up capturing a PNG —
+  `gestos.py` serves the right, tested JSON, with the vocabulary already
+  resolved in every field, but wiring it to the page is unfinished work,
+  declared, not promised as done. `kinetica`'s viewer does move things with
+  this vocabulary (pieces, orbit, hologram), but it does NOT go through
+  `gestos.py`: it reimplements it inside the browser, with its own stillness
+  constant.
+- **`kinetica.py`** is neither 3D reconstruction nor a scanner: it comes from
+  ONE 2D photo, with no stereo camera or depth sensor; without `--regiones`
+  the result is automatic and explicitly worse (pieces with no real name,
+  `auto_1`/`auto_2`…, flagged, not hidden). `abyss/vendor/mp/` (real hand
+  tracking) doesn't ship in the repository — without `python instalar.py
+  --manos`, the viewer still serves, just with no hands, with an on-screen
+  warning.
+- **`kinetico.py`** decrees the folder depth to show (`--hondura`), it
+  doesn't measure it; a sphere's size (bytes) and a cube's (files inside) are
+  different units that are never compared to each other; and the color by
+  format comes from the name's EXTENSION, never from opening the file to
+  look inside. Above `--tope`, a folder collapses into a single ball that
+  says how many descendants it has, instead of trying to show them all.
 
 ## Dependencies
 
@@ -632,4 +755,103 @@ of Anthropic.
 
 ## License
 
-Apache License 2.0 — see [`LICENSE`](LICENSE).
+Apache License 2.0 — see [`LICENSE`](LICENSE). The three third-party works
+that do ship inside the repository (three.js, MediaPipe Tasks Vision, U²-Net
+p) each keep their own — the detail, with where each file lives and what
+size it measures, is in [`NOTICE.md`](NOTICE.md).
+
+## Optional keys
+
+Almost everything works with no key at all. What does need one says so and **never touches the
+network**: without `google_maps_key`, the Street View source doesn't attempt the call, it
+reports «sin clave» and moves on.
+
+```
+python instalar.py --claves
+```
+
+Or the **Keys…** button in the installer window, which does the same and also lets you set
+them: one row per key, with what it unlocks, where to get it and its warning beside it. The
+field is masked, a blank field erases nothing, and on save it says how many it wrote, never
+which ones.
+
+It lists which keys exist, which ones you have set — never their value —, what each unlocks,
+what happens without it and where to get it. To set them, edit `imagen_config.json` in your
+memory folder, which lives **outside** this repository.
+
+**No key travels inside the package, and that isn't caution: it can't be done.** Publishing a
+credential under an open licence grants everyone the right to redistribute it, and that grant
+can't be taken back: every copy carries it. On top of that, these services' quotas are per
+account, not per person, so a shared key is a shared quota that the first heavy user exhausts.
+And one of them, Street View, really bills: past 10,000 free calls a month it charges $7.00 per
+1,000, with no cap by default, to whoever owns the key.
+
+The one exception travels because its owner published it: `horde_key` ships as `0000000000`,
+the anonymous key AI Horde offers to anyone who doesn't want an account. That's why the package
+generates images the moment it's installed, without asking you for anything.
+
+## Where this package calls, and from where
+
+Abyss's own auditor (`abyss/auditar.py`, check 4) requires that **every host the code uses be
+named in a README**. A host the code calls and the documentation keeps quiet about is a
+`rompe`-severity finding, and rightly so: it's what a hostile package would never write down.
+Here they all are, with who calls them and when.
+
+None of this happens on its own: every call comes from a skill you invoke in that turn.
+
+**Place and weather** (skill `exterocepcion`, on every prompt if you install it)
+`api.open-meteo.com`, `geocoding-api.open-meteo.com` — the weather, and the coordinates of a
+place name. No key.
+
+**Headlines** (skill `noticias`, at session start)
+Google News RSS. No key.
+
+**Creating images** (skill `imagen`, verb `crear`, only when you ask)
+`gen.pollinations.ai`, `api.cloudflare.com`, `api.together.xyz`, `router.huggingface.co`,
+`aihorde.net` — providers in a cascade; the first four only if you put a key in
+`imagen_config.json`, the last one anonymously.
+
+**Searching for licensed images** (skill `imagen`, verb `buscar`)
+`api.openverse.org`, `commons.wikimedia.org`.
+
+**Links that appear in the code and that this package NEVER calls**
+These five hosts show up in the source text, and the auditor flags them for that
+reason — its rule is that every host that appears must be named where a person
+reads it. None of them is contacted: there is no network request to any of them.
+
+- `enter.pollinations.ai`, `developers.cloudflare.com`, `docs.together.ai`,
+  `developers.google.com` — in the help block of
+  [`plantillas/imagen_config.json`](plantillas/imagen_config.json): the page where
+  EACH provider explains how to get its key. They are there so you don't have to
+  go looking.
+- `www.audi.com` — in the `MARCAS` table of
+  [`abyss/kinetica.py`](abyss/kinetica.py): a brand's official site, which the
+  viewer OFFERS as a link when it recognises that brand. Your browser opens it if
+  you close your hand; this package does not.
+
+
+**Museums and street** (skill `imagen`, verb `mundo`)
+`collectionapi.metmuseum.org` (the Metropolitan) and `api.artic.edu` / `artic.edu` (the Art
+Institute of Chicago), no key. `maps.googleapis.com` (Street View), `graph.mapillary.com` /
+`mapillary.com` and `api.windy.com` / `windy.com` **only with a key**: without one, that
+source doesn't touch the network at all. `es.wikipedia.org` and `wikidata.org`, for a work's
+caption.
+
+**A recognised product's official site** (skill `kinetica`)
+`vivo.com`, `zeiss.com`, `leica-camera.com`, `hasselblad.com`, `sony.com`, `global.canon`,
+`nikon.com`, `fujifilm.com` — never called: they're the list of destinations the viewer may
+OPEN a browser at if it recognises that brand **in the photo itself**.
+
+**Installer downloads** (`instalar.py`, only behind the flag that asks for them)
+`storage.googleapis.com` (MediaPipe's hand model, with `--manos`), `cdn.jsdelivr.net` and
+`apache.org` — none of them downloads on its own.
+
+**Text in documents, never a call**
+`github.com` (`fondo.py`: where to get the cutout model), `threejs.org` and
+`discourse.threejs.org` (`render3d.py`: the source of a technique), `w3.org`
+(`infografia.py`: the SVG namespace) and `copia.ejemplo.com` (`vigia.py`: an example of a
+lookalike domain, inside a comment).
+
+**And what does NOT leave your machine, no matter what**: the memory, the transcripts, the
+session measurements, the PDFs you read, the photos you paint, and everything the package
+writes under `mem/`.

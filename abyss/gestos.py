@@ -16,6 +16,22 @@ comprobación mira el atributo, no solo el `import` (`_mediapipe_utilizable()`).
 en sí SÍ se puede importar sin `mediapipe` (las funciones puras de más abajo no lo
 necesitan): solo `main()`/la CLI comprueban la dependencia y cortan ahí.
 
+## DÓNDE VIVE EL VOCABULARIO (decisión de 8-sep-2026)
+
+La copia que MANDA es `abyss/plantillas/gestos_comun.js`. Hasta hoy la misma gramática
+estaba escrita tres veces —aquí, dentro de `kinetica.html`, y en un módulo suelto— y las
+tres habían divergido: solo la del módulo tenía las reglas nuevas (sin espejo, más lenta,
+dos puños paran). Ahora `kinetica.html` la importa y este fichero es su ESPEJO en Python,
+para quien quiera el estado de la mano desde fuera del navegador.
+
+Espejo quiere decir que hay que mantenerlo a mano: no hay nada que compruebe que los dos
+dicen lo mismo. Si cambias uno, cambia el otro, y si algún día alguien consume este
+servidor de verdad, lo primero es una prueba que compare los dos vocabularios.
+
+Y el estado sigue siendo el de siempre: **este servidor HTTP no lo consume nadie**. Los
+visores kinéticos NO lo usan; leen la mano en el navegador con MediaPipe y el módulo de
+arriba. Esto está aquí para el día que haga falta desde otro proceso.
+
 ## CORRECCIÓN DEL AUTOR (7-sep-2026, manda sobre cualquier versión anterior de este fichero)
 
 Del post citado abajo se toman TÉCNICAS, nunca su diseño. Está PROHIBIDO su vocabulario
@@ -691,8 +707,9 @@ def _cli(argv):
 
 
 if __name__ == '__main__':
-    try:
-        sys.stdout.reconfigure(encoding='utf-8')
-    except Exception:
-        pass
+    try:                       # la consola de Windows y la salida tienen que hablar
+        from . import consola  # el mismo idioma: ver abyss/consola.py
+    except ImportError:
+        import consola
+    consola.preparar()
     sys.exit(_cli(sys.argv[1:]))
