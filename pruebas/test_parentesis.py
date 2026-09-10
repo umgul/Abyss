@@ -1,4 +1,4 @@
-"""`parentesis.py` (ESPECIFICACION.md §8, ESPECIFICACION_TANDA2.md T2.1).
+"""`parentesis.py` (ESPECIFICACION.md §8).
 
 Casos: `--abrir`/`--cerrar` marcan un tramo por sesión y no duplican uno ya
 abierto; `--omitir-sesion` escribe (una vez) en sesiones/.omitir; `--recortar`

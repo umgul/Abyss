@@ -1,4 +1,4 @@
-"""`mundo.py` (ESPECIFICACION_TANDA3.md, T3.3): motivos del mundo real para `imagen.py
+"""`mundo.py`: motivos del mundo real para `imagen.py
 mundo` — met/artic/commons (sin clave) más streetview/mapillary/webcam (con clave) y
 `contexto()` (Wikidata + Wikipedia, sin clave). Sin red en toda la suite: cada fuente
 se prueba con un `pedir_fn` de pega que sirve las respuestas JSON reales capturadas

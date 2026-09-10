@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`skills/ojo/SKILL.md` (ESPECIFICACION_TANDA4.md T4.6): la descripción del
+"""`skills/ojo/SKILL.md`: la descripción del
 frontmatter es lo primero que lee el enrutador de skills, antes que nada del
 cuerpo — así que el verbo que dispara cada frase importa tanto como la frase.
 

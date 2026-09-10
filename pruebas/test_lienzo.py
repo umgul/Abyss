@@ -1,4 +1,4 @@
-"""`lienzo.py` (ESPECIFICACION_TANDA2.md, T2.8): operar con imágenes reales, sin modelo.
+"""`lienzo.py`: operar con imágenes reales, sin modelo.
 Ningún verbo de este fichero resuelve un proyecto de Claude Code salvo `borrar --metodo
 taller` (no probado con red real: ver `test_imagen_buscar.py` para el patrón de servidor
 local falso usado en el resto del paquete si algún día se cablea `taller.py` de verdad ahí),

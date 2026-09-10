@@ -1,4 +1,4 @@
-"""`cuerpo.py` (T2.3 ESPECIFICACION_TANDA2.md): el hardware de la máquina, con
+"""`cuerpo.py`: el hardware de la máquina, con
 normal propia por cuantiles. Las funciones puras (`medir`, `historial`, `guardar`,
 `cuantiles`, `evaluar`, `texto_arranque`, `texto_despertar`) se prueban importando
 el módulo DIRECTAMENTE (no por subproceso, a diferencia del resto de `abyss/`):

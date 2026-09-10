@@ -1,6 +1,6 @@
 """Huella: todo lo que un hilo toca FUERA de su propia carpeta de código.
 
-Motivo (T2.2, ESPECIFICACION_TANDA2.md): el 6-sep el asistente dejó un servidor
+Motivo: el 6-sep el asistente dejó un servidor
 escuchando en un puerto y tres clones de un proyecto ajeno en el directorio
 temporal, y los tuvo que cazar a mano. Un hilo debe poder decir, al cerrar, QUÉ
 tocó — y limpiarlo él mismo si hace falta, sin adivinar.
@@ -613,7 +613,7 @@ def _bajo(ruta, base):
 
 
 # Subcarpetas de `mem` que ESTE paquete genera por su cuenta (mismo criterio que
-# `instalar.DATOS_GENERADOS`, ESPECIFICACION_TANDA2.md T2.2: "solo mem/huella/,
+# `instalar.DATOS_GENERADOS`: "solo mem/huella/,
 # mem/mapas/, mem/pdf/"). Fallo "rompe" medido 7-sep: antes CUALQUIER ruta bajo
 # `mem` contaba como borrable, así que un `Write` de la sesión sobre
 # `memory/MEMORY.md` o sobre una ficha nueva (`memory/ficha-nueva.md`) — el rito

@@ -1,4 +1,4 @@
-"""T2.6 (`ESPECIFICACION_TANDA2.md`): `esceptico` no es un guion Python — es una
+"""`esceptico` no es un guion Python — es una
 skill de Claude Code (`skills/esceptico/SKILL.md`) que `instalar.py` copia a la
 carpeta de skills del usuario (`--skills-dir`, por defecto `~/.claude/skills`).
 "la prueba comprueba que el instalador la copia, que el frontmatter parsea y que

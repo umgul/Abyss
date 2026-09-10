@@ -1,4 +1,4 @@
-"""`render3d.py` (ESPECIFICACION_TANDA3.md, T3.1). `render3d.py` no usa `rutas.resolver()`
+"""`render3d.py`. `render3d.py` no usa `rutas.resolver()`
 (no hay `mem`/proyecto que resolver: es un guion de fichero a fichero, como `pintor.py`) así
 que, a diferencia de otros guiones de `abyss/`, SÍ se puede importar en el propio proceso de
 la prueba (igual que `test_pintor_acabado_suave.py` importa `pintor`) — se hace así para las
@@ -380,7 +380,7 @@ class FormatosDirectos(unittest.TestCase):
 
 class DocumentacionFrenteACodigo(unittest.TestCase):
     """Dos claims del docstring/LICENSE que no coincidían con lo que hace el código
-    (ver ESPECIFICACION_TANDA3.md, arreglos de render3d.py del 7-sep): (1) el aviso de
+    (arreglos de render3d.py del 7-sep): (1) el aviso de
     obsolescencia de three.js NO se borra, solo se le recorta el esquema a sus URLs; (2)
     `document.title` no es una señal que nadie lee — la captura decide solo por peso de
     fichero, y el primer fotograma es síncrono."""

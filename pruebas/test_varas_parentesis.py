@@ -3,8 +3,8 @@ versión viva — `varas.py` recorría los transcripts VIVOS de `proj` buscando
 lecturas de fichas (`"name":"Read"`/`cat `) sin consultar `parentesis.en_parentesis()`
 en absoluto, así que una lectura de ficha hecha DENTRO de un tramo marcado seguía
 contando como uso y le subía el ◆ a esa ficha en `MEMORY.md` — justo el fichero que
-el asistente lee al empezar cada hilo, y justo lo que `ESPECIFICACION_TANDA2.md`
-T2.1 promete gobernar («lo que el propio asistente vuelve a leer en hilos futuros»).
+el asistente lee al empezar cada hilo, y justo lo que lo que gobierna `parentesis.py`
+promete gobernar («lo que el propio asistente vuelve a leer en hilos futuros»).
 
 Fixture: un proyecto con 8 sesiones ARCHIVADAS (para pasar el arranque en frío,
 `propiocepcion.UMBRAL_FRIO`), 4 fichas enlazadas desde `MEMORY.md`, y un transcript

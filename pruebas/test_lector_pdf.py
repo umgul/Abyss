@@ -1,4 +1,4 @@
-"""`lector_pdf.py` (T2.4 ESPECIFICACION_TANDA2.md). Como `cuerpo.py`, se importa
+"""`lector_pdf.py`. Como `cuerpo.py`, se importa
 DIRECTAMENTE (sin subproceso) para las funciones puras: no toca `rutas.resolver()`
 ni stdin al importarse.
 

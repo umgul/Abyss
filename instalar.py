@@ -542,7 +542,7 @@ MODULOS_POR_ID = {m['id']: m for m in MODULOS}
 
 
 # ---------------------------------------------------------------------------------
-# T5.1 · dependencias de terceros por módulo (ESPECIFICACION_TANDA5.md §T5.1).
+# T5.1 · dependencias de terceros por módulo.
 #
 # Cada entrada: `import_nombre` (lo que se prueba a IMPORTAR de verdad, nunca una
 # lista fija de "lo que suele hacer falta"), `pip_nombre` (lo que se instala),
@@ -1295,7 +1295,7 @@ def _tabla_dependencias(idioma, modulos=None, python_exe=None):
 
 
 # ---------------------------------------------------------------------------------
-# T5.2 · bilingüe (ESPECIFICACION_TANDA5.md §T5.2): las cadenas cortas de interfaz
+# T5.2 · bilingüe: las cadenas cortas de interfaz
 # (ventana, botones, avisos, cabeceras, mensajes de error, resumen final) pasan
 # TODAS por aquí — nunca una cadena suelta en medio del código. `_texto()` es el
 # ÚNICO punto de lectura de ESTE diccionario; si una clave faltara en el idioma

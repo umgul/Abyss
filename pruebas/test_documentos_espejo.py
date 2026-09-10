@@ -1,6 +1,6 @@
 """T5.2: `docs/leyes.md`/`docs/leyes.en.md` y `docs/AUDITORIA_DE_ABYSS.md`/
-`docs/AUDITORIA_DE_ABYSS.en.md` son pares espejo (ESPECIFICACION_TANDA5.md,
-igual que README.md/README.en.md). Tres cosas se comprueban de cada par:
+`docs/AUDITORIA_DE_ABYSS.en.md` son pares espejo (igual que README.md/README.en.md).
+Tres cosas se comprueban de cada par:
 
 1. Mismo número de secciones de primer nivel (`^## `) — si un idioma gana o
    pierde una sección, el otro se queda desincronizado sin que nadie lo note

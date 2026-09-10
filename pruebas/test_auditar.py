@@ -1,4 +1,4 @@
-"""`auditar.py` (T4.2, ESPECIFICACION_TANDA4.md): las cinco comprobaciones sobre
+"""`auditar.py`: las cinco comprobaciones sobre
 un paquete, con evidencia de fichero y línea.
 
 `auditar.py` no llama a `rutas.resolver()` ni lee stdin (no guarda nada en

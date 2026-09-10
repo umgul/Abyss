@@ -53,7 +53,7 @@ descarga la imagen elegida desde el host que indique cada banco. Las URLs base s
 `ABYSS_OPENVERSE_URL`/`ABYSS_COMMONS_URL`, que solo existen para poder probar esta pieza sin red
 (`pruebas/test_imagen_buscar.py`, contra JSON guardado): en uso normal nunca se definen.
 
-`render` (ESPECIFICACION_TANDA3.md, T3.1) delega en `render3d.renderizar()`: escribe SIEMPRE la
+`render` delega en `render3d.renderizar()`: escribe SIEMPRE la
 página three.js autocontenida y, con `--png` (o con `--pintar`, que necesita una imagen de la que
 partir y por eso fuerza `--png` aunque no se pida a mano), una captura vía navegador sin cabeza —
 sin uno, «sin dato: no hay navegador sin cabeza» y código 2 (la página HTML ya se ha escrito: eso
@@ -63,7 +63,7 @@ no depende del navegador). Con `--pintar`, el PNG resultante se pasa tal cual a
 `--mirar`, `--fondo`, `--luz`) son las de `render3d.py`, que documenta también sus límites (visor y
 editor de vistas, no modelador; three.js embebido en `abyss/vendor/`, sin red para verlo).
 
-`mundo` (ESPECIFICACION_TANDA3.md, T3.3) delega ENTERO en `mundo._cli()`: motivos DEL MUNDO REAL
+`mundo` delega ENTERO en `mundo._cli()`: motivos DEL MUNDO REAL
 para pintar — The Met, el Art Institute of Chicago y Wikimedia Commons sin clave; Street View,
 Mapillary y las webcams de Windy con clave/token propios en `imagen_config.json`
 (`google_maps_key`, `mapillary_token`, `windy_key`) — sin ellas, esa fuente ni toca la red: avisa

@@ -1,4 +1,4 @@
-"""`infografia.py` (ESPECIFICACION_TANDA2.md, T2.7): de un CSV/JSON a un SVG con la
+"""`infografia.py`: de un CSV/JSON a un SVG con la
 biblioteca estándar. No usa `mem` ni red, así que se prueba en proceso (más rápido) e
 independiente de `rutas.py`; solo el paso por la CLI (`_cli`) se cubre por subprocess una
 vez, para comprobar que también funciona invocado como los demás guiones del paquete.
@@ -88,8 +88,8 @@ class InfografiaPaleta(unittest.TestCase):
     líneas y la leyenda sin color) la SUITE ENTERA seguía en verde. Con UNA
     sola categoría y 6 series, los `<rect>` salen en el mismo orden que las
     series (`j=0..5`): deben ser los 5 tonos de `PALETA`, y la 6ª repetir el
-    color de la 1ª (`ESPECIFICACION_TANDA2.md` T2.7: "paleta sobria fija ...
-    se repiten a partir de la sexta serie")."""
+    color de la 1ª (el docstring de `infografia.py` dice: "Paleta sobria fija de 5
+    tonos (se repiten si hay más de 5 series)")."""
 
     def test_seis_series_usan_los_5_tonos_y_la_sexta_repite_la_primera(self):
         d = Path(tempfile.mkdtemp(prefix='abyss_infog_'))

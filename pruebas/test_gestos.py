@@ -1,4 +1,4 @@
-"""`gestos.py` (ESPECIFICACION_TANDA4.md, T4.5): la regla del 1,7 para dedos extendidos, el
+"""`gestos.py`: la regla del 1,7 para dedos extendidos, el
 pellizco/escala normalizados por percentiles 10/90 de la sesión, el servidor HTTP local, y
 el VOCABULARIO PROPIO (corrección del autor, 7-sep-2026): los dedos aíslan capas del
 despiece, el pellizco es el deslizador de explosión, la pose de la palma orbita la cámara,
@@ -178,7 +178,7 @@ class VocabularioPropio(unittest.TestCase):
 
     def test_ningun_rastro_del_vocabulario_ajeno_en_lo_que_se_sirve(self):
         # El docstring SÍ nombra "flor/aguacate/calavera" una vez, para declarar por qué
-        # están prohibidas (igual que ESPECIFICACION_TANDA4.md) — lo que de verdad importa
+        # están prohibidas — lo que de verdad importa
         # es que esas palabras no aparezcan como claves/valores de lo que este módulo
         # produce: ni el vocabulario configurable ni los campos del estado servido.
         superficie = json.dumps(list(gestos.VOCABULARIO_POR_DEFECTO.keys())

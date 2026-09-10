@@ -5,10 +5,10 @@
     mundo.descargar(candidato, dir) -> (ruta_imagen, ruta_atribucion)
     mundo.contexto(motivo, cfg=None) -> dict (qué es, dónde está, lat/lon) o {}
 
-Petición del usuario (ESPECIFICACION_TANDA3.md, T3.3, 7-sep-2026): la búsqueda de
+Petición del usuario (7-sep-2026): la búsqueda de
 motivos «debe incluir Street View o Google Maps, webs museísticas, de historia, de
 arte, no los repos de imágenes; tiene que plasmar cosas del mundo real». Seis fuentes
-(medido 7-sep 07:54 desde la máquina del usuario, ESPECIFICACION_TANDA3.md):
+(medido 7-sep 07:54 desde la máquina del usuario):
 
     fuente     | qué da                                    | clave            | medido
     met        | obras de la colección, dominio público    | ninguna          | 200 en 0,5s; «Last Supper» 67 resultados; objeto 437213 con primaryImage
@@ -171,8 +171,8 @@ def _buscar_artic(motivo, n, cfg, pedir_fn):
 
 def _buscar_commons(motivo, n, cfg, pedir_fn):
     """Wikimedia Commons: sin clave; sirve tanto para la obra como para el lugar. La
-    URL de `imageinfo.url` YA es la de resolución completa, no una miniatura (medido
-    en ESPECIFICACION_TANDA3.md: La última cena de Leonardo, 9600x4800). El `Artist`
+    URL de `imageinfo.url` YA es la de resolución completa, no una miniatura (medido:
+    La última cena de Leonardo, 9600x4800). El `Artist`
     de la API trae HTML de verdad (enlaces, a veces anidados en `<bdi>`/`<span>`):
     `_sin_html()` lo deja en texto plano."""
     q = urllib.parse.urlencode({
@@ -212,7 +212,7 @@ def _buscar_streetview(motivo, n, cfg, pedir_fn, opciones):
     """Google Street View Static: pide primero `/metadata` (gratis, no gasta cuota
     de imagen) para saber si el punto tiene cobertura antes de dar la URL de la
     imagen. Sin `google_maps_key`, ni se intenta la red (medido sin clave, HTTP 403
-    «You must use an API key», ESPECIFICACION_TANDA3.md)."""
+    «You must use an API key»)."""
     clave = (cfg.get("google_maps_key") or "").strip()
     if not clave:
         raise RuntimeError("sin clave: pon google_maps_key en imagen_config.json")
@@ -240,7 +240,7 @@ def _buscar_streetview(motivo, n, cfg, pedir_fn, opciones):
 
 def _buscar_mapillary(motivo, n, cfg, pedir_fn, opciones):
     """Mapillary Graph API: sin `mapillary_token`, ni se intenta la red (medido sin
-    token, error 190, ESPECIFICACION_TANDA3.md). Vistas a pie de calle con licencia
+    token, error 190). Vistas a pie de calle con licencia
     CC BY-SA 4.0."""
     token = (cfg.get("mapillary_token") or "").strip()
     if not token:
@@ -272,7 +272,7 @@ def _buscar_mapillary(motivo, n, cfg, pedir_fn, opciones):
 
 def _buscar_webcam(motivo, n, cfg, pedir_fn, opciones):
     """Windy webcams API v3: sin `windy_key`, ni se intenta la red (medido sin clave,
-    HTTP 403, ESPECIFICACION_TANDA3.md). El mundo EN DIRECTO: a diferencia de las
+    HTTP 403). El mundo EN DIRECTO: a diferencia de las
     otras cinco fuentes, la imagen puede ser distinta en cada descarga."""
     clave = (cfg.get("windy_key") or "").strip()
     if not clave:
@@ -306,7 +306,7 @@ DESPACHO_CON_CLAVE = {"streetview": _buscar_streetview, "mapillary": _buscar_map
 
 def contexto(motivo, cfg=None, pedir_fn=None):
     """Wikidata `wbsearchentities` + Wikipedia REST, sin clave (medido 7-sep: ambas
-    200, ESPECIFICACION_TANDA3.md). Qué es el motivo, de quién, y su latitud/longitud
+    200). Qué es el motivo, de quién, y su latitud/longitud
     SI Wikipedia la conoce (campo `coordinates` del resumen; ausente en artículos que
     no son de un lugar, p. ej. una persona) — para poder derivar la vista a pie de
     calle sin que el usuario dé `--lugar` a mano. Nunca lanza: sin red, sin resultado

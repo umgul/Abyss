@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`instalar.py` T5.2 (ESPECIFICACION_TANDA5.md): español e inglés en el propio
+"""`instalar.py` T5.2: español e inglés en el propio
 instalador. Todo lo que ve el usuario (ventana, botones, avisos, tabla de
 módulos, mensajes de error, resumen final) pasa por `TEXTOS`/`_texto()`, con
 `--idioma es|en` o, por defecto, el idioma del sistema. Los guiones de

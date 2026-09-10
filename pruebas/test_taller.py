@@ -1,4 +1,4 @@
-"""`taller.py` (ESPECIFICACION_TANDA2.md, T2.8 + encargo directo): servidor local mínimo de
+"""`taller.py` (encargo directo): servidor local mínimo de
 texto→imagen, boquilla A1111 (`POST /sdapi/v1/txt2img`, `GET /health`).
 
 `diffusers` NO está instalado en esta máquina (comprobado): el caso "sin diffusers" se prueba

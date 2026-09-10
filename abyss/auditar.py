@@ -3,7 +3,7 @@
 
     python auditar.py <ruta_de_paquete> [--json] [--markdown salida.md]
 
-Motivo (T4.2, ESPECIFICACION_TANDA4.md): el incidente que cuenta Yonathan Cohen es
+Motivo: el incidente que cuenta Yonathan Cohen es
 que a alguien lo comprometieron con un comando que le dio su propia IA, apuntando a
 un dominio copia. Esto es la misma pregunta aplicada a un paquete ENTERO antes de
 instalarlo: ¿de dónde viene, qué ejecuta y cuándo, qué toca fuera de su carpeta,

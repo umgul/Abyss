@@ -10,7 +10,7 @@ generada en el momento invocando la propia pieza (`varas.py --index`, `vigia.py 
 ve se inventa ni se recorta de una captura vieja: si una pieza cambia, este guion se vuelve a
 correr y el vídeo sale distinto — esa es la garantía.
 
-Bloques (en este orden; T5.3, ver ESPECIFICACION_TANDA5.md):
+Bloques (en este orden; T5.3):
     apertura · memoria y continuidad (`varas --index`) · honestidad (`vigia --probar`) ·
     auditoría (`auditar.py`) · sentidos (`cuerpo` + `exterocepcion`) · pintor (`video_pintura.py`) ·
     estilos (`pintor.py`, cuatro estilos) · mundo (`mundo.py` + `pintor.py`) ·

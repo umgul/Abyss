@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Lectura visual: lo que el ojo LEE — OCR y sus tres usos (ESPECIFICACION_TANDA4.md, T4.3).
+"""Lectura visual: lo que el ojo LEE — OCR y sus tres usos.
 
 Uso:
     python lectura_visual.py texto <imagen> [--portapapeles] [--salida f.txt]
@@ -14,8 +14,7 @@ Motor de OCR, en este orden fijo, nunca se instala nada:
      instalado en cualquier Windows con el paquete de idioma del perfil puesto — no
      hace falta `pip install` nada. Medido el 7-sep-2026 en la máquina de desarrollo:
      imagen sintética de 900×420, 6 líneas, con acentos y `correo@ejemplo.es`/
-     `Tel. +34 600 123 456` intactos, en 443 ms, idioma `es-ES` (el del perfil) — ver
-     ESPECIFICACION_TANDA4.md §0.
+     `Tel. +34 600 123 456` intactos, en 443 ms, idioma `es-ES` (el del perfil).
   2. `tesseract`, si está en el PATH, como segunda vía (en la máquina de desarrollo,
      medido, NO está en el PATH). Su salida TSV (`-c tessedit_create_tsv=1`) da
      posición y tamaño por palabra, agrupadas aquí por línea, así `tarjeta`/`manual`
@@ -26,7 +25,7 @@ Motor de OCR, en este orden fijo, nunca se instala nada:
 
 `texto`: imprime las líneas en el orden que da el motor (de arriba abajo). Con
 `--portapapeles`, además YA COPIADO: en Windows por `Set-Clipboard` de PowerShell
-(medido disponible junto a `clip.exe`, ESPECIFICACION_TANDA4.md §0 — se prefiere
+(medido disponible junto a `clip.exe` — se prefiere
 `Set-Clipboard` porque recibe el texto ya como objeto Unicode; `clip.exe` decodifica
 su entrada con la code page de la consola y desfigura acentos/`ñ` si esa code page
 no es UTF-8, el caso normal de `cmd.exe`); en macOS por `pbcopy`; en Linux por
@@ -246,7 +245,7 @@ def _ocr_tesseract(ruta_tess, ruta_abs, idioma=None, timeout=30):
     PALABRA) agrupado por línea (`block_num`,`par_num`,`line_num`) para dar el
     mismo formato de línea+caja que `ocr_win.ps1` — así `tarjeta`/`manual`
     funcionan igual con cualquiera de los dos motores. No medido en esta
-    máquina (`tesseract` no está en el PATH, ESPECIFICACION_TANDA4.md §0): la
+    máquina (`tesseract` no está en el PATH): la
     prueba de este camino se salta con motivo si no lo encuentra."""
     args = [ruta_tess, ruta_abs, 'stdout', '--psm', '3']
     if idioma:
@@ -635,7 +634,7 @@ exit 0
 
 def escanear_wia(ruta_salida, timeout=60):
     """Adquiere una hoja del escáner WIA tipo 1 (medido: «HP DeskJet 3700
-    series», ESPECIFICACION_TANDA4.md §0) y la guarda en `ruta_salida`. Devuelve
+    series») y la guarda en `ruta_salida`. Devuelve
     el dict `{"ok":true,"ruta":...,"dispositivo":...}` o `{"ok":false,"motivo":...}`
     (nunca lanza: quien llama decide qué hacer según `ok` — en `fotocopia`,
     caer a la vía normal sin tratarlo como error, ver docstring del módulo).

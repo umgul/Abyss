@@ -1,4 +1,4 @@
-"""`pintor.pintar(..., estilo=...)` (ESPECIFICACION_TANDA3.md T3.2 y «Estilos añadidos»): motor
+"""`pintor.pintar(..., estilo=...)`: motor
 único, un dict de parámetros por estilo. Importa `pintor` directamente en el proceso de la
 prueba, como `test_pintor_acabado_suave.py` (no toca `rutas.resolver()` ni conoce `mem`).
 

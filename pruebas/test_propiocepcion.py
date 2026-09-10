@@ -1,4 +1,4 @@
-"""`propiocepcion.py` — el tramo de `parentesis.py` (T2.1, ESPECIFICACION_TANDA2.md)
+"""`propiocepcion.py` — el tramo de `parentesis.py`
 debe quedar FUERA de la medida, igual que `continuidad.frases_usuario()`.
 
 Fallo medido 7-sep: `medir()` nunca llamaba a `parentesis.en_parentesis()`, así

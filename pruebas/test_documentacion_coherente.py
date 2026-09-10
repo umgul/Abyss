@@ -195,8 +195,8 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     tumbando la suite entera.
 
     T5.2 (7-sep) añadió los espejos en inglés que la propia especificación pide
-    («se añaden `docs/leyes.en.md` y ... `docs/AUDITORIA_DE_ABYSS.en.md`»,
-    ESPECIFICACION_TANDA5.md §T5.2): misma razón, la lista blanca vuelve a
+    («se añaden `docs/leyes.en.md` y ... `docs/AUDITORIA_DE_ABYSS.en.md`»):
+    misma razón, la lista blanca vuelve a
     crecer con esos dos ficheros o la suite entera queda en rojo por un
     requisito de la propia especificación."""
 

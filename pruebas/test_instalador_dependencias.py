@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`instalar.py` T5.1 (ESPECIFICACION_TANDA5.md): el instalador resuelve las
+"""`instalar.py` T5.1: el instalador resuelve las
 dependencias de terceros de cada módulo por sí mismo, con consentimiento y sin
 mentir. Regla dura 6 del encargo: NADA de esto instala un paquete de verdad —
 cada prueba que ejercita `--instalar-dependencias`/`instalar_dependencias()`

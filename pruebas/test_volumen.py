@@ -1,4 +1,4 @@
-"""`volumen.py` (ESPECIFICACION_TANDA4.md, T4.4): despiece por capas (2,5D, GrabCut +
+"""`volumen.py`: despiece por capas (2,5D, GrabCut +
 nitidez/luminancia) y `prompt3d` (paleta k-medias, proporciones, horizonte, formas por
 circularidad de contorno). `volumen.py` no llama a `rutas.resolver()` (guion de fichero a
 fichero, como `render3d.py`/`pintor.py`, ver su propio docstring) — se puede importar
@@ -9,8 +9,8 @@ Las imágenes son sintéticas y GEOMÉTRICAS a propósito (formas de color plano
 debería salir de la clasificación por circularidad — nada de esto se afirma "reconocido",
 se afirma "medido de ESTA imagen concreta, construida para dar ese resultado".
 
-`opencv-python`/`numpy` SÍ están instalados en la máquina de desarrollo (medido en
-ESPECIFICACION_TANDA4.md): las pruebas de "sin dependencia" bloquean `cv2` con un
+`opencv-python`/`numpy` SÍ están instalados en la máquina de desarrollo (medido):
+las pruebas de "sin dependencia" bloquean `cv2` con un
 `sitecustomize.py` propio por `PYTHONPATH` (mismo método que
 `test_imagen_dependencias_opcionales.py`) en vez de desinstalar nada de verdad.
 """

@@ -4,7 +4,7 @@ nombre de pila del autor, ni el nombre de otro proyecto privado suyo, ni rutas
 usuario». Dos fallos ya medidos por el revisor entraban aquí:
 `abyss/notify_telegram.ps1.plantilla` (una frase de ejemplo que citaba el nombre
 de ese otro proyecto suyo, en un fichero que SÍ se distribuye) y
-`ESPECIFICACION.md`/`ESPECIFICACION_TANDA2.md` (varias apariciones del nombre de
+`ESPECIFICACION.md` (varias apariciones del nombre de
 pila del autor).
 
 SEGUNDA VUELTA (6-sep, revisor Opus, "roza"): el único fichero del repo con datos
@@ -32,7 +32,7 @@ no duplicado a mano aquí.
 CUARTA VUELTA (revisor Opus, "roza"): `ConfigJsonGeneradoNoEsPublicado` y
 `UnFicheroNoIgnoradoSigueVigilado` ESCRIBÍAN sobre el repo real (`abyss/config.json`
 y `docs/_decoy_prueba_datos_personales.md`) para poder probar los dos casos límite
-— justo el tipo de mutación que `ESPECIFICACION_TANDA2.md` pide evitar («todo en
+— justo el tipo de mutación que las reglas de la suite piden evitar («todo en
 directorios temporales»). Medido por simulación de muerte dura (`os._exit(3)` justo
 tras escribir el señuelo, equivalente a un corte de luz o un `taskkill /F`): el
 señuelo sobrevivía en `docs/` (una ruta que `.gitignore` NO cubre, así que SÍ se

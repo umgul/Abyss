@@ -1,4 +1,4 @@
-"""`lectura_visual.py` (ESPECIFICACION_TANDA4.md, T4.3): OCR y sus tres usos.
+"""`lectura_visual.py`: OCR y sus tres usos.
 
 `lectura_visual.py`, como `render3d.py`/`pintor.py`, no llama a `rutas.resolver()`
 a nivel de módulo (solo dentro de `_cli()`), así que es seguro IMPORTARLO en el
@@ -8,7 +8,7 @@ lo que cubre la CLI completa (verbos, códigos de salida, ficheros por defecto),
 igual que separa `test_render3d.py`.
 
 Motor de OCR: en ESTA máquina de desarrollo, el de Windows (WinRT) está medido
-disponible (ESPECIFICACION_TANDA4.md §0) y `tesseract` NO está en el PATH. Las
+disponible y `tesseract` NO está en el PATH. Las
 clases que necesitan un motor real de verdad usan `skipUnless` sobre lo que la
 propia `lectura_visual` mide en caliente (`motor_winrt_disponible()`,
 `shutil.which('tesseract')`) — nunca se asume por `os.name` a secas — para que
@@ -165,7 +165,7 @@ class TesseractComoSegundaViaFalso(unittest.TestCase):
 
 
 @unittest.skipUnless(_TIENE_TESSERACT, 'tesseract no está en el PATH en esta máquina '
-                      '(medido 7-sep-2026, ver ESPECIFICACION_TANDA4.md §0)')
+                      '(medido 7-sep-2026)')
 class SegundaViaConTesseractReal(unittest.TestCase):
     def test_ocr_tesseract_real_lee_algo(self):
         proj = ay.nuevo_proyecto()

@@ -1,4 +1,4 @@
-"""`vigia.py` T4.1 (ESPECIFICACION_TANDA4.md §T4.1): dos tipos de caza más, `dominio`
+"""`vigia.py` T4.1: dos tipos de caza más, `dominio`
 y `comando`, con la MISMA ley de procedencia que ya aplica a `numero`/`ruta`/`cita`
 (ver `pruebas/test_vigia.py`) — lo que no sale de un `tool_result` ni de un mensaje
 del usuario en la sesión se caza igual, ahora también para hosts/URLs y para líneas

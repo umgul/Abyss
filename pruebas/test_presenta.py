@@ -1,4 +1,4 @@
-"""`presenta.py` (T5.3, ESPECIFICACION_TANDA5.md): el vídeo de un minuto que genera el
+"""`presenta.py` (T5.3): el vídeo de un minuto que genera el
 propio paquete.
 
 `presenta.py` no llama a `rutas.resolver()` ni lee stdin al importarse (construye su
@@ -12,7 +12,7 @@ salida) sin depender de que el proceso de la prueba no haya tocado ya `sys.argv`
 
 Piezas naturalmente opcionales, forzadas ausentes con las banderas que YA declaran sus
 propios módulos (nunca se depende de qué tenga instalado la máquina que corre la
-suite, ni se toca la red — ESPECIFICACION_TANDA5.md / reglas del encargo):
+suite, ni se toca la red — reglas de esta suite):
 `ABYSS_SIN_RED` (mundo.py, vía la propia comprobación de `presenta.py` — `mundo.py` no
 mira esa variable por su cuenta), `ABYSS_RENDER3D_NAVEGADOR=''` (render3d.py: sin
 navegador sin cabeza), `ABYSS_LECTURA_VISUAL_SIN_WINRT`/`SIN_TESSERACT` (lectura_visual.py:
@@ -56,7 +56,7 @@ except Exception as e:
 
 # Piezas que dependen de algo fuera del propio paquete: siempre forzadas ausentes en la
 # suite (sin red, sin navegador sin cabeza, sin motor OCR) — nunca se depende de la
-# máquina que corre las pruebas ni se toca la red (reglas del encargo).
+# máquina que corre las pruebas ni se toca la red (reglas de esta suite).
 ENV_SIN_OPCIONALES = {
     "ABYSS_SIN_RED": "1",
     "ABYSS_RENDER3D_NAVEGADOR": "",

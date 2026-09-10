@@ -1,4 +1,4 @@
-"""`mapa_codigo.py` (T2.5 ESPECIFICACION_TANDA2.md). Igual que `cuerpo.py` y
+"""`mapa_codigo.py`. Igual que `cuerpo.py` y
 `lector_pdf.py`: se importa directamente (sin subproceso) para las funciones
 puras — no toca `rutas.resolver()` ni stdin al importarse.
 

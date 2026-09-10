@@ -1,4 +1,4 @@
-"""TAREA D · integración (ESPECIFICACION_TANDA3.md T3.1/T3.3): los verbos `render` y `mundo`
+"""TAREA D · integración: los verbos `render` y `mundo`
 de `imagen.py`, que delegan en `render3d.renderizar()` y en `mundo._cli()` — mismo patrón que
 ya usan `pintar`→`pintor._cli()` y `video`→`video_pintura._cli()`.
 

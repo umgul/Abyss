@@ -68,7 +68,7 @@ Formatos de entrada:
     texto=[tamaño] (el texto mostrado es el propio `nombre`).
   - `.stl` (binario o ASCII; multi-solid ASCII → una pieza por bloque `solid/endsolid`,
     cada una es su propio grupo). Un STL de una sola malla, por tanto, es una sola pieza:
-    la explosión no tiene nada de qué separarla (límite documentado en ESPECIFICACION_TANDA3.md,
+    la explosión no tiene nada de qué separarla (límite declarado a propósito,
     no un caso especial en el código: sale solo de que solo hay un grupo).
   - `.obj` (+ `.mtl` si hay `mtllib`/`usemtl`, solo se lee `Kd` como color): cada `o`/`g`
     es una pieza; caras con más de 3 vértices se trianguladan en abanico.

@@ -1,4 +1,4 @@
-"""`huella.py` (ESPECIFICACION_TANDA2.md T2.2): todo lo que un hilo toca fuera de
+"""`huella.py`: todo lo que un hilo toca fuera de
 su carpeta. Las funciones puras (`diferencias`, `debe_fotografiar`,
 `parece_persistente`, `agrupar_por_raiz`, `informe`, `resumen_stop`, `limpiar`)
 se prueban importando el módulo DIRECTAMENTE — igual que `cuerpo.py` (T2.3):

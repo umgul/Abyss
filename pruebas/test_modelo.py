@@ -14,7 +14,7 @@ turno siguiente ya responde con el modelo preferido (`claude-fable-5-1`, el valo
 por defecto de `modelo.preferido()` sin `modelo_preferido.json`): sin tramo (caso de
 control) el aviso `[modelo · revisión]` reinyecta el texto secreto; con el tramo
 marcado, `--despertar` no debe mencionarlo en absoluto — igual que exige
-`ESPECIFICACION_TANDA2.md` T2.1 ("lo que el propio asistente vuelve a leer en hilos
+lo que gobierna `parentesis.py` ("lo que el propio asistente vuelve a leer en hilos
 futuros").
 """
 import sys

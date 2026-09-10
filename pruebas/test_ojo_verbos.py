@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`ojo.py` (ESPECIFICACION_TANDA4.md, T4.6): ocho verbos, un solo punto de entrada.
+"""`ojo.py`: ocho verbos, un solo punto de entrada.
 `mirar` es "lo de hoy" (sin cambios); los otros siete DELEGAN enteros en
 `lectura_visual._cli()`, `volumen._cli()` o `gestos._cli()` — nunca repiten su lógica
 de visión.

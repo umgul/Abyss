@@ -78,8 +78,8 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/ojo.py" tarjeta <imagen> [--salida base] --p
 python "${CLAUDE_PLUGIN_ROOT}/abyss/ojo.py" manual <imagen...> [--salida f.md] --proyecto "$(pwd)"
 ```
 
-Delegan enteros en `lectura_visual.py` (ver su propio docstring y
-`ESPECIFICACION_TANDA4.md` T4.3 para el detalle completo). Motor de OCR, en
+Delegan enteros en `lectura_visual.py` (ver su propio docstring
+para el detalle completo). Motor de OCR, en
 este orden, nunca se instala nada: el de Windows por WinRT (viene ya
 instalado con el paquete de idioma del perfil) y, si no, `tesseract` si está
 en el PATH. Sin ninguno de los dos: «sin dato: no hay motor OCR» y código 2.
@@ -110,7 +110,7 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/ojo.py" despiece <imagen> [--capas 4] [--sal
 python "${CLAUDE_PLUGIN_ROOT}/abyss/ojo.py" prompt3d <imagen> [--salida f.txt] [--escena f.json]
 ```
 
-Delegan enteros en `volumen.py` (`ESPECIFICACION_TANDA4.md` T4.4). **No es
+Delegan enteros en `volumen.py`. **No es
 reconstrucción 3D**: todo sale de heurísticas declaradas sobre una sola foto
 2D, nunca de una cámara estéreo ni de un sensor de profundidad.
 
@@ -139,7 +139,7 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/ojo.py" gestos [--camara 0] [--puerto 8799] 
     [--escena f.json] [--holograma] [--vocabulario f.json]
 ```
 
-Delega entero en `gestos.py` (`ESPECIFICACION_TANDA4.md` T4.5). MediaPipe lee
+Delega entero en `gestos.py`. MediaPipe lee
 21 puntos por mano; el vocabulario es **propio de este paquete**, no el de
 ningún tutorial ajeno: número de dedos aísla capas del despiece, pellizco
 desliza la explosión, pose de la palma orbita la cámara, la palma abierta y

@@ -4,7 +4,7 @@ Petición del usuario (6-sep 18:26): cuando dice «esto no lo metas en tu memori
 «esto es un paréntesis» o «elimina todo el rato que hemos hablado de X», el
 asistente necesita una herramienta honesta para cumplirlo — no un «vale, lo
 olvido» de boquilla mientras `continuidad.py` sigue copiando la sesión entera.
-Es el §8 de `ESPECIFICACION.md` y la T2.1 de `ESPECIFICACION_TANDA2.md`.
+Es el §8 de `ESPECIFICACION.md`.
 
 Dos mecanismos, DISTINTOS y no confundibles:
 

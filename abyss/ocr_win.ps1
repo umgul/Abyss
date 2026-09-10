@@ -23,7 +23,7 @@
 #
 # Medido el 7-sep-2026 en la máquina de desarrollo (idioma del perfil `es-ES`, sin instalar
 # nada): sobre una imagen sintética de 900x420 con 6 líneas (con acentos, un correo y un
-# teléfono), 443 ms y las 6 líneas correctas — ver ESPECIFICACION_TANDA4.md §0.
+# teléfono), 443 ms y las 6 líneas correctas.
 param(
     [string]$Ruta = '',
     [string]$Idioma = '',

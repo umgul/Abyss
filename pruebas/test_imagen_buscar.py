@@ -1,4 +1,4 @@
-"""`imagen.py buscar` (ESPECIFICACION_TANDA2.md, T2.8): Openverse y Wikimedia Commons, sin
+"""`imagen.py buscar`: Openverse y Wikimedia Commons, sin
 clave, solo busca y trae con atribución (no monta nada). Probado contra las respuestas JSON
 guardadas en `pruebas/datos/openverse_ejemplo.json` y `pruebas/datos/commons_ejemplo.json`
 (copias fieles de la forma real de cada API, con URLs de imagen sustituidas por rutas de un
