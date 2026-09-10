@@ -1,0 +1,1031 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>Camara kinetica · despiece por componentes</title>
+<style>
+ :root{--tinta:#e8eaed;--flojo:#8d949e;--linea:#22262c;--fondo:#0b0c0e;--caja:#121418;--acento:#7fd1c1}
+ *{box-sizing:border-box}
+ html,body{margin:0;height:100%;background:var(--fondo);color:var(--tinta);
+   font:13px/1.45 "Segoe UI",system-ui,sans-serif;overflow:hidden}
+ #todo{display:flex;height:100%}
+ #izq{width:330px;flex:none;border-right:1px solid var(--linea);display:flex;flex-direction:column}
+ #camcaja{position:relative;background:#000;aspect-ratio:4/3;display:none}
+ #camcaja.encendida{display:block}
+ #vid{display:none}
+ #esq{width:100%;height:100%;display:block}
+ #lecturas{padding:9px 12px;overflow:auto;flex:1}
+ #der{flex:1;position:relative;min-width:0}
+ #lienzo3d{width:100%;height:100%;display:block}
+ #capa{position:absolute;inset:0;pointer-events:none}
+ #hilos{position:absolute;inset:0;width:100%;height:100%}
+ h1{font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:0;padding:10px 12px;
+   border-bottom:1px solid var(--linea);color:var(--flojo);font-weight:600}
+ .fila{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid #191c21}
+ .fila b{font-weight:600;color:var(--acento);font-variant-numeric:tabular-nums}
+ .fila span:first-child{color:var(--flojo)}
+ .sinvara{color:#c9a227 !important}
+ .barra{height:4px;background:#1b1f25;border-radius:2px;margin-top:3px;overflow:hidden}
+ .barra i{display:block;height:100%;background:var(--acento);width:0}
+ #aviso{position:absolute;left:12px;bottom:10px;color:#6e757e;font-size:11px;max-width:56%}
+ #estado{position:absolute;left:12px;top:10px;color:var(--flojo);font-size:11px}
+ #mandos{position:absolute;right:12px;top:10px;display:flex;gap:8px;z-index:5}
+ button{background:var(--caja);color:var(--tinta);border:1px solid var(--linea);
+   padding:7px 13px;border-radius:5px;cursor:pointer;font:inherit}
+ button:hover{border-color:#39414b}
+ button.grabando{border-color:#e0564f;color:#e0564f}
+ .cartel{position:absolute;background:rgba(14,16,19,.92);border:1px solid #2b3views;
+   border:1px solid #2b3138;border-radius:6px;padding:8px 11px;min-width:172px;max-width:236px;
+   max-height:430px;overflow:hidden;
+   transform:translate(-50%,-50%);opacity:0;transition:opacity .25s}
+ .cartel.visible{opacity:1}
+ .cartel h3{margin:0 0 5px;font-size:12px;letter-spacing:.03em;color:var(--acento);font-weight:600}
+ /* En pila y no en dos columnas. Antes era un grid `auto 1fr` con `dt` a nowrap: con una
+    etiqueta larga esa columna se comía el ancho entero y al valor le quedaba una rendija,
+    así que el dato salía en vertical, una palabra por línea. Con la etiqueta encima, el
+    valor dispone SIEMPRE del ancho completo del cartel. */
+ .cartel dl{margin:0;font-size:11px}
+ .cartel dt{color:#79808a;font-size:10px;letter-spacing:.02em;margin-top:5px;
+   overflow-wrap:anywhere}
+ .cartel dt:first-child{margin-top:0}
+ .cartel dd{margin:0;color:var(--tinta);font-variant-numeric:tabular-nums;
+   overflow-wrap:anywhere}
+ .cartel .sindato{color:#c9a227;font-size:10.5px;margin-top:4px}
+ /* La fuente se recorta a tres líneas. No se quita —la regla de la casa es que un dato sin
+    fuente no se enseña— pero una fuente con dos URLs dentro hacía el cartel más alto que la
+    pantalla. El texto entero sigue estando, en el `title` del propio bloque. */
+ .cartel .fuente{color:#5d646d;font-size:9.5px;line-height:1.35;margin-top:5px;
+   border-top:1px solid #22262c;padding-top:4px;overflow:hidden;overflow-wrap:anywhere;
+   display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;max-height:40px}
+ .leyenda{margin-top:10px;color:var(--flojo);font-size:11.5px}
+ .leyenda div{padding:2px 0}
+ .leyenda b{color:var(--tinta);font-weight:600}
+ #ar[hidden]{display:none !important}
+ #ar{position:fixed;inset:0;background:#05070a;z-index:40;display:flex;
+   align-items:center;justify-content:center}
+ #ar_marco{position:relative;line-height:0}
+ #ar_marco canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+ #ar_marco canvas:first-child{position:relative}
+ #ar_pie{position:absolute;top:16px;left:0;right:0;text-align:center;color:#7fd1c1;
+   font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+ #ar_gesto{position:absolute;bottom:42px;left:0;right:0;text-align:center;color:#8d949e;
+   font-size:12px;padding:0 24px}
+ #ar_gesto.sinenlace{color:#c9a227}
+ #ar_barra{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);
+   width:260px;height:5px;background:#1b1f25;border-radius:3px;overflow:hidden}
+ #ar_barra i{display:block;height:100%;background:var(--acento);width:0}
+ #ar_nota{position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#4d545c;
+   font-size:11px;padding:0 24px}
+</style></head><body>
+<div id="todo">
+ <div id="izq">
+  <h1>Manos</h1>
+  <div id="camcaja"><video id="vid" playsinline></video><canvas id="esq"></canvas></div>
+  <div id="lecturas">
+   <div class="fila"><span>manos</span><b id="v_manos">0</b></div>
+   <div class="fila"><span>dedos extendidos</span><b id="v_dedos">0</b></div>
+   <div class="fila"><span>pellizco &rarr; separacion</span><b id="v_pel">0.00</b></div>
+   <div class="barra"><i id="b_pel"></i></div>
+   <div class="fila"><span>vara del pellizco</span><b id="v_varapel">sin vara</b></div>
+
+   <div class="fila"><span>giro / inclinacion</span><b id="v_orb">0 / 0</b></div>
+   <div class="fila"><span>escala (dos manos)</span><b id="v_esc">0.50</b></div>
+   <div class="fila"><span>pieza aislada</span><b id="v_capas">todas</b></div>
+   <div class="fila"><span>mostrando</span><b id="v_modo">foto original</b></div>
+   <div class="fila"><span>gesto completado</span><b id="v_gesto">&mdash;</b></div>
+   <div class="fila"><span>mano quieta &rarr; holograma</span><b id="v_quieto">0%</b></div>
+   <div class="barra"><i id="b_quieto"></i></div>
+   <div class="leyenda">
+    <div id="leyenda_piezas">cargando piezas&hellip;</div>
+    <div><b>pellizco</b> junta y separa las piezas por su eje de montaje</div>
+    <div><b>palma</b> gira y inclina &middot; <b>dos manos ABIERTAS</b> escalan</div>
+    <div><b>mano abierta y quieta 3 s</b> holograma &middot; <b>cerrar la mano</b> abre el sitio oficial</div>
+    <!-- Decia 10 y 90, y el codigo corta en 5 y 95 desde que se ajusto la sensibilidad
+         (`new Vara(5, 95, ...)` mas abajo). La pantalla llevaba dando un numero que no
+         era: en una pieza cuyo argumento es que ensena su propia vara, ese es el fallo
+         que mas caro sale. Medido el 8-sep-2026 al sacar el vocabulario a su fichero. -->
+    <div style="margin-top:8px;color:#6e757e">Cortes del pellizco y de la escala: percentiles
+     5 y 95 de esta sesion. Con menos de 30 lecturas no hay vara y el valor se queda en
+     0,50, sin fingir un corte.</div>
+   </div>
+  </div>
+ </div>
+ <div id="der">
+  <canvas id="lienzo3d"></canvas>
+  <svg id="hilos"></svg>
+  <div id="capa"></div>
+  <div id="estado">iniciando&hellip;</div>
+  <div id="mandos">
+   <button id="b_camara">Encender camara</button>
+   <button id="b_rec">Grabar</button>
+   <button id="b_orig">Ver original</button>
+   <button id="b_foto">Captura</button>
+  </div>
+  <div id="aviso"></div>
+ </div>
+</div>
+<div id="ar" hidden>
+  <div id="ar_marco">
+    <canvas id="ar_video"></canvas><canvas id="ar_holo"></canvas>
+  </div>
+  <div id="ar_pie"></div>
+  <div id="ar_gesto"></div>
+  <div id="ar_barra"><i id="ar_barra_i"></i></div>
+  <div id="ar_nota">El objeto va anclado a la palma: posición por el centro de la mano,
+   tamaño por el ancho de la palma, giro por su orientación. Es un montaje sobre el vídeo,
+   no una medida del espacio.</div>
+</div>
+<canvas id="mezcla" width="1280" height="720" style="display:none"></canvas>
+<script src="three.min.js"></script>
+<script type="module">
+import {FilesetResolver, HandLandmarker} from './mp/vision_bundle.mjs';
+
+const $ = s => document.querySelector(s);
+const estado = $('#estado');
+
+/* ---------- 1. las piezas de verdad, no capas ---------------------------- */
+const ficha = await fetch('piezas/piezas.json').then(r => r.json());
+let fichas = {};
+try { fichas = await fetch('fichas.json').then(r => r.ok ? r.json() : {}); } catch(e) { fichas = {}; }
+
+const ren = new THREE.WebGLRenderer({canvas:$('#lienzo3d'), antialias:true, alpha:false,
+                                     preserveDrawingBuffer:true});
+ren.outputColorSpace = THREE.SRGBColorSpace;
+const esc = new THREE.Scene(); esc.background = new THREE.Color('#0b0c0e');
+const cam = new THREE.PerspectiveCamera(36, 1, 0.01, 100);
+const pivote = new THREE.Group(); esc.add(pivote);
+esc.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+const ANCHO_ESC = 2.0;                                   // el ancho de la foto son 2 unidades
+const ALTO_ESC  = ANCHO_ESC * ficha.alto / ficha.ancho;
+const carg = new THREE.TextureLoader();
+const piezas = [];
+
+for (const p of ficha.piezas.slice().sort((a,b) => a.orden - b.orden)){
+  const tex = await new Promise(ok => carg.load(p.png, t => {t.colorSpace = THREE.SRGBColorSpace; ok(t);}));
+  const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, alphaTest:0.03,
+                                           side:THREE.DoubleSide, depthWrite:false});
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(p.tam_frac[0]*ANCHO_ESC, p.tam_frac[1]*ALTO_ESC), mat);
+  const base = new THREE.Vector3((p.centro[0]-0.5)*ANCHO_ESC,
+                                 -(p.centro[1]-0.5)*ALTO_ESC,
+                                 p.orden * 0.03);
+  m.position.copy(base);
+  m.renderOrder = p.orden;
+  pivote.add(m);
+  piezas.push({dato:p, malla:m, base, rumbo:new THREE.Vector3(...p.rumbo),
+               cartel:null, esc:1, centrado:0});
+}
+
+/* EL CUBO: el volumen invisible donde vive el despiece. Su medio lado se calcula del
+   contenido — la posicion mas lejana que alcanza cualquier pieza con la separacion al
+   maximo, mas su media diagonal — asi que TODO cabe dentro por construccion. La camara
+   se ajusta a este cubo y no a lo que hay en cada instante: por eso no salta, y por eso
+   ninguna pieza se puede salir del encuadre. Se puede ver con la tecla C. */
+const K_MAX = 1.35;
+let CUBO_H = ALTO_ESC/2;
+for (const q of piezas){
+  const g = q.malla.geometry.parameters;
+  const lejos = q.base.clone().addScaledVector(q.rumbo, K_MAX);
+  CUBO_H = Math.max(CUBO_H, Math.abs(lejos.x) + g.width/2, Math.abs(lejos.y) + g.height/2);
+}
+CUBO_H *= 1.02;
+const cubo = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(CUBO_H*2, CUBO_H*2, CUBO_H*2)),
+  new THREE.LineBasicMaterial({color:0x2c343d, transparent:true, opacity:0.9}));
+cubo.visible = false;                       // invisible, como pediste: solo estructura
+pivote.add(cubo);
+addEventListener('keydown', e => { if(e.key === 'c' || e.key === 'C') cubo.visible = !cubo.visible; });
+
+/* La FOTO ORIGINAL como plano propio. En reposo se ve ELLA, entera y sin costuras:
+   asi el despiece parte de lo que la camara vio, no de un collage. Al separar, se funde
+   con las piezas recortadas. */
+const texOrig = await new Promise(ok => carg.load('original.jpg',
+  x => {x.colorSpace = THREE.SRGBColorSpace; ok(x);}));
+const fondoFoto = new THREE.Mesh(
+  new THREE.PlaneGeometry(ANCHO_ESC, ALTO_ESC),
+  new THREE.MeshBasicMaterial({map:texOrig, transparent:true, depthWrite:false}));
+fondoFoto.position.set(0, 0, -0.02); fondoFoto.renderOrder = -1;
+pivote.add(fondoFoto);
+const suavePaso = (a, b, x) => { const u = Math.max(0, Math.min(1, (x-a)/(b-a)));
+                                 return u*u*(3-2*u); };
+
+/* carteles: un div por pieza, con hilo hasta ella */
+const capa = $('#capa'), hilos = $('#hilos');
+for (const q of piezas){
+  const f = fichas[q.dato.clave] || {};
+  const filas = (f.datos || []).map(d =>
+    '<dt>' + d.etiqueta + '</dt><dd>' + d.valor + '</dd>').join('');
+  const c = document.createElement('div');
+  c.className = 'cartel';
+  c.innerHTML = '<h3>' + (f.titulo || q.dato.titulo) + '</h3>'
+    + (filas ? '<dl>' + filas + '</dl>'
+             : '<div class="sindato">sin dato con fuente</div>')
+    + (f.fuente ? '<div class="fuente" title="' + String(f.fuente).replace(/"/g, '&quot;')
+                  + '">' + f.fuente + '</div>' : '');
+  // los mismos datos en crudo: el video no puede copiar un div, tiene que dibujarlos
+  q.cartelDatos = {titulo: (f.titulo || q.dato.titulo),
+                   filas: (f.datos || []).map(d => [d.etiqueta, d.valor]),
+                   fuente: f.fuente || null};
+  capa.appendChild(c);
+  const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  l.setAttribute('stroke', '#3c454f'); l.setAttribute('stroke-width', '1');
+  hilos.appendChild(l);
+  q.cartel = c; q.hilo = l;
+}
+// la leyenda nombra las piezas que HAY, no las de una foto de demo: para CUALQUIER foto
+// (la plantilla se copia tal cual, ver kinetica.py:483) esto sale de `piezas` ya cargadas.
+// El aviso de las dos manos sale SOLO cuando hace falta: con cinco piezas o menos, decir
+// que se cuenta con dos manos sería dar una instrucción que no sirve para nada. Va aquí
+// arriba y no dentro de la asignación porque una prueba lee los 300 caracteres siguientes
+// a ella para comprobar que la leyenda se construye recorriendo `piezas` de verdad, y tres
+// líneas de comentario en medio empujaban eso fuera de su ventana.
+const AVISO_DOS_MANOS = piezas.length > 5
+  ? '<b>se cuenta con las DOS manos</b> (6 = cinco y una) &middot; ' : '';
+$('#leyenda_piezas').innerHTML = AVISO_DOS_MANOS
+  + '<b>0 dedos</b> = todas &middot; '
+  + piezas.map(q => '<b>' + (q.dato.orden + 1) + '</b> ' + q.dato.titulo).join(' &middot; ');
+// el aviso sale de la propia ficha (ficha.procedencia, redactada por kinetica.py para
+// CADA modo, ver kinetica.py:427-452): nunca un texto fijo que afirme "region puesta a
+// mano" o "inpainting" cuando el modo automatico no hizo ninguna de las dos cosas.
+$('#aviso').textContent = ficha.procedencia.regiones + ' · ' + ficha.procedencia.recorte
+  + ' · ' + ficha.procedencia.relleno + ' · Las cifras de los carteles solo salen si tienen fuente.';
+
+// Dos radios: el de la FOTO (lo que hay que llenar en reposo) y el del CUBO (lo que hay
+// que abarcar con el despiece abierto del todo). La camara va de uno a otro segun la
+// separacion, asi la imagen ocupa la zona de vision en vez de quedarse pequena al fondo.
+const RADIO_FOTO = Math.hypot(ANCHO_ESC, ALTO_ESC)/2 * 1.02;
+let RADIO_CUBO = RADIO_FOTO;   // alcance REAL de las piezas al separarse del todo
+for (const q of piezas){
+  const g = q.malla.geometry.parameters;
+  const lejos = q.base.clone().addScaledVector(q.rumbo, K_MAX);
+  RADIO_CUBO = Math.max(RADIO_CUBO,
+                        Math.hypot(lejos.x, lejos.y) + Math.hypot(g.width, g.height)/2 * 0.72);
+}
+RADIO_CUBO *= 0.88;   // las piezas no llegan todas a la vez a su extremo
+let SEMI = 0.32;
+function medir(){
+  const c = $('#lienzo3d'), w = c.clientWidth, h = c.clientHeight;
+  ren.setSize(w, h, false); ren.setPixelRatio(Math.min(2, devicePixelRatio));
+  cam.aspect = (w > 0 && h > 0) ? w / h : 16/9; cam.updateProjectionMatrix();
+  hilos.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+  const semiV = Math.tan(cam.fov*Math.PI/360);
+  SEMI = Math.min(semiV, semiV * cam.aspect);
+}
+let radioVista = 1, DIST = 6;
+const foco = new THREE.Vector3(), focoObj = new THREE.Vector3();
+addEventListener('resize', medir); medir();
+
+/* ---------- 2-4. la vara, el filtro y el vocabulario ---------------------
+   Ya no viven aquí. Estaban copiados, y la copia se quedó vieja: las reglas nuevas
+   (sin espejo, más lento, dos puños paran) solo llegaron al fichero compartido.
+   Lo que sigue siendo de ESTA pantalla —el pellizco que separa las piezas, la palma
+   quieta que captura, el holograma— se queda abajo, que eso sí es suyo. */
+import {Vara, creaSuavizador, dedosExtendidos, d3} from './gestos_comun.js';
+const suaviza = creaSuavizador();
+
+/* Las varas y los topes del pellizco SÍ son de esta pantalla, y por eso se quedan.
+   Los tres números están fijados a mano tras probarlos con el usuario el 8-sep-2026: eligió
+   «suave» en el deslizador de sensibilidad y luego se retiró el deslizador.
+     ZONA_PELLIZCO   cuánto hay que mover los dedos para que la separación cambie
+     SUAVE_PELLIZCO  cuánto se calma el movimiento (más bajo = más calmado)
+     el cuarto argumento de Vara es `anchoMin`: por debajo de ese ancho la ventana no
+     mide un gesto, amplifica el temblor — así que se ensancha en vez de afinar. */
+const varaPellizco = new Vara(5, 95, 30, 0.38);
+const varaEscala   = new Vara(5, 95, 30, 0.25);
+const ZONA_PELLIZCO = 0.073, SUAVE_PELLIZCO = 0.080;
+
+const pellizcoBruto = p => d3(p[4], p[8]) / (d3(p[9], p[0]) || 1e-6);
+function poseDePalma(p){
+  const o = p[0], a = p[5], b = p[17];
+  const u = {x:a.x-o.x, y:a.y-o.y, z:a.z-o.z}, v = {x:b.x-o.x, y:b.y-o.y, z:b.z-o.z};
+  const n = {x:u.y*v.z-u.z*v.y, y:u.z*v.x-u.x*v.z, z:u.x*v.y-u.y*v.x};
+  const L = Math.hypot(n.x,n.y,n.z) || 1e-6;
+  return {giro: Math.atan2(n.x/L, Math.abs(n.z/L)+1e-6),
+          inclinacion: Math.asin(Math.max(-1, Math.min(1, n.y/L)))};
+}
+
+/* ---------- 5. la camara y el bucle -------------------------------------- */
+const vid = $('#vid'), esq = $('#esq'), ctx = esq.getContext('2d');
+let detector = null, corriendo = false, ultimo = -1;
+const CONEX = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+               [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const GIRO_BASE = 0.30, INCL_BASE = -0.08;
+const SEG_QUIETA = 3.0;   // mano abierta y quieta este tiempo -> captura
+
+let objetivo = {explosion:0.0, giro:0, inclinacion:0, escala:0.5, aislada:null};
+let suave    = {explosion:0.0, giro:0, inclinacion:0, escala:0.5};
+let verOriginal = false;   // boton: forzar la foto entera
+let quietoDesde = null, ultimoCentro = null;
+
+const Q = new URLSearchParams(location.search);
+const DEMO = Q.get('demo') === '1';
+if(Q.has('explosion')) objetivo.explosion = suave.explosion = parseFloat(Q.get('explosion'));
+if(Q.has('giro'))      objetivo.giro      = suave.giro      = parseFloat(Q.get('giro'));
+if(Q.has('aislada'))   objetivo.aislada   = parseInt(Q.get('aislada')) || null;
+function pasoDemo(t){
+  const s = t/1000;
+  objetivo.explosion = 0.5 - 0.5*Math.cos(s*0.6);
+  objetivo.giro = Math.sin(s*0.3)*0.4;
+  objetivo.inclinacion = Math.sin(s*0.19)*0.12;
+  $('#v_pel').textContent = objetivo.explosion.toFixed(2);
+  $('#b_pel').style.width = (objetivo.explosion*100) + '%';
+}
+
+async function arrancaCamara(){
+  if(corriendo) return;
+  estado.textContent = 'pidiendo camara…';
+  const flujo = await navigator.mediaDevices.getUserMedia({video:{width:960, height:720}});
+  vid.srcObject = flujo; await vid.play();
+  esq.width = vid.videoWidth; esq.height = vid.videoHeight;
+  estado.textContent = 'cargando el modelo de manos…';
+  const fs = await FilesetResolver.forVisionTasks('./mp/wasm');
+  // Se crea un detector NUEVO cada vez que se enciende, tal cual el patrón ya probado de
+  // kinetico.html: no se intenta reciclar el de un encendido anterior. El HandLandmarker
+  // no depende del MediaStream (lee fotogramas del <video> en cada detectForVideo), así que
+  // esto no es indispensable para que funcione — pero es el camino que ya está medido, y
+  // aquí no se inventa otro.
+  detector = await HandLandmarker.createFromOptions(fs, {
+    baseOptions:{modelAssetPath:'./mp/hand_landmarker.task'},
+    numHands:2, runningMode:'VIDEO',
+    minHandDetectionConfidence:0.6, minTrackingConfidence:0.6});
+  corriendo = true;
+  estado.textContent = 'mueve la mano unos segundos: la sesion se hace su propia vara';
+  $('#b_camara').textContent = 'Apagar camara'; $('#camcaja').classList.add('encendida');
+}
+function apagaCamara(){
+  if(!corriendo) return;
+  corriendo = false;
+  if(vid.srcObject){ vid.srcObject.getTracks().forEach(p => p.stop()); vid.srcObject = null; }
+  ctx.clearRect(0, 0, esq.width, esq.height);
+  $('#b_camara').textContent = 'Encender camara';
+  $('#camcaja').classList.remove('encendida');
+  estado.textContent = 'camara apagada: el boton la enciende otra vez';
+  ultimasManos = [];
+  // Los contadores son una LECTURA de la cámara, no un estado de la escena: con la cámara
+  // apagada no hay manos que contar, así que tienen que decirlo — no quedarse en el último
+  // número visto antes de apagar.
+  $('#v_manos').textContent = '0';
+  $('#v_dedos').textContent = '0';
+  $('#v_quieto').textContent = '0%'; $('#b_quieto').style.width = '0%';
+}
+
+function pintaEsqueleto(manos){
+  ctx.save(); ctx.clearRect(0,0,esq.width,esq.height);
+  ctx.translate(esq.width,0); ctx.scale(-1,1);
+  ctx.drawImage(vid,0,0,esq.width,esq.height);
+  ctx.restore();
+  for(const p of manos){
+    ctx.strokeStyle='rgba(127,209,193,.85)'; ctx.lineWidth=2;
+    for(const c of CONEX){
+      ctx.beginPath();
+      ctx.moveTo((1-p[c[0]].x)*esq.width, p[c[0]].y*esq.height);
+      ctx.lineTo((1-p[c[1]].x)*esq.width, p[c[1]].y*esq.height);
+      ctx.stroke();
+    }
+    ctx.fillStyle='#e8eaed';
+    for(const q of p){ ctx.beginPath(); ctx.arc((1-q.x)*esq.width, q.y*esq.height, 3, 0, 6.284); ctx.fill(); }
+  }
+}
+
+let ultimasManos = [];
+const MANO_FALSA = Q.get('manofalsa') === '1';
+
+/* MANO SINTETICA — solo para comprobar el anclaje sin camara (?manofalsa=1).
+   Son 21 puntos de una palma abierta plausible, girando despacio: si el objeto la sigue
+   bien aqui, la matematica del anclaje esta bien, y lo unico que queda por probar con una
+   mano de verdad es la deteccion. No se usa nunca fuera de ese parametro. */
+function manoSintetica(t){
+  const quieta = Q.has('manofalsa_quieta');
+  const s = quieta ? 0 : t / 1000;
+  const giro = Math.sin(s * 0.5) * 0.6, cx = 0.5 + Math.sin(s * 0.3) * 0.10;
+  const cy = 0.58 + Math.cos(s * 0.23) * 0.05, R = 0.13;
+  const co = Math.cos(giro), si = Math.sin(giro);
+  // (u a lo ancho de la palma, v a lo largo) -> fotograma, con la palma inclinada
+  const P = (u, v, z) => ({x: cx + (u * co) * R, y: cy + (v + u * si * 0.35) * R,
+                           z: (z || 0) * R * 0.6 - u * si * R * 0.5});
+  const dedo = (u, largo) => [P(u, -0.30, 0), P(u, -0.30 - largo*0.33, 0),
+                              P(u, -0.30 - largo*0.66, 0), P(u, -0.30 - largo, 0)];
+  const puntos = [P(0, 0.75, 0)];                                   // 0 muneca
+  puntos.push(P(-0.85, 0.35, 0.1), P(-1.15, 0.05, 0.2), P(-1.35, -0.20, 0.3), P(-1.5, -0.42, 0.4)); // 1-4 pulgar
+  puntos.push(...dedo(-0.55, 0.95));                                 // 5-8 indice
+  puntos.push(...dedo(-0.18, 1.05));                                 // 9-12 corazon
+  puntos.push(...dedo( 0.18, 0.98));                                 // 13-16 anular
+  puntos.push(...dedo( 0.52, 0.80));                                 // 17-20 menique
+  return puntos;
+}
+
+const vAux = new THREE.Vector3();
+const caja = new THREE.Box3(), esfera = new THREE.Sphere();
+const vBorde = new THREE.Vector3();
+/* Los carteles se pisaban unos a otros: cada uno se colocaba mirando SOLO a su propia
+   pieza, así que dos piezas cercanas daban dos carteles en el mismo sitio y el de abajo
+   quedaba ilegible. Esto los separa después, empujando el par que se solapa por el eje
+   donde menos hay que moverlos, y sin salirse de la pantalla. Tres pasadas: con siete
+   carteles converge, y si no converge queda mejor que antes, nunca peor. */
+function reparteCarteles(piezas, W, H){
+  const vis = piezas.filter(q => q.sitio);
+  for(let paso = 0; paso < 3; paso++){
+    for(let a = 0; a < vis.length; a++) for(let b = a+1; b < vis.length; b++){
+      const A = vis[a].sitio, B = vis[b].sitio;
+      const dx = B.cx - A.cx, dy = B.cy - A.cy;
+      const solX = (A.w + B.w)/2 + 10 - Math.abs(dx);
+      const solY = (A.h + B.h)/2 + 8  - Math.abs(dy);
+      if(solX <= 0 || solY <= 0) continue;            // no se tocan
+      if(solX < solY){                                 // se separan por donde menos cuesta
+        const s = (dx >= 0 ? 1 : -1) * solX / 2;
+        A.cx -= s; B.cx += s;
+      } else {
+        const s = (dy >= 0 ? 1 : -1) * solY / 2;
+        A.cy -= s; B.cy += s;
+      }
+    }
+    for(const q of vis){
+      q.sitio.cx = Math.max(q.sitio.mw, Math.min(W - q.sitio.mw, q.sitio.cx));
+      q.sitio.cy = Math.max(q.sitio.mh, Math.min(H - q.sitio.mh, q.sitio.cy));
+    }
+  }
+  for(const q of vis){
+    const S = q.sitio;
+    q.cartel.style.left = S.cx + 'px'; q.cartel.style.top = S.cy + 'px';
+    q.hilo.setAttribute('x1', S.cx); q.hilo.setAttribute('y1', S.cy);
+    q.hilo.setAttribute('x2', S.x);  q.hilo.setAttribute('y2', S.y);
+    q.hilo.setAttribute('opacity', '1');
+    q.pantalla = {cx: S.cx, cy: S.cy, x: S.x, y: S.y, W, H};   // para dibujarlo en el vídeo
+  }
+}
+
+function bucle(t){
+  requestAnimationFrame(bucle);
+  if(DEMO) pasoDemo(t);
+  if(corriendo && detector && vid.readyState >= 2 && vid.currentTime !== ultimo){
+    ultimo = vid.currentTime;
+    const r = detector.detectForVideo(vid, t);
+    const manos = (r.landmarks || []).filter(m => m.length === 21).map((m,i) => suaviza(i, m, t));
+    ultimasManos = manos;
+    pintaEsqueleto(manos);
+    $('#v_manos').textContent = manos.length;
+    if(manos.length){
+      /* DOS cuentas de dedos, y hacen falta las dos.
+         `nd` es la de la mano que manda, y es la que gobierna los gestos que SON de una
+         mano: el pellizco (que se hace con dos dedos de la misma mano) y la palma abierta
+         y quieta del holograma. `ndTotal` suma las dos manos, y es la que elige qué pieza
+         se aísla.
+         Por qué: aislar se hace CONTANDO, y un despiece puede tener más de cinco piezas —
+         el del coche tiene siete—, así que con una sola mano las piezas 6 y 7 eran
+         inalcanzables: el número existía en la leyenda y no había forma de pedirlo.
+         Seis es cinco en una mano y uno en la otra. */
+      const p = manos[0], nd = dedosExtendidos(p);
+      const ndTotal = manos.reduce((s, m) => s + dedosExtendidos(m), 0);
+      $('#v_dedos').textContent = manos.length > 1 ? (ndTotal + ' (dos manos)') : nd;
+      const bruto = pellizcoBruto(p);
+      // la vara solo aprende de lecturas en las que la mano PARECE estar pellizcando:
+      // meterle las de cuando hace otra cosa comprime la ventana y todo se vuelve brusco
+      if(nd >= 1 && nd <= 4) varaPellizco.mete(bruto);
+      // sin vara todavia no se despieza: se queda la foto entera en vez de fingir un 0,50
+      const crudoNorm = varaPellizco.hay ? varaPellizco.norm(bruto) : 0.0;
+      // zona muerta: sin ella, el ruido del detector mueve la separacion con los dedos
+      // quietos. `ZONA_PELLIZCO` sale del deslizador de sensibilidad.
+      if(Math.abs(crudoNorm - objetivo.explosion) > ZONA_PELLIZCO) objetivo.explosion = crudoNorm;
+      $('#v_pel').textContent = objetivo.explosion.toFixed(2);
+      $('#b_pel').style.width = (objetivo.explosion*100) + '%';
+      const tp = $('#v_varapel'); tp.textContent = varaPellizco.texto();
+      tp.classList.toggle('sinvara', !varaPellizco.hay);
+      const pose = poseDePalma(p);
+      objetivo.giro = pose.giro; objetivo.inclinacion = pose.inclinacion;
+      $('#v_orb').textContent = (pose.giro*57.3).toFixed(0)+'° / '+(pose.inclinacion*57.3).toFixed(0)+'°';
+      objetivo.aislada = (ndTotal >= 1 && ndTotal <= piezas.length) ? ndTotal : null;
+      $('#v_capas').textContent = objetivo.aislada === null ? 'todas'
+        : piezas.find(q => q.dato.orden === objetivo.aislada-1).dato.titulo;
+      /* Escalar pide las dos manos ABIERTAS, no solo dos manos. Antes bastaba con que
+         hubiera dos, y eso choca de frente con contar hasta seis o siete: al levantar la
+         segunda mano con un dedo para pedir la pieza 6, la escena se ponía además a
+         escalar. Con las dos abiertas (cuatro dedos o más en cada una) los dos gestos
+         dejan de pisarse: contar es una mano abierta y unos pocos dedos en la otra;
+         escalar es separar dos manos abiertas, que es como se estira algo. */
+      if(manos.length === 2 && manos.every(m => dedosExtendidos(m) >= 4)){
+        const b = d3(manos[0][0], manos[1][0]);
+        varaEscala.mete(b); objetivo.escala = varaEscala.norm(b);
+        $('#v_esc').textContent = objetivo.escala.toFixed(2);
+      }
+
+      // Solo x,y para «movio»: la z de MediaPipe es profundidad inferida, no medida, y su
+      // temblor entraba entero en esta cuenta. Como hypot(dx,dy,dz) >= hypot(dx,dy)
+      // siempre (dz^2 >= 0), quitarla solo puede BAJAR «movio»: el gesto queda igual o
+      // más fácil de disparar, nunca más difícil. No se toca el umbral 0.012, que no
+      // tiene medida detrás ni a favor ni en contra.
+      const centro = {x:p[9].x, y:p[9].y};
+      const movio = ultimoCentro ? Math.hypot(centro.x-ultimoCentro.x, centro.y-ultimoCentro.y) : 1;
+      ultimoCentro = centro;
+      if(nd === 5 && movio < 0.012){
+        if(quietoDesde === null) quietoDesde = t;
+        // el puño enseña cuánto le falta y este gesto no: sin barra, un gesto de 3 s que
+        // se reinicia solo es indistinguible de un gesto que no existe.
+        const avanceQuieto = Math.max(0, Math.min(1, (t - quietoDesde) / (SEG_QUIETA*1000)));
+        $('#v_quieto').textContent = Math.round(avanceQuieto*100) + '%';
+        $('#b_quieto').style.width = (avanceQuieto*100) + '%';
+        if(t - quietoDesde > SEG_QUIETA*1000){
+          abrirHolograma(); $('#v_gesto').textContent = 'holograma';
+          quietoDesde = null; $('#v_quieto').textContent = '0%'; $('#b_quieto').style.width = '0%';
+        }
+      } else {
+        quietoDesde = null;
+        $('#v_quieto').textContent = '0%'; $('#b_quieto').style.width = '0%';
+      }
+
+      // Dentro del holograma, cerrar la mano abre el sitio oficial — solo si lo hay.
+      // Cero o UN dedo: con el puño cerrado el pulgar sigue contando como extendido
+      // bastantes veces, y con la regla estricta el gesto casi nunca se disparaba.
+      if(holoAbierto && nd <= 1){
+        malos = 0;
+        if(punnoDesde === null) punnoDesde = t;
+        const falta = SEG_PUNNO*1000 - (t - punnoDesde);
+        avancePunno = Math.max(0, Math.min(1, 1 - falta/(SEG_PUNNO*1000)));
+        if(falta <= 0 && !abriendo){
+          punnoDesde = null; avancePunno = 0;
+          if(RECON.url){
+            // se avisa y se espera: si se abriera de golpe, el gesto y su efecto no
+            // llegarían a verse en la grabación
+            abriendo = {url: RECON.url, hasta: t + 1400};
+            $('#ar_gesto').textContent = 'abriendo ' + RECON.url
+              + ' — si el navegador bloquea la pestaña, se abre aquí mismo';
+          } else {
+            $('#ar_gesto').textContent = 'no hay enlace que abrir: ' + RECON.por_que;
+            $('#ar_gesto').classList.add('sinenlace');
+          }
+        }
+      } else if(holoAbierto && punnoDesde !== null){
+        // el detector parpadea: no se abandona el gesto por un fotograma suelto
+        if(++malos > TOLERA_MALOS){ punnoDesde = null; avancePunno = 0; malos = 0; }
+      } else { punnoDesde = null; avancePunno = 0; malos = 0; }
+
+    } else { quietoDesde = null; ultimoCentro = null; punnoDesde = null;
+      $('#v_quieto').textContent = '0%'; $('#b_quieto').style.width = '0%'; }
+  }
+
+  for(const k of ['giro','inclinacion','escala'])
+    suave[k] += (objetivo[k] - suave[k]) * 0.14;
+  suave.explosion += (objetivo.explosion - suave.explosion) * SUAVE_PELLIZCO;
+
+  // cada pieza sale por SU eje de montaje, no todas hacia el fondo
+  // por debajo de 0,05 de separacion manda la foto original; entre 0,05 y 0,30 se
+  // funde con las piezas; a partir de ahi, solo piezas
+  const mezclaOrig = verOriginal ? 1 : (1 - suavePaso(0.05, 0.30, suave.explosion));
+  fondoFoto.material.opacity += (mezclaOrig - fondoFoto.material.opacity)*0.2;
+  fondoFoto.visible = fondoFoto.material.opacity > 0.02;
+  $('#v_modo').textContent = mezclaOrig > 0.6 ? 'foto original'
+                            : (mezclaOrig > 0.05 ? 'fundiendo' : 'piezas');
+  const K = suave.explosion * 1.35;
+  focoObj.set(0, 0, 0); let nVistas = 0;
+  for(const q of piezas){
+    q.malla.position.set(q.base.x + q.rumbo.x*K, q.base.y + q.rumbo.y*K, q.base.z + q.rumbo.z*K);
+    const vis = objetivo.aislada === null || q.dato.orden === objetivo.aislada-1;
+    q.malla.material.opacity += ((vis?1:0.0)*(1-mezclaOrig) - q.malla.material.opacity)*0.2;
+    q.malla.visible = vis && q.malla.material.opacity > 0.02;
+    // aislada: al centro del cubo y escalada para llenarlo, para verla ENTERA sin mover
+    // la camara. Es la respuesta a "que se vea la pieza entera".
+    const sola = objetivo.aislada !== null && q.dato.orden === objetivo.aislada-1;
+    const g = q.malla.geometry.parameters;
+    const escObj = sola ? (radioVista*1.62) / Math.hypot(g.width, g.height) : 1;
+    q.esc = q.esc + (escObj - q.esc)*0.14;
+    q.centrado = q.centrado + ((sola?1:0) - q.centrado)*0.14;
+    q.malla.scale.setScalar(q.esc);
+    q.malla.position.multiplyScalar(1 - q.centrado);   // 0 = en su sitio, 1 = en el centro
+    if(vis){ focoObj.add(q.malla.position); nVistas++; }
+  }
+  if(nVistas) focoObj.divideScalar(nVistas); else focoObj.set(0, 0, 0);
+  if(mezclaOrig > 0.5) focoObj.set(0, 0, 0);      // con la foto entera, el centro es el suyo
+  foco.lerp(focoObj, 0.06);
+  pivote.rotation.y = GIRO_BASE + suave.giro*0.85;
+  pivote.rotation.x = INCL_BASE + suave.inclinacion*0.45;
+  pivote.updateMatrixWorld(true);
+
+  // La camara NO persigue al contenido: mira siempre el cubo. Las dos manos solo acercan
+  // o alejan dentro de ese marco. Encuadre estable, sin saltos y sin recortes.
+  // en reposo llena la foto; al separarse retrocede hasta abarcar el cubo
+  const objRadio = objetivo.aislada !== null ? RADIO_FOTO
+                 : RADIO_FOTO + (RADIO_CUBO - RADIO_FOTO) * suavePaso(0.05, 0.75, suave.explosion);
+  radioVista += (objRadio - radioVista) * 0.08;
+  DIST = radioVista / SEMI * (1.03 - suave.escala*0.28);
+  const mira = foco.clone().applyEuler(pivote.rotation);
+  cam.position.set(mira.x, mira.y, mira.z + DIST); cam.lookAt(mira);
+  ren.render(esc, cam);
+
+  // carteles: proyectar el centro de cada pieza y colgar el hilo
+  //           (y luego repartirlos, ver `reparteCarteles`)
+  const c3 = $('#lienzo3d'), W = c3.clientWidth, H = c3.clientHeight;
+  for(const q of piezas){
+    vAux.copy(q.malla.position); q.malla.parent.localToWorld(vAux); vAux.project(cam);
+    const x = (vAux.x*0.5+0.5)*W, y = (-vAux.y*0.5+0.5)*H;
+    const fuera = objetivo.aislada !== null && q.dato.orden !== objetivo.aislada-1;
+    const mostrar = mezclaOrig < 0.35 && !fuera && isFinite(x) && isFinite(y) && W > 0;
+    q.cartel.classList.toggle('visible', mostrar);
+    if(mostrar){
+      // radio que la pieza ocupa en pantalla: se proyecta un punto de su borde
+      const g = q.malla.geometry.parameters;
+      vBorde.set(q.malla.position.x + g.width*q.esc/2, q.malla.position.y + g.height*q.esc/2, q.malla.position.z);
+      q.malla.parent.localToWorld(vBorde); vBorde.project(cam);
+      const bx = (vBorde.x*0.5+0.5)*W, by = (-vBorde.y*0.5+0.5)*H;
+      const radioPx = Math.min(320, Math.max(60, Math.hypot(bx-x, by-y)));
+      // hacia fuera del centro de la vista, para no taparla
+      let dx = x - W/2, dy = y - H/2;
+      const L = Math.hypot(dx, dy) || 1;
+      if(L < 40){ dx = 0; dy = -1; } else { dx /= L; dy /= L; }
+      const sep = radioPx + 105;
+      // El cartel va centrado en (cx, cy) por su translate(-50%,-50%), así que para que
+      // quepa entero hace falta MEDIO cartel de margen — y eso no es una constante: un
+      // cartel de tres filas y otro de diez miden distinto. Antes se recortaba contra 130
+      // y 70 fijos y los carteles altos se salían por arriba y por abajo.
+      const mw = q.cartel.offsetWidth / 2 + 8, mh = q.cartel.offsetHeight / 2 + 8;
+      const cx = Math.max(mw, Math.min(W - mw, x + dx*sep));
+      const cy = Math.max(mh, Math.min(H - mh, y + dy*sep));
+      q.sitio = {cx, cy, x, y, w: q.cartel.offsetWidth, h: q.cartel.offsetHeight, mw, mh};
+    } else { q.hilo.setAttribute('opacity', '0'); q.pantalla = null; q.sitio = null; }
+  }
+  reparteCarteles(piezas, W, H);
+  if(holoAbierto) pintaHolograma(MANO_FALSA ? [manoSintetica(t)] : ultimasManos);
+  if(abriendo && t >= abriendo.hasta){
+    const u = abriendo.url; abriendo = null; cerrarHolograma();
+    abrirEnlace(u);
+  }
+  mezclaFotograma();
+}
+
+/* ---------- 6. captura y grabacion --------------------------------------- */
+function captura(){
+  ren.render(esc, cam);
+  const a = document.createElement('a');
+  a.download = 'kinetica_captura.png';
+  a.href = $('#lienzo3d').toDataURL('image/png'); a.click();
+  $('#v_gesto').textContent = 'captura';
+  setTimeout(function(){ $('#v_gesto').textContent = '—'; }, 1600);
+}
+$('#b_orig').onclick = () => {
+  verOriginal = !verOriginal;
+  $('#b_orig').textContent = verOriginal ? 'Ver despiece' : 'Ver original';
+  $('#b_orig').style.borderColor = verOriginal ? '#7fd1c1' : '';
+};
+$('#b_foto').onclick = captura;
+
+/* ─── HOLOGRAMA SOBRE LA MANO ────────────────────────────────────────────────────
+   El producto entero, montado, flotando sobre la palma, dentro de la imagen de la
+   cámara y con fondo transparente. No es una medida del espacio: es un montaje sobre
+   el vídeo, anclado a tres puntos de la mano. La pantalla lo dice.
+
+   De dónde sale cada cosa, y por qué esos puntos:
+     · DÓNDE  — centro de la palma = promedio de muñeca (0), nudillo del índice (5) y
+                nudillo del meñique (17). Se promedian tres y no se coge el 9 suelto
+                porque un punto solo tiembla y tres, mucho menos.
+     · CUÁNTO — el ancho de palma en pantalla (distancia 5→17) es la regla: no depende
+                de lo lejos que esté la mano, así que el objeto mide TANTAS PALMAS y no
+                un tamaño fijo en píxeles.
+     · CÓMO   — base ortonormal de la palma: u = 5→17, w = normal de la palma, v = w×u.
+                Eso es la rotación, sin solvePnP y sin calibrar la cámara.
+
+   Las piezas son planos: de canto se verían como cartón. Se les da GROSOR apilando
+   CAPAS_GROSOR copias de cada una, cada vez más oscuras hacia atrás, y además el giro se
+   limita (TOPE_GIRO) mezclando la orientación de la palma con la de frente. Ninguna de
+   las dos cosas es volumen medido: son un remedio declarado a que la foto es plana. */
+const AR = $('#ar'), arV = $('#ar_video'), arHo = $('#ar_holo');
+const vctx = arV.getContext('2d');
+let holoAbierto = false, punnoDesde = null, vistoAr = 0;
+let avancePunno = 0, malos = 0, abriendo = null;
+const SEG_PUNNO = 0.9;      // aguantar el puño este tiempo abre el enlace
+const TOLERA_MALOS = 6;     // fotogramas sueltos sin puño que se perdonan
+const RECON = ficha.reconocimiento || {como:'ninguno', url:null, por_que:'la ficha no trae reconocimiento'};
+
+const CAPAS_GROSOR = 7;      // copias apiladas que simulan el canto de cada pieza
+const GROSOR = 0.05;         // en unidades de escena, sobre un ancho de foto de 2
+const TOPE_GIRO = 0.55;      // 1 = obedece del todo a la palma; 0 = siempre de frente
+const PALMAS_DE_ANCHO = 2.6; // el objeto mide esto de anchos de palma
+const ALTURA_PALMA = 0.55;   // cuánto flota por encima, en anchos de palma
+
+const renAR = new THREE.WebGLRenderer({canvas:arHo, alpha:true, antialias:true});
+renAR.outputColorSpace = THREE.SRGBColorSpace;
+renAR.setClearColor(0x000000, 0);
+const escAR = new THREE.Scene();
+const camAR = new THREE.OrthographicCamera(-1, 1, 1, -1, -20, 20);
+escAR.add(new THREE.AmbientLight(0xffffff, 1.0));
+const grupoAR = new THREE.Group();
+
+// el objeto MONTADO, con grosor: las piezas en su sitio de la foto, sin separar
+for(const q of piezas){
+  for(let k = 0; k < CAPAS_GROSOR; k++){
+    const f = 1 - 0.62 * (k / (CAPAS_GROSOR - 1));       // el canto se oscurece hacia atrás
+    const m = new THREE.Mesh(q.malla.geometry, new THREE.MeshBasicMaterial({
+      map: q.malla.material.map, transparent:true, alphaTest:0.06,
+      color: new THREE.Color(f, f, f), side: THREE.DoubleSide}));
+    m.position.set(q.base.x, q.base.y, q.base.z - k * (GROSOR / (CAPAS_GROSOR - 1)));
+    m.renderOrder = 100 - k;
+    grupoAR.add(m);
+  }
+}
+// centrar el conjunto en sí mismo, para que la palma lo sostenga por el medio
+const cajaAR = new THREE.Box3().setFromObject(grupoAR);
+const centroAR = cajaAR.getCenter(new THREE.Vector3());
+const anchoAR = Math.max(cajaAR.max.x - cajaAR.min.x, 1e-6);
+grupoAR.children.forEach(m => m.position.sub(centroAR));
+const pivAR = new THREE.Group(); pivAR.add(grupoAR); escAR.add(pivAR);
+
+let arW = 960, arHh = 720;
+function medirAR(){
+  // el marco toma la proporción del vídeo y cabe entero en la ventana: así el mapa entre
+  // los puntos de la mano (0..1 del fotograma) y la escena es exacto, sin recortes
+  const rel = (esq.width && esq.height) ? esq.width / esq.height : 4/3;
+  let w = innerWidth * 0.94, h = w / rel;
+  if(h > innerHeight * 0.88){ h = innerHeight * 0.88; w = h * rel; }
+  arW = Math.round(w); arHh = Math.round(h);
+  const marco = $('#ar_marco');
+  marco.style.width = arW + 'px'; marco.style.height = arHh + 'px';
+  const pr = Math.min(2, devicePixelRatio);
+  arV.width = Math.round(arW * pr); arV.height = Math.round(arHh * pr);
+  renAR.setPixelRatio(pr); renAR.setSize(arW, arHh, false);
+  const a = arW / arHh;
+  camAR.left = -a/2; camAR.right = a/2; camAR.top = 0.5; camAR.bottom = -0.5;
+  camAR.updateProjectionMatrix();
+}
+addEventListener('resize', () => { if(holoAbierto) medirAR(); });
+
+function abrirHolograma(){
+  if(holoAbierto) return;
+  holoAbierto = true; AR.hidden = false; vistoAr = 0;
+  medirAR();
+  $('#ar_pie').textContent = 'holograma sobre la mano';
+  const g = $('#ar_gesto');
+  if(RECON.url){
+    g.textContent = 'cierra la mano para abrir ' + RECON.url + ' — ' + RECON.por_que;
+    g.classList.remove('sinenlace');
+  } else {
+    g.textContent = 'sin enlace: ' + RECON.por_que;
+    g.classList.add('sinenlace');
+  }
+}
+/* Abrir un enlace desde un GESTO, no desde un clic.
+   MEDIDO el 8-sep en este mismo navegador: `window.open` llamado fuera de un clic
+   devuelve null — bloqueado. Y pedido con `noopener` devuelve null SIEMPRE, aunque
+   funcione, así que ni se podía distinguir. Por eso el puño llenaba la barra y no pasaba
+   nada. Ahora: se intenta la pestaña (y se anula `opener` a mano, que es lo que daba
+   `noopener`); si el navegador la bloquea, se sale por la misma pestaña, que no se
+   bloquea nunca. Si había una grabación en marcha se para antes, porque navegar destruye
+   la página y el vídeo a medias se perdería. */
+async function abrirEnlace(u){
+  // PRIMERO se le pide al servidor de la escena que lo abra el SISTEMA, en su propia
+  // ventana. En una ventana de aplicación no hay barra ni botón de atrás: si se navega
+  // aquí, la escena desaparece y solo se vuelve con Alt+flecha izquierda, que hay que
+  // saber. Abriéndolo fuera, la escena se queda viva detrás y no hay nada que deshacer.
+  // El servidor no acepta ninguna URL: abre la de `reconocimiento.url` de esta escena y
+  // ninguna otra, así que esto no es un agujero por el que colar un enlace.
+  try{
+    const r = await fetch('/abrir-enlace', {method:'POST'});
+    const j = await r.json();
+    if(j && j.ok){
+      $('#ar_gesto').textContent = 'abierto aparte: ' + j.url + ' — la escena sigue aquí';
+      return 'ventana del sistema';
+    }
+  }catch(e){ /* servidor sin el verbo (una escena servida a pelo): se sigue como antes */ }
+  let w = null;
+  try { w = window.open(u, '_blank'); } catch(e) { w = null; }
+  if(w){ try { w.opener = null; } catch(e) {} return 'pestaña nueva'; }
+  if(grabadora && grabadora.state === 'recording'){
+    // navegar destruye la página y con ella la grabación: se para para que se guarde
+    grabadora.stop();
+    $('#b_rec').textContent = 'Grabar'; $('#b_rec').classList.remove('grabando');
+    setTimeout(() => { location.href = u; }, 900);   // que dé tiempo a guardar el vídeo
+    return 'misma pestaña (se guarda el vídeo antes de salir)';
+  }
+  location.href = u;
+  return 'misma pestaña';
+}
+
+function cerrarHolograma(){ holoAbierto = false; AR.hidden = true; punnoDesde = null; }
+addEventListener('keydown', e => { if(e.key === 'Escape') cerrarHolograma(); });
+$('#ar_pie').addEventListener('click', cerrarHolograma);
+
+/* punto de la mano (0..1 del fotograma, x ESPEJADO como se ve en pantalla) -> escena */
+const aEscena = (p, a) => new THREE.Vector3((1 - p.x - 0.5) * a, 0.5 - p.y, -p.z * a);
+
+const qPalma = new THREE.Quaternion(), qFrente = new THREE.Quaternion();
+const mBase = new THREE.Matrix4();
+const vU = new THREE.Vector3(), vV = new THREE.Vector3(), vW = new THREE.Vector3();
+const vTmp = new THREE.Vector3(), vCentro = new THREE.Vector3();
+let escSuave = 0, primeraVez = true;
+
+function pintaHolograma(manos){
+  const W = arV.width, H = arV.height;
+  vctx.save(); vctx.clearRect(0, 0, W, H);
+  if(esq.width && vid.readyState >= 2){
+    vctx.translate(W, 0); vctx.scale(-1, 1); vctx.drawImage(vid, 0, 0, W, H);
+  } else { vctx.fillStyle = '#0b0c0e'; vctx.fillRect(0, 0, W, H); }
+  vctx.restore();
+
+  const p = (manos && manos.length) ? manos[0] : null;
+  vistoAr = p ? 1 : Math.max(0, vistoAr - 0.016);   // sin mano, se desvanece en ~1 s
+  pivAR.visible = vistoAr > 0.02;
+  if(p){
+    const a = arW / arHh;
+    const P0 = aEscena(p[0], a), P5 = aEscena(p[5], a), P17 = aEscena(p[17], a);
+    vCentro.copy(P0).add(P5).add(P17).divideScalar(3);
+    const anchoPalma = P5.distanceTo(P17) || 1e-6;
+
+    vU.copy(P17).sub(P5).normalize();
+    vTmp.copy(P0).sub(P5);
+    vW.copy(vU).cross(vTmp).normalize();
+    if(vW.z < 0) vW.negate();                 // la normal mira siempre hacia la cámara
+    vV.copy(vW).cross(vU).normalize();
+    // La imagen va ESPEJADA, así que una palma neutra daba una base girada media vuelta;
+    // mezclada al 55 % con la de frente, eso salía como 99 grados y el objeto aparecía
+    // tumbado (MEDIDO con la mano falsa congelada). Se endereza girando la base media
+    // vuelta sobre su propia normal cuando toca, para que la mano neutra sea giro CERO.
+    if(vU.x < 0){ vU.negate(); vV.negate(); }
+    mBase.makeBasis(vU, vV, vW);
+    qPalma.setFromRotationMatrix(mBase);
+    qFrente.identity();                        // giro limitado: ver TOPE_GIRO
+    pivAR.quaternion.copy(qFrente).slerp(qPalma, TOPE_GIRO);
+
+    const escObj = anchoPalma * PALMAS_DE_ANCHO / anchoAR;
+    escSuave = primeraVez ? escObj : escSuave + (escObj - escSuave) * 0.25;
+    primeraVez = false;
+    pivAR.scale.setScalar(escSuave);
+    pivAR.position.copy(vCentro).addScaledVector(vW, anchoPalma * ALTURA_PALMA);
+  }
+  // cuanto falta para que el puno abra el enlace: un gesto sin realimentacion es un
+  // gesto del que no sabes si esta funcionando
+  $('#ar_barra_i').style.width = (avancePunno*100) + '%';
+  grupoAR.children.forEach(m => { m.material.opacity = vistoAr; });
+  renAR.render(escAR, camAR);
+}
+$('#b_camara').onclick = () => corriendo ? apagaCamara()
+  : arrancaCamara().catch(e => { estado.textContent = 'sin camara: ' + e.message; });
+
+const mez = $('#mezcla'), mctx = mez.getContext('2d');
+function mezclaFotograma(){
+  mctx.fillStyle = '#0b0c0e'; mctx.fillRect(0,0,1280,720);
+  if(holoAbierto){ mezclaHolograma(); return; }
+  const c3 = $('#lienzo3d');
+  if(c3.width) mctx.drawImage(c3, 320, 0, 960, 720);
+  if(esq.width) mctx.drawImage(esq, 0, 100, 320, 240);
+  mctx.fillStyle = '#8d949e'; mctx.font = '12px Segoe UI, sans-serif';
+  mctx.fillText('dedos ' + $('#v_dedos').textContent
+              + '   separacion ' + $('#v_pel').textContent
+              + '   pieza ' + $('#v_capas').textContent, 12, 372);
+  mctx.fillText($('#v_varapel').textContent, 12, 392);
+  dibujaCarteles();
+}
+
+/* Los carteles, DIBUJADOS en el lienzo de la mezcla. Un <div> encima del lienzo se ve en
+   pantalla pero no entra en la grabacion, porque lo que se graba es este lienzo. Se dibuja
+   en la misma posicion relativa: la vista 3D ocupa el rectangulo (320,0)-(1280,720). */
+function dibujaCarteles(){
+  const c3 = $('#lienzo3d');
+  if(!c3.width) return;
+  const kx = v => 320 + (v / c3.clientWidth) * 960;
+  const ky = v => (v / c3.clientHeight) * 720;
+  for(const q of piezas){
+    const P = q.pantalla, D = q.cartelDatos;
+    if(!P || !D) continue;
+    const cx = kx(P.cx), cy = ky(P.cy), px = kx(P.x), py = ky(P.y);
+    mctx.save();
+    mctx.strokeStyle = 'rgba(60,69,79,.95)'; mctx.lineWidth = 1;
+    mctx.beginPath(); mctx.moveTo(cx, cy); mctx.lineTo(px, py); mctx.stroke();
+
+    mctx.font = '600 12px Segoe UI, sans-serif';
+    const filas = D.filas.length ? D.filas : [['', 'sin dato con fuente']];
+    let ancho = mctx.measureText(D.titulo).width;
+    mctx.font = '11px Segoe UI, sans-serif';
+    for(const [e, v] of filas)
+      ancho = Math.max(ancho, mctx.measureText(e).width + mctx.measureText(v).width + 22);
+    const W = Math.min(300, Math.max(150, ancho + 22));
+    const H = 26 + filas.length * 15 + (D.fuente ? 15 : 0);
+    const x0 = Math.max(4, Math.min(1276 - W, cx - W/2)), y0 = Math.max(4, Math.min(716 - H, cy - H/2));
+
+    mctx.fillStyle = 'rgba(14,16,19,.92)';
+    mctx.strokeStyle = '#2b3138';
+    mctx.beginPath(); mctx.roundRect(x0, y0, W, H, 6); mctx.fill(); mctx.stroke();
+
+    mctx.fillStyle = '#7fd1c1'; mctx.font = '600 12px Segoe UI, sans-serif';
+    mctx.fillText(D.titulo, x0 + 10, y0 + 17);
+    let y = y0 + 34;
+    mctx.font = '11px Segoe UI, sans-serif';
+    for(const [e, v] of filas){
+      mctx.fillStyle = '#79808a'; mctx.textAlign = 'left';
+      mctx.fillText(e, x0 + 10, y);
+      mctx.fillStyle = (v === 'sin dato con fuente') ? '#c9a227' : '#e8eaed';
+      mctx.textAlign = 'right'; mctx.fillText(v, x0 + W - 10, y);
+      mctx.textAlign = 'left'; y += 15;
+    }
+    if(D.fuente){
+      mctx.fillStyle = '#5d646d'; mctx.font = '10px Segoe UI, sans-serif';
+      mctx.fillText(D.fuente.slice(0, 46), x0 + 10, y + 2);
+    }
+    mctx.restore();
+  }
+}
+/* Con el holograma abierto, lo que se graba es EL HOLOGRAMA: el vídeo con el objeto
+   encima, su título, el aviso del enlace y cuánto falta para que el puño lo abra. Antes se
+   seguía grabando el despiece, así que el holograma no aparecía en el vídeo. */
+function mezclaHolograma(){
+  const v = $('#ar_video'), h = $('#ar_holo');
+  if(!v.width) return;
+  const rel = v.width / v.height;
+  let w = 1280, hh = w / rel;
+  if(hh > 720){ hh = 720; w = hh * rel; }
+  const x0 = (1280 - w)/2, y0 = (720 - hh)/2;
+  mctx.drawImage(v, x0, y0, w, hh);
+  mctx.drawImage(h, x0, y0, w, hh);
+
+  mctx.fillStyle = '#7fd1c1'; mctx.font = '600 15px Segoe UI, sans-serif';
+  mctx.textAlign = 'center';
+  mctx.fillText(($('#ar_pie').textContent || '').toUpperCase(), 640, 34);
+  mctx.font = '12px Segoe UI, sans-serif';
+  mctx.fillStyle = abriendo ? '#7fd1c1' : (RECON.url ? '#8d949e' : '#c9a227');
+  const linea = $('#ar_gesto').textContent || '';
+  mctx.fillText(linea.slice(0, 118), 640, 686);
+  mctx.textAlign = 'left';
+
+  if(avancePunno > 0.02){        // cuánto falta para que el puño abra el enlace
+    const aw = 260, ax = 640 - aw/2, ay = 700;
+    mctx.fillStyle = '#1b1f25'; mctx.fillRect(ax, ay, aw, 5);
+    mctx.fillStyle = '#7fd1c1'; mctx.fillRect(ax, ay, aw * avancePunno, 5);
+  }
+}
+
+let grabadora = null, trozos = [];
+
+/* GRABAR = lo que se ve en la PANTALLA, igual que compartir pantalla en una reunión.
+   Antes se grababa `mez`, un lienzo compuesto aparte con la escena, la cámara y la ficha:
+   salía limpio, pero SOLO salía eso. Nada de lo que ocurre fuera del lienzo entraba —
+   ni el sitio oficial que abre el puño, ni el PDF, ni una ventana encima— y para enseñar
+   cómo se usa esto hace falta justamente lo de fuera.
+   `getDisplayMedia` es la misma puerta que usa cualquier videollamada: el navegador saca
+   su propio selector (pantalla entera / ventana / pestaña) y graba lo elegido en vivo.
+   Tiene que salir de un CLIC, y por eso vive en el botón y no se puede disparar con un
+   gesto. Si se cancela el selector o el navegador no la trae, se cae al lienzo de antes,
+   que sigue funcionando: peor demo, pero nunca un botón muerto. */
+$('#b_rec').onclick = async () => {
+  if(grabadora && grabadora.state === 'recording'){
+    grabadora.stop(); $('#b_rec').textContent = 'Grabar';
+    $('#b_rec').classList.remove('grabando'); return;
+  }
+  trozos = [];
+  let flujo = null, comoSeGrabo = 'la pantalla';
+  try{
+    flujo = await navigator.mediaDevices.getDisplayMedia(
+      {video:{frameRate:30}, audio:false});
+    // si se para el compartir desde el aviso del navegador, se cierra el vídeo bien
+    flujo.getVideoTracks()[0].addEventListener('ended', () => {
+      if(grabadora && grabadora.state === 'recording') grabadora.stop();
+      $('#b_rec').textContent = 'Grabar'; $('#b_rec').classList.remove('grabando');
+    });
+  }catch(e){
+    flujo = mez.captureStream(30); comoSeGrabo = 'el lienzo (se canceló la pantalla)';
+  }
+  $('#v_gesto').textContent = 'grabando ' + comoSeGrabo;
+  grabadora = new MediaRecorder(flujo,
+                {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond: 8000000});
+  grabadora.ondataavailable = e => { if(e.data.size) trozos.push(e.data); };
+  grabadora.onstop = () => {
+    const a = document.createElement('a');
+    a.download = 'kinetica_demo.webm';
+    a.href = URL.createObjectURL(new Blob(trozos, {type:'video/webm'})); a.click();
+  };
+  grabadora.start();
+  $('#b_rec').textContent = 'Parar'; $('#b_rec').classList.add('grabando');
+};
+
+function asentar(){
+  const m = verOriginal ? 1 : (1 - suavePaso(0.05, 0.30, suave.explosion));
+  fondoFoto.material.opacity = m; fondoFoto.visible = m > 0.02;
+  const K = suave.explosion * 1.35;
+  radioVista = objetivo.aislada !== null ? RADIO_FOTO
+             : RADIO_FOTO + (RADIO_CUBO - RADIO_FOTO)*suavePaso(0.05, 0.75, suave.explosion);
+  focoObj.set(0, 0, 0); let n = 0;
+  for(const q of piezas){
+    const vis  = objetivo.aislada === null || q.dato.orden === objetivo.aislada-1;
+    const sola = objetivo.aislada !== null && q.dato.orden === objetivo.aislada-1;
+    const g = q.malla.geometry.parameters;
+    q.esc = sola ? (radioVista*1.62)/Math.hypot(g.width, g.height) : 1;
+    q.centrado = sola ? 1 : 0;
+    q.malla.material.opacity = (vis?1:0)*(1-m);
+    q.malla.visible = vis && q.malla.material.opacity > 0.02;
+    q.malla.scale.setScalar(q.esc);
+    q.malla.position.set(q.base.x + q.rumbo.x*K, q.base.y + q.rumbo.y*K, q.base.z + q.rumbo.z*K)
+                    .multiplyScalar(1 - q.centrado);
+    if(vis){ focoObj.add(q.malla.position); n++; }
+  }
+  foco.copy(n && m <= 0.5 ? focoObj.divideScalar(n) : focoObj.set(0, 0, 0));
+}
+if(Q.has('aislada') && objetivo.aislada){
+  const q0 = piezas.find(q => q.dato.orden === objetivo.aislada - 1);
+  if(q0) $('#v_capas').textContent = q0.dato.titulo;
+}
+if(Q.has('explosion') || Q.has('aislada') || Q.has('giro')) asentar();
+if(Q.get('holo') === '1' || MANO_FALSA) setTimeout(abrirHolograma, 60);
+
+// ?dbg=1 expone el estado para poder INSPECCIONAR en vez de suponer
+if(Q.get('dbg') === '1') window.__dbg = () => ({
+  explosion: suave.explosion, mezclaOrig: 1 - suavePaso(0.05, 0.30, suave.explosion),
+  aislada: objetivo.aislada, radioVista, DIST,
+  fondo: {vis: fondoFoto.visible, op: +fondoFoto.material.opacity.toFixed(3)},
+  centrado: piezas.map(q => +q.centrado.toFixed(2)),
+  piezas: piezas.map(q => ({n: q.dato.clave, vis: q.malla.visible,
+                            op: +q.malla.material.opacity.toFixed(3),
+                            esc: +q.esc.toFixed(2)}))});
+estado.textContent = piezas.length + ' piezas separadas. Pulsa "Encender camara".';
+requestAnimationFrame(bucle);
+</script></body></html>
