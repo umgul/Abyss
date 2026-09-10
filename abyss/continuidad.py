@@ -33,7 +33,7 @@ Arranque en frío (§2.2): con menos de `propiocepcion.UMBRAL_FRIO` sesiones med
 un reloj no lleva percentiles («sin vara todavía (n=…)») y la sala de los relojes no
 despierta ninguno — no hay corpus para decidir qué «destaca».
 
-Paréntesis (T2.1, `parentesis.py`): si el usuario abrió un tramo con `--abrir` en
+Paréntesis (`parentesis.py`): si el usuario abrió un tramo con `--abrir` en
 una sesión, `frases_usuario()` salta las líneas cuya `timestamp` cae dentro de ese
 tramo (`parentesis.en_parentesis()`), y `guardar()` copia el transcript a
 `sesiones/` saltando esas mismas líneas en vez de un `copyfile` a pelo. Bolsas y
@@ -148,8 +148,8 @@ def _sid_de_ruta(path):
 
 def frases_usuario(path):
     """Todas las frases del usuario de una sesión (sin meta, sin sidechain, sin lo
-    que caiga dentro de un tramo de paréntesis de esa sesión — `parentesis.py`,
-    T2.1). Lee .jsonl y .jsonl.gz por igual (§2.4)."""
+    que caiga dentro de un tramo de paréntesis de esa sesión — `parentesis.py`).
+    Lee .jsonl y .jsonl.gz por igual (§2.4)."""
     sid = _sid_de_ruta(path)
     out = []
     with P.abrir_texto(path) as fh:
@@ -239,7 +239,7 @@ def guardar(transcript_path):
     Si ya existe una copia comprimida (.jsonl.gz) no la reabre: --comprimir ya la
     dejó archivada.
 
-    Paréntesis (T2.1): si esta sesión tiene algún tramo marcado (`parentesis.py
+    Paréntesis: si esta sesión tiene algún tramo marcado (`parentesis.py
     --abrir`), la copia se hace SIEMPRE saltando esas líneas (`_copiar_saltando_parentesis`)
     en vez del `copyfile` de siempre — y por eso, con tramos, no se compara tamaño
     contra la copia anterior: una copia filtrada es siempre más pequeña que el

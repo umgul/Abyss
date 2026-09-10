@@ -260,7 +260,7 @@ class Numeros(unittest.TestCase):
         self.assertTrue(os.path.exists(r['color']))
 
     def test_contorno_pinta_pixeles_en_la_frontera_entre_zonas(self):
-        """T2.8, fallo "roza": los contornos de `numeros` no tenían falsador —
+        """Fallo "roza": los contornos de `numeros` no tenían falsador —
         medido por mutación (convertir `_dibujar_contornos` en un `return`
         inmediato, dejando la plantilla SIN ninguna línea entre zonas, que es
         lo único que la hace pintable), las 19 pruebas anteriores seguían en
@@ -274,7 +274,7 @@ class Numeros(unittest.TestCase):
         img = self._imagen_de_n_bloques(d / 'bloques3.png', n, ancho=120, alto=90)
         r = lienzo.numeros(str(img), colores=n, ancho=120, min_zona=10, salida=str(d / 'salida3'))
         plantilla = np.asarray(Image.open(r['plantilla']).convert('RGB'))
-        cuerpo = plantilla[:90, :, :]  # sin el pie de paleta (los últimos 40 px, T2.8)
+        cuerpo = plantilla[:90, :, :]  # sin el pie de paleta (los últimos 40 px)
         contorno = np.all(cuerpo == (160, 160, 160), axis=-1)
         # con el contorno de verdad, las dos fronteras (horizontal y vertical)
         # entre los 4 bloques suman ~210 píxeles en esta imagen; un `return`

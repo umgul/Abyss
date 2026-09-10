@@ -214,7 +214,7 @@ class SinMotorDeExtraccion(unittest.TestCase):
 
 
 class IndexarConFicheroQueNoEsPdf(unittest.TestCase):
-    """T2.4, fallo "engaña" medido 7-sep: `extraer()` solo atrapaba
+    """Fallo "engaña" medido 7-sep: `extraer()` solo atrapaba
     `ImportError`, así que un fichero de texto plano renombrado a `.pdf` hacía
     que `fitz` (instalado) reventara con `pymupdf.FileDataError` como
     traceback completo por stderr (con la ruta absoluta del fichero dentro) en
@@ -255,7 +255,7 @@ class IndexarConFicheroQueNoEsPdf(unittest.TestCase):
 @unittest.skipUnless(_TIENE_FITZ, 'sin fitz (PyMuPDF): pip install pymupdf')
 class HeuristicaDeSeccionCasoMinimo(unittest.TestCase):
     """Fallo "roza" medido 7-sep: con una página de EXACTAMENTE dos líneas
-    (título + una sola línea de cuerpo — la forma MÍNIMA que T2.4 pone como
+    (título + una sola línea de cuerpo — la forma MÍNIMA usada como
     falsador), `tamanos[n // 2]` daba la mediana SUPERIOR para `n` par; con
     n=2 eso es el propio tamaño del título (mediana == p90), así que
     `tamano > mediana` no era nunca cierto y NINGUNA sección salía detectada.
@@ -293,7 +293,7 @@ class HeuristicaDeSeccionCasoMinimo(unittest.TestCase):
 
 
 class BuscarOrdenaPorPuntuacionDescendente(unittest.TestCase):
-    """T2.4, fallo "roza": el orden de `--buscar` no tenía falsador — medido
+    """Fallo "roza": el orden de `--buscar` no tenía falsador — medido
     por mutación (invertir `puntuaciones.sort(...)` para devolver PRIMERO la
     página MENOS relevante), las 23 pruebas anteriores seguían en verde porque
     su única consulta aparecía en una sola página (con un resultado, cualquier

@@ -1,4 +1,4 @@
-"""sondeo.py — fichero de prueba para `pruebas/test_auditar.py` (T4.2).
+"""sondeo.py — fichero de prueba para `pruebas/test_auditar.py`.
 
 Gancho `UserPromptSubmit` de `paquete_sintetico`: corre en CADA mensaje y no
 aparece nombrado en el `README.md` de este mismo paquete (a propósito, para

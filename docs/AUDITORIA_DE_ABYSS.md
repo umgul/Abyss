@@ -1,4 +1,4 @@
-# Abyss sobre Abyss (T4.2)
+# Abyss sobre Abyss
 
 *[English version](AUDITORIA_DE_ABYSS.en.md)*
 

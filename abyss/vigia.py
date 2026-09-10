@@ -5,7 +5,7 @@ fichero y citas «…» de mi última respuesta que no aparecen ni en lo que dij
 usuario ni en lo que devolvió una herramienta en toda la sesión. Es la ley de probar
 logs reales aplicada a mi propia boca.
 
-Paréntesis (T2.1, `parentesis.py`): `leer_turno()` salta ENTERA cualquier línea
+Paréntesis (`parentesis.py`): `leer_turno()` salta ENTERA cualquier línea
 cuyo `timestamp` cae dentro de un tramo abierto de esa sesión — ni entra como
 evidencia, ni como respuesta mía a verificar. Sin este filtro (fallo medido
 7-sep) el vigía sí usaba el tramo como evidencia, y si la ÚLTIMA respuesta caía
@@ -28,7 +28,7 @@ paréntesis promete que no viaja a memoria futura.
         - ESTADOS: frases mías en 1ª persona sobre mi estado («me siento», «me alegra»,
           «tengo ganas»…) sin medida ni marca de conjetura. NO bloquean (un «me alegro»
           es acto de habla); se cuentan como «estados sin vara» en la presión.
-        - DOMINIO y COMANDO (T4.1, motivo: el incidente que un usuario sufrió con un
+        - DOMINIO y COMANDO (motivo: el incidente que un usuario sufrió con un
           comando que le dio su propia IA apuntando a un dominio copia): MISMA ley de
           procedencia que numero/ruta/cita, aplicada a lo que puede llevarme a otra
           máquina. `dominio`: cualquier host o URL de mi respuesta que no aparece en la
@@ -132,7 +132,7 @@ RE_ESTADO = re.compile(
 MARCAS = ('[medida', 'medida:', 'conjetura', 'no lo sé', 'no puedo medir', 'proxy', 'percentil',
           'sin vara', 'no tengo vara', 'no lo puedo afirmar', 'acto de habla')
 
-# --- T4.1: dominio y comando (misma ley de procedencia que numero/ruta/cita) ---
+# --- Dominio y comando (misma ley de procedencia que numero/ruta/cita) ---
 RE_URL = re.compile(r'\b(?:https?|ftp)://[^\s\'"<>\)\]]+', re.I)
 # Lista de TLD declarada — tan incompleta como `EXT` para rutas (§ límite arriba):
 # un dominio SIN esquema (`http(s)://`) solo se reconoce si termina en uno de estos.
@@ -143,7 +143,7 @@ TLDS = ('com', 'net', 'org', 'io', 'dev', 'sh', 'co', 'app', 'xyz', 'info', 'biz
         'fun', 'live', 'news', 'wiki', 'blog', 'cf', 'ga', 'ml', 'tk', 'edu', 'gov', 'int')
 RE_DOMINIO_DESNUDO = re.compile(
     r'(?<![\w@./\\-])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:' + '|'.join(TLDS) + r'))\b', re.I)
-# Instalación o ejecución remota (T4.1, motivo: comando dado por una IA hacia un dominio
+# Instalación o ejecución remota (motivo: comando dado por una IA hacia un dominio
 # copia): tuberías curl/wget/iwr/irm hacia un intérprete, o gestores de paquetes/registro.
 RE_COMANDO = re.compile(
     r'(?:\b(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:bash|sh|zsh)\b'
@@ -155,7 +155,7 @@ RE_COMANDO = re.compile(
 
 def normaliza_host(h):
     """Host en minúsculas, sin `www.`, sin usuario/contraseña, sin puerto ni ruta —
-    para comparar PROCEDENCIA por host, no por URL entera (T4.1): tanto
+    para comparar PROCEDENCIA por host, no por URL entera: tanto
     `https://Copia.EJEMPLO.com:8443/instalar.sh` como `copia.ejemplo.com` cuentan
     como el mismo dominio, y solo uno de los dos necesita haber salido de la
     evidencia para que el otro no se cace."""
@@ -208,11 +208,11 @@ def leer_turno(path, todas=False, sid=None):
     """Devuelve (evidencia: str, respuesta_final: str[, lista de todas mis respuestas finales]).
     Evidencia = todo lo que NO es mío.
 
-    Paréntesis (T2.1): cualquier línea cuya `timestamp` cae dentro de un tramo
+    Paréntesis: cualquier línea cuya `timestamp` cae dentro de un tramo
     abierto de esta sesión (`parentesis.en_parentesis()`) se salta ENTERA — ni
     entra como evidencia, ni como texto mío a verificar, ni como `tool_use`.
-    Fallo medido 7-sep: esta función nunca miraba el tramo — T2.1 exige "el
-    vigía no lo usa como evidencia" y sin este filtro sí lo usaba, e incluso
+    Fallo medido 7-sep: esta función nunca miraba el tramo — el vigía debía
+    no usarlo como evidencia y sin este filtro sí lo usaba, e incluso
     podía guardar fragmentos literales de una respuesta dicha DENTRO de un
     tramo en `confabulaciones.jsonl` (`citas`/`parafrasis`), justo lo que el
     tramo promete que no viaja. Sin `sid` explícito se infiere del nombre de
@@ -289,7 +289,7 @@ def _tipo_cita(respuesta, inicio, fin):
 def cazar(evidencia, respuesta):
     """Devuelve dict con listas: numeros, rutas, citas (atribuidas a alguien, tipo
     `cita`) y parafrasis (comillas «» sin atribución cerca, tipo `parafrasis`,
-    §2.1b) sin fuente; dominios y comandos (T4.1, misma ley de procedencia — ver
+    §2.1b) sin fuente; dominios y comandos (misma ley de procedencia — ver
     docstring del módulo); estados sin vara."""
     ev = evidencia; ev_num = normaliza_num(ev); ev_low = re.sub(r'\s+', ' ', ev.lower())
     sin_codigo = re.sub(r'```.*?```', ' ', respuesta, flags=re.S)  # los bloques de código suelen ser copias
@@ -314,7 +314,7 @@ def cazar(evidencia, respuesta):
             continue
         entrada = c[:60]
         (citas if _tipo_cita(respuesta, m.start(), m.end()) == 'cita' else parafrasis).append(entrada)
-    # T4.1: dominio y comando SÍ miran dentro de los bloques ```código``` (usan
+    # Dominio y comando SÍ miran dentro de los bloques ```código``` (usan
     # `respuesta`, no `sin_codigo`) — un `curl … | bash` suele venir precisamente
     # ahí, y `numero` los ignora por un motivo que no aplica aquí («suelen ser
     # copias»): una copia de un comando de instalación es justo lo que se quiere cazar.
@@ -354,7 +354,7 @@ _CAMPOS_DUROS = ('numeros', 'rutas', 'citas', 'parafrasis', 'dominios', 'comando
 
 def _duras(r):
     """Cuántas cazas duras (no estados) lleva un registro: números + rutas + citas +
-    parafrasis + dominios + comandos (T4.1). Un `--descargo` no tiene ninguna de
+    parafrasis + dominios + comandos. Un `--descargo` no tiene ninguna de
     estas claves, cuenta 0."""
     return sum(len(r.get(campo, [])) for campo in _CAMPOS_DUROS)
 

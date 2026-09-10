@@ -52,7 +52,7 @@ no hay una segunda implementación.
 Sin rutas de usuario en el código: todo lo que toca a un usuario concreto (dónde
 está `~/.claude`, qué proyecto, qué `python`) se resuelve en tiempo de ejecución.
 
-Quinta tanda (T5.1, dependencias de terceros): `--dependencias` mira, con un
+Quinta tanda (dependencias de terceros): `--dependencias` mira, con un
 `import` REAL bajo el `python` que se vaya a usar (nunca una lista fija de "lo que
 suele hacer falta"), qué le falta a cada módulo con paquetes de pip opcionales
 (`DEPENDENCIAS`, más abajo) y lo dice en una tabla (falta/paquete/tamaño aprox.).
@@ -66,7 +66,7 @@ del gestor que corresponda, nunca se finge instalado. `--desinstalar-dependencia
 NO existe a propósito: quitar paquetes de Python del entorno de alguien es más
 arriesgado que ponerlos.
 
-Quinta tanda (T5.2, bilingüe): todo lo que ve el usuario en la ventana, la CLI y
+Quinta tanda (bilingüe): todo lo que ve el usuario en la ventana, la CLI y
 los avisos pasa por `TEXTOS` (`_texto(idioma, clave, **fmt)`), con `--idioma
 es|en` o, por defecto, el idioma del sistema (inglés si no empieza por "es"). Los
 guiones (`abyss/*.py`) siguen documentados y con sus propios mensajes SIEMPRE en
@@ -151,7 +151,7 @@ import rutas  # noqa: E402
 SETTINGS_POR_DEFECTO = os.path.join(os.path.expanduser('~'), '.claude', 'settings.json')
 MANIFIESTO_NOMBRE = 'abyss_manifiesto.json'
 
-# Segunda tanda (T2.6): el módulo `esceptico` no es un guion Python — es una skill
+# Segunda tanda: el módulo `esceptico` no es un guion Python — es una skill
 # de Claude Code (`skills/esceptico/SKILL.md` en este repo) que se COPIA a la
 # carpeta de skills del usuario, igual que `~/.claude/settings.json` es la carpeta
 # de ganchos por defecto. `--skills-dir <ruta>` la cambia (pruebas, o una instalación
@@ -542,12 +542,12 @@ MODULOS_POR_ID = {m['id']: m for m in MODULOS}
 
 
 # ---------------------------------------------------------------------------------
-# T5.1 · dependencias de terceros por módulo.
+# Dependencias de terceros por módulo.
 #
 # Cada entrada: `import_nombre` (lo que se prueba a IMPORTAR de verdad, nunca una
 # lista fija de "lo que suele hacer falta"), `pip_nombre` (lo que se instala),
 # `para` (para qué sirve, en castellano) y `para_en` (la misma explicación en
-# inglés — T5.2: la tabla de `--dependencias` es de las cadenas que el usuario
+# inglés — la tabla de `--dependencias` es de las cadenas que el usuario
 # ve, así que también lleva su traducción; `_para_localizado()` la elige y cae
 # al castellano de `para` si a alguna entrada le faltara `para_en`, mismo
 # fail-closed que `_texto()`). Comprobado contra el código real de cada guion, no
@@ -767,7 +767,7 @@ def _hay_gpu_nvidia():
 
 
 def _comando_taller_torch():
-    """El `pip install torch` exacto para esta máquina (T5.1: "detecta si hay GPU
+    """El `pip install torch` exacto para esta máquina ("detecta si hay GPU
     NVIDIA y escribe el comando de instalación que corresponde"). Con GPU NVIDIA
     detectada, la rueda CUDA; si no, la de CPU (server sin GPU, o AMD/Intel/Apple,
     donde el índice de PyPI ya sirve la rueda correcta por su cuenta)."""
@@ -1228,7 +1228,7 @@ def descargar_vendor_mp(*, idioma='es', forzar=False, timeout=30):
 
 
 def _para_localizado(idioma, e):
-    """El texto de la columna «para qué» en el idioma pedido (T5.2): con
+    """El texto de la columna «para qué» en el idioma pedido: con
     `idioma != 'es'` usa `e['para_en']` si la entrada la declara; si no (fail-
     closed, mismo criterio que `_texto()`), cae al castellano de `e['para']`
     antes que dejar la fila sin explicación."""
@@ -1250,7 +1250,7 @@ def _fila_dependencia(idioma, mid, e):
 
 
 def _texto_no_instalables(idioma):
-    """T5.1: lo que este instalador NO puede poner porque son binarios del
+    """Lo que este instalador NO puede poner porque son binarios del
     sistema (nunca de pip) — el motor de OCR fuera de Windows (el código llama al
     binario `tesseract` por PATH, nunca a `pytesseract`: instalarlo por pip no
     activaría nada) y torch+diffusers para `taller.py` (pesan gigas y dependen de
@@ -1295,7 +1295,7 @@ def _tabla_dependencias(idioma, modulos=None, python_exe=None):
 
 
 # ---------------------------------------------------------------------------------
-# T5.2 · bilingüe: las cadenas cortas de interfaz
+# Bilingüe: las cadenas cortas de interfaz
 # (ventana, botones, avisos, cabeceras, mensajes de error, resumen final) pasan
 # TODAS por aquí — nunca una cadena suelta en medio del código. `_texto()` es el
 # ÚNICO punto de lectura de ESTE diccionario; si una clave faltara en el idioma
@@ -1574,7 +1574,7 @@ _ETIQUETA_ESTADO_CLAVE = {True: 'estado_instalado', False: 'estado_no_instalado'
 
 
 def _texto(idioma, clave, **fmt):
-    """Único punto de lectura de `TEXTOS` (T5.2): `idioma` no reconocido, o clave
+    """Único punto de lectura de `TEXTOS`: `idioma` no reconocido, o clave
     que faltara en él, caen al castellano antes que reventar el instalador por
     un texto — fail-closed también aquí (preferible un idioma "que no toca" a
     ningún mensaje)."""
@@ -1585,7 +1585,7 @@ def _texto(idioma, clave, **fmt):
 
 def _idioma_sistema():
     """`'es'` si el idioma del sistema empieza por "es"; si no, o si no se puede
-    determinar, `'en'` (T5.2). `locale.getdefaultlocale()` está deprecado desde
+    determinar, `'en'`. `locale.getdefaultlocale()` está deprecado desde
     Python 3.11 (aviso silenciado a propósito: es solo una detección de
     conveniencia, nunca debe imprimir ruido por su cuenta) y podría desaparecer
     en una versión futura de Python; si falla o no da nada, se cae a
@@ -1691,7 +1691,7 @@ def _escribir_config_codigo(python_exe):
 
 
 # ---------------------------------------------------------------------------------
-# Skills copiadas (T2.6, `esceptico`): sin PyYAML (biblioteca estándar solo), así que
+# Skills copiadas (`esceptico`): sin PyYAML (biblioteca estándar solo), así que
 # el frontmatter no se parsea de verdad — solo se extrae el BLOQUE entre las dos
 # primeras líneas `---` y se busca la marca dentro, literal. Basta para lo que este
 # paquete necesita: escribir la marca al copiar, y comprobarla al desinstalar.
@@ -1859,8 +1859,8 @@ def instalar(ids, *, settings_ruta, python_exe, mem, telegram=None, skills_dir=N
     """Instala los módulos `ids` (lista de str) fusionando en `settings_ruta`.
     `telegram` es `(token, chat_id)` o None/incompleto (entonces ese módulo se
     salta con aviso). `skills_dir` es donde copiar una skill como `esceptico`
-    (por defecto `SKILLS_DIR_POR_DEFECTO`, ~/.claude/skills). `idioma` (T5.2,
-    por defecto 'es' — NUNCA el del sistema aquí: lo resuelve la CLI/ventana y
+    (por defecto `SKILLS_DIR_POR_DEFECTO`, ~/.claude/skills). `idioma` (por
+    defecto 'es' — NUNCA el del sistema aquí: lo resuelve la CLI/ventana y
     lo pasa ya decidido, para que llamar a esta función directamente sea
     determinista) decide en qué idioma salen los mensajes devueltos. Devuelve la
     lista de mensajes (str) para mostrar al usuario."""
@@ -1936,7 +1936,7 @@ def instalar(ids, *, settings_ruta, python_exe, mem, telegram=None, skills_dir=N
 
         if mod.get('especial') == 'taller':
             ruta_script = _script(mod['script'])
-            # T5.1: comando EXACTO detectado (nvidia-smi), no una condicional
+            # Comando EXACTO detectado (nvidia-smi), no una condicional
             # genérica ("si tienes GPU NVIDIA...") — nunca se instala desde aquí.
             mensajes.append(_texto(idioma, 'taller_mensaje', mid=mid, script=ruta_script,
                                     torch_cmd=_comando_taller_torch()))
@@ -1965,8 +1965,8 @@ def desinstalar(ids, *, settings_ruta, mem, borrar_datos=False, skills_dir=None,
     nuestro código (o al `.ps1` de telegram que escribimos nosotros), retira una
     skill copiada (`esceptico`) SOLO si lleva nuestra marca, y restaura las claves
     de preferencia/permisos a su valor previo. Si `borrar_datos`, además limpia
-    `DATOS_GENERADOS` de `mem` (nunca MEMORY.md ni las fichas). `idioma='es'`
-    (T5.2): igual que en `instalar()`, nunca el del sistema aquí — lo decide
+    `DATOS_GENERADOS` de `mem` (nunca MEMORY.md ni las fichas). `idioma='es'`:
+    igual que en `instalar()`, nunca el del sistema aquí — lo decide
     quien llama."""
     skills_dir = skills_dir or SKILLS_DIR_POR_DEFECTO
     mensajes = []
@@ -2125,7 +2125,7 @@ def _campo_localizado(idioma, mod, campo):
 
 
 def _linea_localizada(idioma, mod):
-    """El texto de una frase de `mod` en el idioma pedido (T5.2), mismo criterio
+    """El texto de una frase de `mod` en el idioma pedido, mismo criterio
     que `_para_localizado()`: con `idioma != 'es'` usa `mod['linea_en']` si el
     módulo la declara; si no (fail-closed), cae al castellano de `mod['linea']`
     antes que dejar la fila sin descripción."""
@@ -2190,7 +2190,7 @@ def _claves(argv, idioma='es'):
 
 
 def _listar(settings_ruta, skills_dir=None, idioma='es'):
-    """`idioma='es'` (T5.2): con `--idioma en`, la etiqueta de estado, las
+    """`idioma='es'`: con `--idioma en`, la etiqueta de estado, las
     cabeceras y `mod['linea']` (vía `_linea_localizada()`, cayendo al castellano
     si al módulo le faltara `linea_en`) cambian de idioma — y `toca`/`aviso`
     (que sí llevan vocabulario castellano de control, p. ej. «ganchos») se
@@ -2268,7 +2268,7 @@ _FLAGS_CON_VALOR = ('--settings', '--python', '--proyecto', '--instalar', '--des
                     '--telegram-token', '--telegram-chat', '--skills-dir', '--idioma')
 _FLAGS_SIN_VALOR = ('--listar', '--claves', '--sin-ventana', '--borrar-datos', '--sin-preguntar', '-h', '--help',
                     '--dependencias', '--manos', '--modelo')
-# T5.1: `--instalar-dependencias` lleva un valor OPCIONAL ("[mod1,mod2]" en el uso:
+# `--instalar-dependencias` lleva un valor OPCIONAL ("[mod1,mod2]" en el uso:
 # sin lista, se comprueban/instalan TODOS los módulos de `DEPENDENCIAS`) — a
 # diferencia de `_FLAGS_CON_VALOR`, que siempre exige un valor detrás.
 _FLAGS_VALOR_OPCIONAL = ('--instalar-dependencias',)
@@ -2543,7 +2543,7 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
         etiqueta = tk.Label(marco, text='...', width=15, anchor='w')
         etiqueta.grid(row=fila, column=2, sticky='w')
         etiquetas_estado[mod['id']] = etiqueta
-        # `linea`/`aviso` son documentación del código (T5.2): se muestran igual
+        # `linea`/`aviso` son documentación del código: se muestran igual
         # en las dos ventanas, castellano siempre — solo la etiqueta de estado y
         # los botones/avisos propios del instalador cambian de idioma.
         texto = mod['linea'] + (f'  ⚠ {mod["aviso"]}' if mod.get('aviso') else '')
@@ -2598,7 +2598,7 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
         refrescar()
 
     def hacer_dependencias():
-        # T5.1: la casilla/botón de la ventana llama a las MISMAS funciones que
+        # La casilla/botón de la ventana llama a las MISMAS funciones que
         # la CLI (`_tabla_dependencias`/`instalar_dependencias`) — nunca una
         # segunda implementación. Solo actúa sobre los módulos MARCADOS que
         # tengan dependencias registradas; si ninguno lo está, sobre todos.
@@ -2655,14 +2655,14 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
 if __name__ == '__main__':
     argv = sys.argv[1:]
 
-    # T5.2: el idioma se resuelve ANTES que nada más (incluso antes de `--help`),
+    # El idioma se resuelve ANTES que nada más (incluso antes de `--help`),
     # para que `--help --idioma en` salga en inglés. Un valor inválido (ni "es" ni
     # "en") es un error de bandera propio — fail-closed, nunca se adivina o se
     # ignora en silencio — dicho en los DOS idiomas a la vez, porque aquí todavía
     # no hay NINGÚN idioma decidido con el que elegir uno solo para el mensaje.
     _idioma_pedido = _valor_flag(argv, '--idioma')
     if _idioma_pedido and _idioma_pedido.strip().lower() not in ('es', 'en'):
-        # bilingue-a-proposito: única excepción a "todo pasa por TEXTOS" (T5.2) —
+        # bilingue-a-proposito: única excepción a "todo pasa por TEXTOS" —
         # antes de esta línea no hay idioma resuelto con el que elegir uno solo.
         sys.stderr.write(f'instalar: --idioma debe ser "es" o "en" (must be "es" or "en"), no "{_idioma_pedido}"\n')
         sys.exit(2)

@@ -149,7 +149,7 @@ class EstilosDelPintor(unittest.TestCase):
                              f'{estilo}: satura a 0 — debe salir gris de verdad (R=G=B), no solo apagado')
 
     def test_carbon_tramado_no_rompe_el_motor_y_admite_acabado_y_suave(self):
-        # --acabado/--suave valen para cualquier estilo (T3.2): una capa de más, o el doble de
+        # --acabado/--suave valen para cualquier estilo: una capa de más, o el doble de
         # tamaño con reducción al final — nunca crashean con el tramado a 45° de carbon.
         sin = pintor.pintar(self.foto, salida=os.path.join(self.d, 'carbon_sin'), ancho=150,
                              semilla=5, estilo='carbon', acabado=False, avisar=lambda *a: None)

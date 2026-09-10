@@ -94,7 +94,7 @@ os.environ['ABYSS_PROYECTO'] = proj
 RUTA = os.path.join(mem, 'parentesis.json')
 SES = os.path.join(mem, 'sesiones')
 VIVO = os.path.join(mem, '.vivo')
-TOPE_VIVO_S = 120  # 2 minutos (T2.1): por debajo de esto, --recortar/--recortar-tramo se niegan
+TOPE_VIVO_S = 120  # 2 minutos: por debajo de esto, --recortar/--recortar-tramo se niegan
 
 
 # ---------- mem/parentesis.json ----------

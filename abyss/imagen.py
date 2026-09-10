@@ -104,8 +104,8 @@ def _cfg(mem):
 
 def _log(mem, etiqueta, texto):
     """Añade una línea a `<mem>/imagen.log`: fecha, etiqueta (verbo) y detalle, en
-    columnas separadas por tabulador. Usada por `render`/`render --pintar` (T3.1: "las
-    dos salidas se apuntan en mem/imagen.log") — el mismo fichero donde `crear()`
+    columnas separadas por tabulador. Usada por `render`/`render --pintar`, cuyas
+    dos salidas se apuntan en mem/imagen.log — el mismo fichero donde `crear()`
     escribe su propia línea (con su propio formato de columnas, sin tocar aquí)."""
     with open(os.path.join(mem, "imagen.log"), "a", encoding="utf-8") as fh:
         fh.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}\t{etiqueta}\t{texto}\n")

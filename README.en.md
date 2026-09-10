@@ -612,7 +612,7 @@ another's.
 
 Python 3.12 or newer, standard library for almost everything. The
 recommended path for the rest is letting the package resolve it itself
-(fifth batch, T5.1) instead of reading
+(fifth batch) instead of reading
 [`requirements.txt`](requirements.txt) by hand:
 
 ```
@@ -633,7 +633,7 @@ and the rest continue, never retrying on its own. `--desinstalar-dependencias`
 does not exist: removing Python packages from someone's environment is
 riskier than adding them, and that's left to whoever installed them. Both
 flags — and the "Dependencies…" checkbox in the Tk window — speak
-`--idioma es|en` (the system's by default, see T5.2 further below);
+`--idioma es|en` (the system's by default);
 [`requirements.txt`](requirements.txt) carries the same list, all commented
 out, for whoever prefers installing by hand without going through
 `instalar.py`.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Ojo: el órgano de visión de Abyss, con verbos — nunca por gancho (T4.6).
+"""Ojo: el órgano de visión de Abyss, con verbos — nunca por gancho.
 
 Uso:
     python ojo.py mirar [ruta_salida.jpg] [indice_camara] [--proyecto <cwd>]
@@ -18,13 +18,13 @@ desde antes de esta tanda), cada verbo DELEGA entero en el módulo que de
 verdad lo implementa y ya tiene su propia batería de pruebas:
 
   - `texto` / `fotocopia` / `tarjeta` / `manual` → `lectura_visual._cli()`
-    (T4.3: OCR por el motor de Windows o `tesseract`; enderezar/umbralizar un
+    (OCR por el motor de Windows o `tesseract`; enderezar/umbralizar un
     documento fotografiado o escaneado; extraer una tarjeta a `.vcf`; ordenar
     varias fotos de un manual en markdown).
-  - `despiece` / `prompt3d` → `volumen._cli()` (T4.4: despiece por capas 2,5D
+  - `despiece` / `prompt3d` → `volumen._cli()` (despiece por capas 2,5D
     con GrabCut + nitidez/luminancia; o un prompt de diseño 3D con lo medido
     de la foto — paleta, proporción, horizonte, formas).
-  - `gestos` → `gestos._cli()` (T4.5: MediaPipe + vocabulario PROPIO del
+  - `gestos` → `gestos._cli()` (MediaPipe + vocabulario PROPIO del
     paquete; sirve el estado por HTTP SOLO en `127.0.0.1`).
 
 Cada módulo delegado declara sus propias dependencias opcionales y su propio

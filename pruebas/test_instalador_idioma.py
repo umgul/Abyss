@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`instalar.py` T5.2: español e inglés en el propio
+"""`instalar.py`: español e inglés en el propio
 instalador. Todo lo que ve el usuario (ventana, botones, avisos, tabla de
 módulos, mensajes de error, resumen final) pasa por `TEXTOS`/`_texto()`, con
 `--idioma es|en` o, por defecto, el idioma del sistema. Los guiones de
@@ -84,7 +84,7 @@ def _dependencias(idioma, extra_env=None):
 
 
 # Vocabulario de control castellano — exactamente el que cita la especificación
-# (T5.2, prueba de `--idioma en --listar`). Palabra completa (`\b`) e
+# (prueba de `--idioma en --listar`). Palabra completa (`\b`) e
 # insensible a mayúsculas: así "módulos" (plural, aparece en la línea de
 # `mapa_codigo`, que es documentación del código y se muestra en los dos
 # idiomas a propósito) no cuenta como la palabra de control "módulo".
@@ -97,7 +97,7 @@ def _palabras_de_control_presentes(texto):
 
 
 class ListarEnInglesNoLlevaVocabularioDeControlCastellano(unittest.TestCase):
-    """T5.2, prueba de la especificación, literal: "--idioma en --listar no
+    """Prueba de la especificación, literal: "--idioma en --listar no
     imprime ni una palabra de la lista castellana de control"."""
 
     def test_idioma_en_listar_sin_palabras_de_control(self):
@@ -205,7 +205,7 @@ class IdiomaEnNoDejaBloquesLargosSinTraducir(unittest.TestCase):
 
 
 class DependenciasYModulosCaenAlCastellanoSiFaltaLaTraduccion(unittest.TestCase):
-    """`_para_localizado()`/`_linea_localizada()` (T5.2): mismo fail-closed que
+    """`_para_localizado()`/`_linea_localizada()`: mismo fail-closed que
     `_texto()` — si una entrada NO declarara `para_en`/`linea_en`, cae al
     castellano de `para`/`linea` en vez de imprimir una fila muda o reventar."""
 
@@ -248,7 +248,7 @@ class DependenciasYModulosCaenAlCastellanoSiFaltaLaTraduccion(unittest.TestCase)
 
 
 class NingunTextoQuedaFueraDelDiccionario(unittest.TestCase):
-    """T5.2, prueba de la especificación, literal: "ningún texto del instalador
+    """Prueba de la especificación, literal: "ningún texto del instalador
     queda fuera del diccionario (una prueba que busca literales sospechosos en
     el código)". Escaneo estático por `ast`: cualquier cadena (o f-string con
     parte literal) que llegue de verdad al usuario — como argumento de
@@ -410,8 +410,8 @@ class TextoCaeACastellanoAntesQueReventar(unittest.TestCase):
 
 
 class IdiomaPorDefectoEsElDelSistemaSiNoEsElInvalido(unittest.TestCase):
-    """T5.2: "por defecto, el del sistema (locale.getdefaultlocale(); si no
-    empieza por es, inglés)". Se prueba `_idioma_sistema()` en proceso (rápido)
+    """Por defecto, el del sistema (locale.getdefaultlocale(); si no
+    empieza por es, inglés). Se prueba `_idioma_sistema()` en proceso (rápido)
     monkeypatcheando `locale.getdefaultlocale` — nunca cambia el locale de
     verdad del proceso de pruebas."""
 
@@ -435,7 +435,7 @@ class IdiomaPorDefectoEsElDelSistemaSiNoEsElInvalido(unittest.TestCase):
         with mock.patch.object(inst.locale, 'getdefaultlocale', return_value=(None, None)), \
              mock.patch.object(inst.os, 'environ', env_sin_idioma):
             self.assertEqual(inst._idioma_sistema(), 'en',
-                              'sin ninguna pista de idioma, T5.2 pide caer a inglés, nunca a castellano por defecto')
+                              'sin ninguna pista de idioma, debe caer a inglés, nunca a castellano por defecto')
 
 
 class InstalarYDesinstalarDefectoEsCastellanoSiempre(unittest.TestCase):

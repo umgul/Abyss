@@ -110,7 +110,7 @@ class ConstruirMapa(unittest.TestCase):
         self.assertEqual(arrancar['linea_ini'], MODULO_A.splitlines().index('    def arrancar(self, fuerte=False):') + 1)
 
     def test_lineas_fin_exactas_clase_metodo_y_funcion(self):
-        """T2.5, fallo "roza": `linea_fin` no tenía falsador — medido por
+        """Fallo "roza": `linea_fin` no tenía falsador — medido por
         mutación (sustituir TODOS los `node.end_lineno` por `node.lineno` en
         `mapa_codigo.py`, de modo que cada símbolo pasa a tener rango de una
         sola línea): las 19 pruebas anteriores seguían en verde porque solo se

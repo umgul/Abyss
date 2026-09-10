@@ -349,8 +349,8 @@ def cuantiles(canal, hist):
 
 
 def _valor_fmt(canal, v, con_unidad=True):
-    """Texto del valor de `canal`, con COMA decimal (castellano — T2.3 lo pide
-    con el ejemplo literal «ram libre 9,8 GB»; `infografia.py` ya trae `--es`/
+    """Texto del valor de `canal`, con COMA decimal (castellano: lo pide el
+    ejemplo literal «ram libre 9,8 GB»; `infografia.py` ya trae `--es`/
     `--no-es` para esto mismo en otra pieza de la misma tanda). Sin
     agrupación de miles: ningún canal de `cuerpo.py` llega a esa magnitud, así
     que un `.` -> `,` directo sobre el número ya formateado basta y no hace

@@ -1,4 +1,4 @@
-"""T5.2: `docs/leyes.md`/`docs/leyes.en.md` y `docs/AUDITORIA_DE_ABYSS.md`/
+"""`docs/leyes.md`/`docs/leyes.en.md` y `docs/AUDITORIA_DE_ABYSS.md`/
 `docs/AUDITORIA_DE_ABYSS.en.md` son pares espejo (igual que README.md/README.en.md).
 Tres cosas se comprueban de cada par:
 

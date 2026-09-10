@@ -74,7 +74,7 @@ fichero» y se sigue por la vía normal ya indicada (`<imagen>` o `--camara`),
 tal cual si `--escaner` no se hubiera puesto. Por eso `--escaner` nunca basta
 por sí solo: la vía normal (fichero o cámara) es obligatoria siempre, la
 acabe usando o no. **Este camino no se ejerce contra hardware real en la
-batería de pruebas del paquete** (T4.3): solo se prueba que detecta la
+batería de pruebas del paquete**: solo se prueba que detecta la
 ausencia sin reventar y cae a la vía normal sin error.
 
 Sin `--salida`: si la entrada es un fichero, `<carpeta_de_la_imagen>/
@@ -105,7 +105,7 @@ cada una de las imágenes dan uno (líneas «página N»/«page N», «N/M», o 
 es solo un número — el primer patrón que acierte en cada página manda); si falta en
 alguna, se queda con el orden en que se dieron los ficheros (declarado: no se
 adivina un orden a medias). Une palabras partidas por un guion de corte a final de
-línea («informa-» + «ción» → «información»); no une nada más. **Honestidad** (T4.3):
+línea («informa-» + «ción» → «información»); no une nada más. **Honestidad**:
 el guion NO RESUME — entrega el texto limpio y ordenado, con las líneas que detecta
 como paso numerado («1.», «Paso 2», «Step 3», una viñeta) reescritas a una lista
 markdown consistente; el resto del texto, tal cual lo leyó el motor. Resumir ese
@@ -241,7 +241,7 @@ def _tesseract_disponible():
 
 
 def _ocr_tesseract(ruta_tess, ruta_abs, idioma=None, timeout=30):
-    """Segunda vía (T4.3): TSV de `tesseract` (`left/top/width/height` por
+    """Segunda vía: TSV de `tesseract` (`left/top/width/height` por
     PALABRA) agrupado por línea (`block_num`,`par_num`,`line_num`) para dar el
     mismo formato de línea+caja que `ocr_win.ps1` — así `tarjeta`/`manual`
     funcionan igual con cualquiera de los dos motores. No medido en esta
@@ -300,7 +300,7 @@ def leer(ruta_imagen, idioma=None, avisar=print):
     (caja en píxeles; `x`/`y`/`ancho`/`alto` a 0 si el motor no la da). Nunca
     inventa texto ni posición: lo que no mide, no aparece.
 
-    Orden (T4.3, ver docstring del módulo): WinRT primero si esta máquina es
+    Orden (ver docstring del módulo): WinRT primero si esta máquina es
     Windows y el motor existe para el idioma pedido; si no, `tesseract` si está
     en el PATH; si ninguno, `SinMotorOCR` ("sin dato: no hay motor OCR").
 
@@ -410,7 +410,7 @@ def _enderezar_documento(img_bgr, avisar=print):
     """(imagen_bgr, recortado: bool). Busca el contorno cuadrilátero de mayor
     área que cubra al menos 1/5 de la imagen (bordes de Canny dilatados,
     `findContours` + `approxPolyDP` a 4 esquinas convexas) y aplica una
-    transformación de perspectiva. Sin ninguno así: NO recorta (declarado, T4.3)
+    transformación de perspectiva. Sin ninguno así: NO recorta (declarado)
     — solo endereza por el ángulo dominante de los bordes."""
     gris = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     borroso = cv2.GaussianBlur(gris, (5, 5), 0)
@@ -643,7 +643,7 @@ def escanear_wia(ruta_salida, timeout=60):
     absoluto (ni siquiera para preguntar si hay uno): existe para poder probar
     el camino "sin dato" sin depender de qué tenga enchufado la máquina que
     corre la suite, y sobre todo para que la suite NUNCA accione un escáner de
-    verdad (T4.3: ese camino no se ejerce contra hardware real) — mismo patrón
+    verdad (ese camino no se ejerce contra hardware real) — mismo patrón
     que `ABYSS_RENDER3D_NAVEGADOR`."""
     if os.environ.get('ABYSS_LECTURA_VISUAL_SIN_WIA'):
         return {'ok': False, 'motivo': 'sin dato: no hay escáner WIA conectado'}
@@ -700,7 +700,7 @@ def _clasificar_lineas(lineas_ocr):
 
 
 def _nombre_cargo_empresa(resto):
-    """Heurística declarada (T4.3 — "por posición y tamaño"): la línea de mayor
+    """Heurística declarada ("por posición y tamaño"): la línea de mayor
     ALTURA de caja es el nombre; entre las demás, la primera con un sufijo
     societario conocido es la empresa; la que quede, por orden de aparición, es
     el cargo. Lo que sobra se queda fuera (nunca se inventa un cargo)."""
@@ -878,7 +878,7 @@ def _cuerpo_pagina_md(lineas_texto):
 
 
 def manual(rutas_imagenes, idioma=None, avisar=print):
-    """Markdown de T4.3 (ver docstring del módulo): OCR de cada imagen, orden
+    """Markdown (ver docstring del módulo): OCR de cada imagen, orden
     por página SI TODAS la dan, guiones de corte unidos, pasos detectados
     reescritos como lista — el resto del texto tal cual. No resume nada."""
     paginas = []

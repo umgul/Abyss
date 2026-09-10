@@ -57,13 +57,13 @@ class VaraPropiaPorCuantiles(unittest.TestCase):
 
 
 class FormatoDecimalCastellano(unittest.TestCase):
-    """T2.3, fallo "roza" medido 7-sep: la línea del cuerpo imprimía los
+    """Fallo "roza" medido 7-sep: la línea del cuerpo imprimía los
     decimales con PUNTO, no con coma, contra el ejemplo literal de la propia
     especificación («ram libre 9,8 GB»). Medido con el gancho SessionStart
     real: «ram libre 22.0 GB» (con punto)."""
 
     def test_valor_fmt_usa_coma_no_punto(self):
-        # 10035 MB / 1024 = 9,8 GB — el mismo ejemplo literal de T2.3
+        # 10035 MB / 1024 = 9,8 GB — el mismo ejemplo literal
         self.assertEqual(cuerpo._valor_fmt('ram_libre_mb', 10035.0), '9,8 GB')
         self.assertNotIn('.', cuerpo._valor_fmt('ram_libre_mb', 10035.0))
 

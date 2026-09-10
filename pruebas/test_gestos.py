@@ -146,7 +146,7 @@ class PellizcoPorPercentiles(unittest.TestCase):
 
 
 class VocabularioPropio(unittest.TestCase):
-    """T4.5: "el vocabulario se puede sustituir por fichero" — `cargar_vocabulario()`
+    """El vocabulario se puede sustituir por fichero — `cargar_vocabulario()`
     mezcla un JSON propio SOLO en las claves que declare, sobre `VOCABULARIO_POR_DEFECTO`,
     y nunca copia el vocabulario del post (nada de "flor"/"aguacate"/"calavera" en ningún
     sitio de este módulo)."""
@@ -198,7 +198,7 @@ class VocabularioPropio(unittest.TestCase):
 
 
 class CapasAisladasPorDedos(unittest.TestCase):
-    """T4.5: "número de dedos = qué capa del despiece se aísla" — 0 todas, 1 la primera,
+    """Número de dedos = qué capa del despiece se aísla — 0 todas, 1 la primera,
     2 las dos primeras… NUNCA el vocabulario del post (esto maneja capas de una escena
     real de `render3d.py`, no invoca figuritas)."""
 
@@ -219,7 +219,7 @@ class CapasAisladasPorDedos(unittest.TestCase):
 
 
 class OrbitaDeLaPalma(unittest.TestCase):
-    """T4.5: "pose de la palma = órbita de la cámara" — mismo dato, vocabulario propio."""
+    """Pose de la palma = órbita de la cámara — mismo dato, vocabulario propio."""
 
     def test_alias_giro_e_inclinacion_de_yaw_y_pitch(self):
         pose = {'roll': 1.0, 'pitch': 12.5, 'yaw': -30.0}
@@ -230,7 +230,7 @@ class OrbitaDeLaPalma(unittest.TestCase):
 
 
 class CapturaPorQuietud(unittest.TestCase):
-    """T4.5: "mano abierta y quieta un segundo = capturar PNG"."""
+    """Mano abierta y quieta un segundo = capturar PNG."""
 
     def test_quieta_un_segundo_dispara_captura_una_sola_vez(self):
         d = gestos.DetectorCapturaPorQuietud(segundos=1.0, umbral_movimiento=0.04)
@@ -258,7 +258,7 @@ class CapturaPorQuietud(unittest.TestCase):
 
 
 class ServidorSoloEnLoopback(unittest.TestCase):
-    """T4.5, tercera prueba de la especificación: "el servidor local responde JSON y no
+    """Tercera prueba declarada: "el servidor local responde JSON y no
     escucha fuera de 127.0.0.1". Se llama directamente a `construir_servidor()` (no
     necesita `mediapipe`/`cv2`, `estado`/`cerrojo` son los únicos que usan los manejadores)."""
 
@@ -459,7 +459,7 @@ def _quitar_mediapipe_falso():
 
 
 class ModuloFalsoIntegracion(unittest.TestCase):
-    """T4.5, segunda prueba de la especificación, literal: "un módulo falso inyectado en
+    """Segunda prueba declarada, literal: "un módulo falso inyectado en
     sys.modules con 21 puntos sintéticos" ejercitando la regla del 1,7 y el pellizco por
     percentiles 10/90 a través del camino REAL (`crear_detector().process(...)` ->
     `manos_de_resultado()` -> `dedos_extendidos()`/`apertura_pellizco_bruta()`), no solo
@@ -500,7 +500,7 @@ class ModuloFalsoIntegracion(unittest.TestCase):
         self.assertEqual(info['dedos'], EXTENDIDOS_ESPERADOS)
         self.assertEqual(info['dedos_extendidos'], 3)
         self.assertIsInstance(info['pellizco'], float)
-        self.assertEqual(info['explosion'], info['pellizco'])  # alias, vocabulario propio (T4.5)
+        self.assertEqual(info['explosion'], info['pellizco'])  # alias, vocabulario propio
 
     def test_puntos_de_resultado_sin_mano_da_none(self):
         _inyectar_mediapipe_falso([])
@@ -549,7 +549,7 @@ class ModuloFalsoIntegracion(unittest.TestCase):
 
 
 class GestoAMediasNoCambiaLaEscena(unittest.TestCase):
-    """T4.5, cuarta prueba de la especificación: "un gesto a medias NO cambia la escena".
+    """Cuarta prueba declarada: "un gesto a medias NO cambia la escena".
     `procesar_fotograma([], ...)` (sin ninguna mano completa) da `None`, y el bucle de
     `main()` deja entonces el `estado` servido TAL CUAL — se comprueba aquí simulando ese
     contrato: aplicar un `None` nunca debe machacar el último estado bueno."""

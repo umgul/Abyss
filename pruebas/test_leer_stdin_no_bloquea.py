@@ -96,7 +96,7 @@ class OjoNoSeCuelgaConAbyssProyectoPuesto(unittest.TestCase):
             # índice de cámara 99: no existe de verdad en ninguna máquina de pruebas,
             # así ojo.py falla al abrir la "cámara" sin tocar hardware real — lo que
             # se está midiendo es si el PROCESO vuelve, no si hay foto.
-            # T4.6: ojo.py despacha por verbos y `mirar` es el que abre la cámara.
+            # ojo.py despacha por verbos y `mirar` es el que abre la cámara.
             [sys.executable, str(ay.script('ojo.py')), 'mirar', str(salida), '99'],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding='utf-8', errors='replace', env=env,

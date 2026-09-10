@@ -1,6 +1,6 @@
 # paquete-sintetico
 
-Paquete de PRUEBA para `pruebas/test_auditar.py` (T4.2): existe solo para que
+Paquete de PRUEBA para `pruebas/test_auditar.py`: existe solo para que
 `auditar.py` tenga algo sucio que auditar, con las tres cosas que pide el
 encargo — nunca se instala de verdad ni se referencia desde `settings.json`.
 

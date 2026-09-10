@@ -1,4 +1,4 @@
-# Abyss on Abyss (T4.2)
+# Abyss on Abyss
 
 *[Versión en castellano](AUDITORIA_DE_ABYSS.md)*
 
@@ -54,7 +54,7 @@ English mirror of [`docs/AUDITORIA_DE_ABYSS.md`](AUDITORIA_DE_ABYSS.md): the fir
 python abyss/auditar.py . --markdown docs/AUDITORIA_DE_ABYSS.md
 ```
 
-`auditar.py` has no `--idioma` flag and, per T5.2, keeps its own printed
+`auditar.py` has no `--idioma` flag and keeps its own printed
 output in Spanish (only `instalar.py`'s own text is bilingual) — so
 everything below, from the verdict line onward, is the SAME output the
 script wrote (`a_markdown()`), copied as is, not a second run and not a

@@ -21,7 +21,7 @@ de sierra; cuesta unas N² veces más en el dibujo. --acabado: capa final extra 
 más bajo que repasa lo que quedó sin cubrir. Las dos se miden: el error medio se imprime siempre.
 Ambas valen para cualquier --estilo (una capa más, o un tamaño mayor, del mismo motor).
 
-## Estilos (T3.2): un dict de parámetros, no un algoritmo distinto
+## Estilos: un dict de parámetros, no un algoritmo distinto
 
 `--estilo` elige un dict de partida (tabla abajo); cualquier bandera suelta (`--radios`,
 `--umbral`, `--longitud`, `--alfa`, `--jitter-color`, `--jitter-rumbo`, `--papel`,
@@ -55,7 +55,7 @@ cuadro igual (papel de fondo, cada capa compuesta con su alfa). Para no cambiar 
 otras tres claves del `.json.gz` (`W`, `H`, `trazos` — de las que ya dependen pruebas y guiones),
 esos tres datos viajan DENTRO de `"radios"`, que pasa de ser una lista a un dict:
 `"radios": {"lista": [...], "estilo": "acuarela", "papel": "#faf7f0", "alfa": 0.42}`.
-Un `.json.gz` viejo (de antes de T3.2, con `"radios"` como lista) se sigue leyendo: sin ese dict,
+Un `.json.gz` viejo (con `"radios"` como lista) se sigue leyendo: sin ese dict,
 `video_pintura.py` asume `estilo="oleo"`, el papel oscuro de siempre y alfa 1.0.
 
 Salida (en --salida; por defecto, junto a la foto):
@@ -130,7 +130,7 @@ input{vertical-align:middle}</style></head><body>
 <canvas id="c" width="%(W)d" height="%(H)d"></canvas>
 <script>
 const T=%(trazos)s;
-const PAPEL=%(papel)s,ALFA=%(alfa)s;  // del estilo (T3.2): antes esta plantilla los ignoraba
+const PAPEL=%(papel)s,ALFA=%(alfa)s;  // del estilo: antes esta plantilla los ignoraba
 const c=document.getElementById('c'),x=c.getContext('2d'),n=document.getElementById('n'),v=document.getElementById('v');
 x.lineCap='round';x.lineJoin='round';let i=0,run=false;
 // alfa<1 (impresionista/acuarela/pastel/carbon): cada capa (grupo de radio) se pinta aparte y se

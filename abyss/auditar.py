@@ -16,7 +16,7 @@ sale de leer texto y, para el historial, de `git log` LOCAL sobre el propio
 `.git` del paquete (`git log` no toca ningún remoto — sigue siendo "sin red").
 Auditar un paquete malicioso con este guion no lo dispara: solo se lee.
 
-Las cinco comprobaciones (T4.2 §comprobación N — cada una devuelve su propio dict
+Las cinco comprobaciones (§comprobación N — cada una devuelve su propio dict
 con `evidencia` y, si procede, `hallazgos`):
 
   1. **Procedencia**: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
@@ -46,7 +46,7 @@ con `evidencia` y, si procede, `hallazgos`):
      "manifiesto", "backup"...). Escribir fuera Y no declarar cómo deshacerlo es
      `rompe`; escribir fuera con un README que sí lo explica no genera hallazgo
      (es evidencia igualmente, para poder leerla).
-  4. **Qué sale de la máquina** (la comprobación que importa de verdad, T4.2): TODOS
+  4. **Qué sale de la máquina** (la comprobación que importa de verdad): TODOS
      los hosts de red del paquete — no solo el CÓDIGO: `EXT_RED` (arreglo posterior
      al primer informe) es `EXT_CODIGO` MÁS los ficheros de datos y configuración
      (`.json`, `.yaml`/`.yml`, `.toml`, `.ini`, `.cfg`, `.env`, `.txt`, `.bat`/`.cmd`),
@@ -75,8 +75,8 @@ con `evidencia` y, si procede, `hallazgos`):
      `pollinations.ai` y `pollinations.ai` se leen igual de rápido y el guion no
      sabe distinguirlos.
 
-Veredicto en tres niveles (como `/esceptico`, con otro vocabulario para paquetes,
-T4.2): **rompe** (hace algo que no declara: comprobaciones 2-4), **engaña**
+Veredicto en tres niveles (como `/esceptico`, con otro vocabulario para
+paquetes): **rompe** (hace algo que no declara: comprobaciones 2-4), **engaña**
 (declara algo que no cumple — no se infiere aquí de forma automática: hace falta
 saber qué afirma el README para saber que miente, y eso lo lee una persona o el
 Opus de `/esceptico --paquete`, no un regex; queda declarado como límite, no
@@ -128,7 +128,7 @@ EXCLUIR_DIRS_SIEMPRE = {'.git', 'venv', '.venv', 'node_modules', '__pycache__',
 # vendor/dist/build SÍ son contenido del paquete (terceros embebidos): se excluyen
 # de "código propio" (comprobaciones 2, 3 y la parte "propia" de la 4) pero la
 # comprobación 4 los recorre APARTE (`_listar_ficheros_terceros_embebidos`) en vez
-# de callarlos — arreglo T4.2, ver docstring del módulo.
+# de callarlos — ver docstring del módulo.
 DIRS_TERCEROS_EMBEBIDOS = {'vendor', 'dist', 'build'}
 # Las pruebas son contenido del paquete, pero sus hosts son ATREZO, no llamadas: un
 # fichero que prueba a un auditor tiene que inventarse dominios para que los cace. Antes
@@ -139,7 +139,7 @@ DIRS_TERCEROS_EMBEBIDOS = {'vendor', 'dist', 'build'}
 DIRS_PRUEBAS = {'pruebas', 'tests', 'test'}
 EXCLUIR_DIRS = EXCLUIR_DIRS_SIEMPRE | DIRS_TERCEROS_EMBEBIDOS | DIRS_PRUEBAS
 EXT_CODIGO = {'.py', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.ps1', '.sh', '.rb', '.go'}
-# Ficheros de datos/configuración: la comprobación 4 (T4.2 arreglo) también los
+# Ficheros de datos/configuración: la comprobación 4 también los
 # lee, porque un host puesto aquí y leído por el código (`cfg['endpoint']`) sale
 # de la máquina igual que uno escrito a mano en un `.py` — antes pasaba sin verse.
 EXT_DATOS = {'.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.env', '.txt', '.bat', '.cmd'}
@@ -212,7 +212,7 @@ def _listar_ficheros(ruta, extensiones, excluir=EXCLUIR_DIRS):
 def _listar_ficheros_terceros_embebidos(ruta, extensiones):
     """Como `_listar_ficheros`, pero SOLO lo que cae bajo alguna carpeta
     `vendor/`, `dist/` o `build/` de `ruta` (a cualquier profundidad) — usada
-    por la comprobación 4 para declarar esos hosts APARTE (T4.2 arreglo) en vez
+    por la comprobación 4 para declarar esos hosts APARTE en vez
     de saltárselos en silencio como hacían las comprobaciones 2 y 3. Sigue sin
     bajar a `EXCLUIR_DIRS_SIEMPRE` (un `.git` o `node_modules` anidado dentro de
     `vendor/` tampoco es contenido legible del paquete)."""
@@ -693,7 +693,7 @@ def extraer_hosts_codigo(ruta):
     """{host: [(fichero_relativo, línea), ...]} del código Y de los ficheros de
     datos/configuración PROPIOS de `ruta` (`EXT_RED` = `EXT_CODIGO` más
     `.json`/`.yaml`/`.yml`/`.toml`/`.ini`/`.cfg`/`.env`/`.txt`/`.bat`/`.cmd` —
-    T4.2 arreglo: antes solo se leía `EXT_CODIGO` y un host puesto en un
+    Arreglo: antes solo se leía `EXT_CODIGO` y un host puesto en un
     `.json` de configuración pasaba entero sin verse), nunca `vendor/dist/build`
     (leídos aparte por `extraer_hosts_terceros_embebidos`, nunca como código
     propio) NI los propios `RUTAS_MANIFIESTO` (ver la constante: su
@@ -711,7 +711,7 @@ def extraer_hosts_pruebas(ruta):
 
 def extraer_hosts_terceros_embebidos(ruta):
     """Igual que `extraer_hosts_codigo`, pero solo de lo que cae bajo
-    `vendor/`, `dist/` o `build/` (T4.2 arreglo): antes esas carpetas se
+    `vendor/`, `dist/` o `build/`: antes esas carpetas se
     saltaban EN SILENCIO en la comprobación 4 y un "sin hallazgos" no
     distinguía "no hay nada" de "no miré ahí". Se declaran aparte a propósito:
     nunca cuentan como código de ESTE paquete, así que nunca generan hallazgo
@@ -798,8 +798,8 @@ def _texto_historia_git(g):
 
 
 def _que_no_leyo(r):
-    """Lista de lo que ESTA pasada no leyó, declarado en vez de callado (T4.2
-    arreglo, misma disciplina que `vigia.py` aplica a sus falsos negativos): un
+    """Lista de lo que ESTA pasada no leyó, declarado en vez de callado (arreglo,
+    misma disciplina que `vigia.py` aplica a sus falsos negativos): un
     "sin hallazgos" sin esta lista no distingue "no hay nada" de "no miré ahí".
     Se usa igual con o sin hallazgos — el límite no depende del resultado."""
     terceros = r['red']['hosts_terceros_embebidos']

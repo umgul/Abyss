@@ -176,7 +176,7 @@ class TallerSinDiffusers(unittest.TestCase):
 
 
 class TallerSoloEscuchaEnLoopback(unittest.TestCase):
-    """T2.8, fallo "roza": el docstring de la propia prueba afirmaba el límite
+    """Fallo "roza": el docstring de la propia prueba afirmaba el límite
     ("nunca en otra interfaz que no sea 127.0.0.1") sin que ninguna prueba lo
     comprobara — medido por mutación (cambiar `('127.0.0.1', puerto)` por
     `('0.0.0.0', puerto)`), las 5 pruebas de antes seguían en verde. Se llama

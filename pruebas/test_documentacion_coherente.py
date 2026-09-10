@@ -188,15 +188,15 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     `docs/leyes.md` tiene SEIS leyes numeradas, más una sección de resumen final
     que no es una séptima ley).
 
-    T4.2 (7-sep) añadió `docs/AUDITORIA_DE_ABYSS.md` (el primer informe de
+    El 7-sep se añadió `docs/AUDITORIA_DE_ABYSS.md` (el primer informe de
     `auditar.py`, corrido sobre el propio paquete) a la lista blanca: sigue sin
     haber fichas de diseño personales, pero la lista de lo permitido en `docs/`
     tenía que crecer con ese fichero o quedaba una lista blanca desactualizada
     tumbando la suite entera.
 
-    T5.2 (7-sep) añadió los espejos en inglés que la propia especificación pide
-    («se añaden `docs/leyes.en.md` y ... `docs/AUDITORIA_DE_ABYSS.en.md`»):
-    misma razón, la lista blanca vuelve a
+    También el 7-sep se añadieron los espejos en inglés que este paquete
+    se pide a sí mismo («se añaden `docs/leyes.en.md` y ...
+    `docs/AUDITORIA_DE_ABYSS.en.md`»): misma razón, la lista blanca vuelve a
     crecer con esos dos ficheros o la suite entera queda en rojo por un
     requisito de la propia especificación."""
 
@@ -214,7 +214,7 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
         self.assertEqual(nombres, permitidos,
                           'docs/ no debe llevar más que la lista blanca declarada: el leyes.md '
                           'destilado (y su espejo en inglés), el ejemplo de ganchos, y el informe '
-                          'de auditoría de T4.2 (y su espejo en inglés de T5.2)')
+                          'de auditoría (y su espejo en inglés)')
 
     def test_leyes_md_tiene_exactamente_seis_leyes_numeradas(self):
         texto = (RAIZ / 'docs' / 'leyes.md').read_text(encoding='utf-8')
@@ -276,7 +276,7 @@ class ReadmesDicenElCasoCrlfDelLimiteHonesto(unittest.TestCase):
 
 
 class ReadmeNoVendeLosVerbosDeLaManoComoHechos(unittest.TestCase):
-    """Fallo "engaña" medido 7-sep (T4.5): README.md describía los cinco verbos de
+    """Fallo "engaña" medido 7-sep: README.md describía los cinco verbos de
     `gestos.py` como si ya movieran algo en pantalla («número de dedos aísla capas
     del despiece, pellizco desliza la explosión, pose de la palma orbita la
     cámara, mano abierta y quieta un segundo captura PNG, dos manos escalan») —

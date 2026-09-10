@@ -1,6 +1,6 @@
 # Abyss funciona con la biblioteca estándar de Python 3.12+ salvo para piezas opcionales.
 # Todas van comentadas a propósito: instala solo la que necesites (quita el # de su línea),
-# o mejor, deja que el propio paquete lo resuelva por ti (quinta tanda, T5.1):
+# o mejor, deja que el propio paquete lo resuelva por ti (quinta tanda):
 #
 #   python instalar.py --dependencias                  (qué falta, por módulo, con tamaño aprox.)
 #   python instalar.py --instalar-dependencias imagen   (instala SOLO lo que de verdad falte)

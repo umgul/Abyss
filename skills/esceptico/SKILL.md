@@ -62,7 +62,7 @@ vara que medir aquí — solo el procedimiento.
    fichero original — el veredicto vive aparte, y decidir qué hacer con él es
    de quien pidió la revisión.
 
-## Procedimiento `--paquete <ruta>` (T4.2: auditar un paquete antes de instalarlo)
+## Procedimiento `--paquete <ruta>` (auditar un paquete antes de instalarlo)
 
 Mismo espíritu ("verificar antes de construir"), aplicado a un paquete
 entero en vez de a un plan de texto — antes de instalarlo, no después de que
@@ -88,7 +88,7 @@ ya haya corrido un gancho suyo:
    > manifiestos, el código que el informe señala por fichero:línea, y
    > cualquier otro fichero que te parezca relevante) y buscar lo que el
    > automatismo NO puede ver por regex: si el README promete algo que el
-   > código no cumple (`engaña`, T4.2 — el automatismo declara que esto
+   > código no cumple (`engaña` — el automatismo declara que esto
    > necesita a alguien que lea, no un patrón), un host construido por
    > concatenación que el regex no cazó, un gancho o llamada peligrosa que el
    > informe no marcó como hallazgo pero sí merece una lectura, o cualquier

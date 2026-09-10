@@ -79,7 +79,7 @@ class EscenaJsonCLI(unittest.TestCase):
         self.assertTrue(_sin_url_externa(html), "la página no debe referenciar ninguna URL externa")
 
     def test_html_se_escribe_siempre_aunque_no_se_pida_bandera(self):
-        """El HTML es el propio resultado de T3.1 (a diferencia de `pintor.py`, donde
+        """El HTML es el propio resultado (a diferencia de `pintor.py`, donde
         `--html` es un extra opcional): se escribe exista o no la bandera `--html`."""
         tmp = tempfile.mkdtemp(prefix="abyss_render3d_")
         entrada = os.path.join(tmp, "escena_prueba.json")

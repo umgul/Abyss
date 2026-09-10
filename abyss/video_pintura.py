@@ -11,13 +11,13 @@ Uso:
 --retrato: atajo para dos ojos de un retrato centrado (0.37,0.33 y 0.63,0.33).
 Sin foco, la capa fina se pinta en el orden en que se pintó.
 
-Estilos (T3.2, `pintor.py`): el `.json.gz` guarda el papel de fondo y el alfa de capa dentro de
+Estilos (`pintor.py`): el `.json.gz` guarda el papel de fondo y el alfa de capa dentro de
 `"radios"` (`{"lista", "estilo", "papel", "alfa"}` — ver el docstring de `pintor.py`). Este guion
 los lee: pinta sobre ESE papel (no un negro fijo) y, si el estilo pinta con alfa < 1 (acuarela,
 impresionista, pastel, carbón), compone cada capa (grupo de radio) de una vez con su alfa sobre lo
 ya pintado, igual que hace `pintor.pintar()` — así el vídeo no oscurece de más donde los trazos de
 una misma capa se solapan. Con alfa = 1 (óleo, tinta) pinta directo, como siempre: más rápido y
-sin componer nada. Un `.json.gz` de antes de T3.2 (sin ese dict) se sigue leyendo: sin él, se
+sin componer nada. Un `.json.gz` viejo (sin ese dict) se sigue leyendo: sin él, se
 asume óleo (papel oscuro de siempre, alfa 1).
 
 Depende de Pillow e imageio_ffmpeg (pip install imageio-ffmpeg). Todo en local. Si falta
@@ -62,7 +62,7 @@ def video(trazos_gz, salida, segundos=9.0, ancho=1080, fps=30, foco=None, hold_i
     d = json.load(gzip.open(trazos_gz, "rt", encoding="utf-8"))
     W0, H0, T = d["W"], d["H"], d["trazos"]
     meta = d.get("radios")
-    meta = meta if isinstance(meta, dict) else {}  # .json.gz de antes de T3.2: "radios" era una lista
+    meta = meta if isinstance(meta, dict) else {}  # .json.gz viejo: "radios" era una lista
     papel = _rgb_de_hex(meta.get("papel"))
     alfa_estilo = float(meta.get("alfa", 1.0))
     s = ancho / W0

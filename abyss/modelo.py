@@ -152,7 +152,7 @@ def recorrer(tp):
     usuario, con el modelo y el primer texto de la respuesta. También el último
     /model y si fue posterior a la última respuesta.
 
-    Paréntesis (T2.1/T2 ronda 2): cualquier línea cuya `timestamp` cae dentro de
+    Paréntesis: cualquier línea cuya `timestamp` cae dentro de
     un tramo abierto de esta sesión (`parentesis.en_parentesis()`) se salta
     ENTERA — ni como turno de usuario, ni como respuesta ni como modelo. Fallo
     "engaña" medido 7-sep: esta función leía el transcript VIVO sin mirar el

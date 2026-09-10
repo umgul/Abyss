@@ -36,7 +36,7 @@ _STDIN = rutas.leer_stdin_si_hace_falta(sys.argv[1:])
 proj, mem = rutas.resolver(sys.argv[1:], _STDIN)
 os.environ['ABYSS_PROYECTO'] = proj  # para que quien nos importe después no tenga que releer stdin
 
-# Paréntesis (T2.1): se importa DESPUÉS de fijar ABYSS_PROYECTO (igual que hace
+# Paréntesis: se importa DESPUÉS de fijar ABYSS_PROYECTO (igual que hace
 # continuidad.py con este mismo módulo) para que la propia resolución de
 # `parentesis.py` no vuelva a tocar stdin.
 try:
@@ -75,12 +75,12 @@ def archivos_sesion(directorio):
 
 
 def medir(path):
-    """... Paréntesis (T2.1): cualquier línea cuya `timestamp` cae dentro de un
+    """... Paréntesis: cualquier línea cuya `timestamp` cae dentro de un
     tramo abierto de esta sesión (`parentesis.en_parentesis()`) se salta ENTERA
     — igual que `continuidad.frases_usuario()` — así ni sus turnos, ni sus
     palabras, ni las fichas o sondas que mencione entran en la medida. Fallo
-    medido 7-sep (T2.1 exige que "propiocepción... ignore el tramo" y no lo
-    hacía en absoluto: esta función nunca llamaba a `en_parentesis()`)."""
+    medido 7-sep: la propiocepción debía ignorar el tramo y no lo hacía en
+    absoluto — esta función nunca llamaba a `en_parentesis()`."""
     base = os.path.basename(path)
     if base.endswith('.jsonl.gz'):
         sid = base[:-9]

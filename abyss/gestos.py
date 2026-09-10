@@ -68,7 +68,7 @@ no invoca objetos: MANEJA la escena de despiece que ya sabe abrir `render3d.py`.
   queda en su último valor bueno (o en `ESTADO_INICIAL` si aún no hubo ninguno). Nunca se
   predice ni se extrapola un punto que falta.
 
-## Vocabulario PROPIO (T4.5) — la mano no invoca objetos, MANEJA el despiece
+## Vocabulario PROPIO — la mano no invoca objetos, MANEJA el despiece
 
 Cada fila es cambiable por fichero (`--vocabulario f.json`, p. ej. guardado en
 `mem/gestos_vocabulario.json` del proyecto de quien lo use — este guion no lo busca solo
@@ -102,7 +102,7 @@ Con `--escena f.json`, lee sus grupos (mismo `escena.json` de `render3d.py`/`vol
 y arranca con `capas_visibles` = TODAS (0 dedos todavía). `--holograma` solo viaja como un
 campo más del estado (`true`); ESTE guion no dibuja nada.
 
-**Límite declarado y honesto**: la especificación (T4.5) pide que "la página de
+**Límite declarado y honesto**: este paquete se pide a sí mismo que "la página de
 `render3d.py` lo lea y reaccione" a este estado — eso exigiría añadir JS de sondeo a la
 página que genera `render3d.py`, y el encargo de esta tanda para este guion limita los
 cambios en `render3d.py` a AÑADIR `--holograma` (cuatro cuadrantes), nada más. Esa
@@ -149,7 +149,7 @@ DEDOS = (
     ('menique', 17, 20),
 )
 RATIO_EXTENDIDO_HEREDADO = 1.7  # del post citado (ver docstring), no medido aquí todavía
-MUESTRAS_PARA_VARA = 30         # T4.5: por debajo de esto, «sin vara todavía (n=…)»
+MUESTRAS_PARA_VARA = 30         # por debajo de esto, «sin vara todavía (n=…)»
 
 VOCABULARIO_POR_DEFECTO = {
     'ratio_dedo_extendido': RATIO_EXTENDIDO_HEREDADO,
@@ -246,14 +246,14 @@ def apertura_pellizco_bruta(puntos):
 
 def distancia_entre_manos(manos_puntos):
     """Distancia entre las muñecas (punto 0) de las DOS primeras manos de
-    `manos_puntos` — "dos manos = escala" (T4.5). `None` con menos de dos manos."""
+    `manos_puntos` — "dos manos = escala". `None` con menos de dos manos."""
     if len(manos_puntos) < 2:
         return None
     return _dist(manos_puntos[0][WRIST], manos_puntos[1][WRIST])
 
 
 def capas_visibles_por_dedos(grupos, n_dedos):
-    """"número de dedos = qué capa del despiece se aísla" (T4.5): 0 dedos → TODAS las
+    """"número de dedos = qué capa del despiece se aísla": 0 dedos → TODAS las
     capas; 1 → solo la primera; 2 → las dos primeras… hasta el total de `grupos` (pedir
     más dedos que capas no revienta: satura al total, nunca inventa una capa de más).
     `None` si no hay ninguna escena cargada (`grupos` es `None`)."""
@@ -265,7 +265,7 @@ def capas_visibles_por_dedos(grupos, n_dedos):
 
 
 def orbita_de_pose(pose):
-    """"pose de la palma = órbita de la cámara" (T4.5): el MISMO número que da
+    """"pose de la palma = órbita de la cámara": el MISMO número que da
     `pose_palma()`, con los dos nombres que usa una órbita de cámara (`giro`=yaw,
     `inclinacion`=pitch) en vez de los de una IMU (roll/pitch/yaw) — ningún cálculo
     nuevo, un vocabulario propio sobre el mismo dato. `None` si no hay pose."""
@@ -280,7 +280,7 @@ class NormalizadorPercentil:
     `vigia.py`, aplicado aquí a una señal continua en vez de a un conteo por sesión): 0,0 en
     el percentil 10 o por debajo, 1,0 en el percentil 90 o por encima, lineal entre medias.
 
-    Arranque en frío (T4.5): con menos de `minimo` muestras (30 por defecto, vocabulario
+    Arranque en frío: con menos de `minimo` muestras (30 por defecto, vocabulario
     `muestras_para_vara`) no hay distribución que valga — `normalizar()` devuelve 0,5 (ni
     un extremo ni el otro) en vez de fingir un corte sobre un puñado de lecturas, y
     `descripcion()` lo dice: «sin vara todavía (n=…)» (mismo patrón de aviso que
@@ -359,7 +359,7 @@ class FiltroUnaEuro:
 
 
 class DetectorCapturaPorQuietud:
-    """"Mano abierta y quieta un segundo = capturar PNG" (T4.5): sigue, fotograma a
+    """"Mano abierta y quieta un segundo = capturar PNG": sigue, fotograma a
     fotograma, si los 5 dedos están extendidos Y la muñeca apenas se mueve; cuando eso
     dura ≥ `segundos` (parámetro del vocabulario `segundos_captura_quieta`) declara el
     gesto `"captura"` UNA sola vez — mientras la mano se mantenga abierta y quieta no
@@ -489,7 +489,7 @@ def procesar_puntos(puntos, ancho, alto, normalizador_pellizco, ratio=RATIO_EXTE
         'dedos_extendidos': sum(1 for v in dedos.values() if v),
         'pellizco_bruto': round(bruto, 5),
         'pellizco': pellizco,
-        'explosion': pellizco,  # alias: "pellizco = deslizador de explosión" (T4.5)
+        'explosion': pellizco,  # alias: "pellizco = deslizador de explosión"
         'vara_pellizco': normalizador_pellizco.descripcion(),
         'pose': pose,
         'orbita': orbita_de_pose(pose),

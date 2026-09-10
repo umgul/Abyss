@@ -88,7 +88,7 @@ de ESTA máquina, no una ley: en otra más cargada (antivirus escaneando cada
 `powershell.exe` nuevo, disco más lento) puede ser mayor, y el mecanismo de
 abajo está para eso.
 
-Coste declarado como problema, no escondido (T2.2): `mem/huella/_costes.json`
+Coste declarado como problema, no escondido: `mem/huella/_costes.json`
 guarda las últimas 30 medidas de coste (ms) de la foto. Con menos de 3 medidas
 todavía no hay mediana que valga, así que `--herramienta` fotografía siempre
 (para poder medir). Con 3 o más, si la MEDIANA de esas medidas supera 1500 ms,
@@ -119,7 +119,7 @@ instrumento de esta máquina falló: si `foto()` devuelve `None` en un campo, el
 informe lo dice explícitamente («sin dato: no se pudo consultar») en vez de
 mostrar una lista vacía que parecería un «no hay nada».
 
-Diseño para las pruebas (igual que `cuerpo.py`, T2.3): NINGUNA función de este
+Diseño para las pruebas (igual que `cuerpo.py`): NINGUNA función de este
 módulo toca `rutas.resolver()` ni stdin al importarse — todas reciben `mem`
 como argumento. Solo `if __name__ == '__main__':` resuelve `proj`/`mem` y lee
 stdin. Así se puede importar el módulo directamente en las pruebas y
@@ -144,7 +144,7 @@ except ImportError:
     import rutas
 
 DIRNOMBRE = 'huella'
-TOPE_MEDIANA_MS = 1500     # T2.2: por encima de esto, fotografiar solo tras comandos "persistentes"
+TOPE_MEDIANA_MS = 1500     # por encima de esto, fotografiar solo tras comandos "persistentes"
 MIN_MEDIDAS_COSTE = 3      # con menos medidas de coste, no hay mediana fiable: se fotografía siempre
 VENTANA_COSTES = 30        # cuántas medidas de coste recientes se conservan
 HEURISTICA_PERSISTENTE = ('start', 'python', 'node', 'serve', 'nohup')  # + el carácter '&' aparte
@@ -237,7 +237,7 @@ def _powershell(cmd, timeout=8):
     absoluto. `pid` es el PID del propio `powershell.exe` lanzado — se necesita
     con `Popen` (no `subprocess.run`, que no lo expone) porque quien fotografía
     procesos (`foto()`) tiene que poder EXCLUIRSE a sí mismo: mientras este
-    `powershell.exe` ejecuta `Get-Process`, se ve vivo a sí mismo (fallo T2.2
+    `powershell.exe` ejecuta `Get-Process`, se ve vivo a sí mismo (fallo
     medido 7-sep, ver docstring del módulo)."""
     try:
         proc = subprocess.Popen(['powershell', '-NoProfile', '-NonInteractive', '-Command', cmd],
@@ -380,7 +380,7 @@ def leer_procesos_posix():
 
 def _pids_propios(pid_powershell=None):
     """PIDs del árbol del propio gancho que NUNCA deben contar como
-    "proceso_nuevo" de la sesión (fallo T2.2 medido 7-sep: con un solo `Bash`
+    "proceso_nuevo" de la sesión (fallo medido 7-sep: con un solo `Bash`
     inocuo, `diferencias()` cazaba `bash`/`powershell`/`python` — el shell que
     invocó el gancho, el `python` de este mismo `huella.py`, y el
     `powershell.exe` que `foto()` acababa de lanzar para MEDIRSE a sí mismo —
@@ -400,7 +400,7 @@ def foto():
     """({'puertos': {...}|None, 'procesos': {...}|None}, coste_ms) — coste_ms es
     SOLO el tiempo de esta llamada, para que `registrar_comando()` lo vaya
     apuntando en `mem/huella/_costes.json`. `procesos` nunca incluye el árbol
-    del propio gancho (`_pids_propios()`, T2.2): ni este mismo intérprete, ni
+    del propio gancho (`_pids_propios()`): ni este mismo intérprete, ni
     quien lo invocó, ni el instrumento (`powershell.exe` en Windows) que
     acaba de tomar la foto — ver `_pids_propios()`."""
     t0 = time.perf_counter()
@@ -509,7 +509,7 @@ def registrar_comando(mem, sid, comando):
 # ---------- --informe / --limpiar ----------
 
 def _raiz(ruta):
-    """Raíz para agrupar (T2.2: «agrupados por raíz»): unidad + primer directorio
+    """Raíz para agrupar («agrupados por raíz»): unidad + primer directorio
     en Windows (`C:\\Users`), `/` + primer directorio en POSIX (`/tmp`).
     Heurística de agrupación, no una ruta canónica."""
     partes = Path(ruta).parts
@@ -589,7 +589,7 @@ def resumen_stop(mem, sid):
     `proceso_nuevo`/`puerto_nuevo` se detectó (`registrar_comando()` la guarda
     como base tras cada diferencia), así que comparar el registro contra ella
     es tautológico: cualquier cosa cazada como "nueva" sale SIEMPRE "viva" en
-    `--fin`, aunque ya llevara rato muerta (fallo T2.2 medido 7-sep: un `Bash`
+    `--fin`, aunque ya llevara rato muerta (fallo medido 7-sep: un `Bash`
     con `echo uno` bastaba para que `--fin` avisara de "3 proceso" que en ese
     mismo instante `--informe`, con una foto fresca, ya no veía). Para no
     pagar esa foto cuando no hace falta, solo se toma si hay algún

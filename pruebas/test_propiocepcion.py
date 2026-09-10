@@ -4,8 +4,8 @@ debe quedar FUERA de la medida, igual que `continuidad.frases_usuario()`.
 Fallo medido 7-sep: `medir()` nunca llamaba a `parentesis.en_parentesis()`, así
 que los turnos/palabras/fichas de dentro de un tramo abierto SÍ entraban en
 `mem/propiocepcion.json` (y de ahí al reloj de la sesión vía
-`continuidad.hacer_reloj()`) — contra lo que exige T2.1 ("propiocepción...
-ignoran el tramo"). `test_arranque_en_frio.py` ya cubre el arranque en frío de
+`continuidad.hacer_reloj()`) — cuando la propiocepción debía ignorar el
+tramo. `test_arranque_en_frio.py` ya cubre el arranque en frío de
 este mismo módulo; aquí solo el tramo.
 """
 import sys

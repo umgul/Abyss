@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""`instalar.py` T5.1: el instalador resuelve las
+"""`instalar.py`: el instalador resuelve las
 dependencias de terceros de cada módulo por sí mismo, con consentimiento y sin
 mentir. Regla dura 6 del encargo: NADA de esto instala un paquete de verdad —
 cada prueba que ejercita `--instalar-dependencias`/`instalar_dependencias()`
@@ -82,7 +82,7 @@ class RegistroDeDependenciasPorModulo(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# T5.1, prueba de la especificación: "--dependencias sobre un entorno con una
+# Prueba de la especificación: "--dependencias sobre un entorno con una
 # dependencia presente y otra ausente marca exactamente esa".
 # ---------------------------------------------------------------------------------
 class EstadoDeDependenciasMarcaExactamenteLoQueFalta(unittest.TestCase):
@@ -119,7 +119,7 @@ class EstadoDeDependenciasMarcaExactamenteLoQueFalta(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# T5.1, prueba de la especificación: "--instalar-dependencias imagen llama a
+# Prueba de la especificación: "--instalar-dependencias imagen llama a
 # sys.executable -m pip install con los paquetes de imagen y con ninguno más".
 # ---------------------------------------------------------------------------------
 class InstalarDependenciasLlamaAPipConLosPaquetesDelModuloYNadaMas(unittest.TestCase):
@@ -165,7 +165,7 @@ class InstalarDependenciasLlamaAPipConLosPaquetesDelModuloYNadaMas(unittest.Test
             self.assertEqual(len(cmd) - cmd.index('install') - 1, 1, cmd)
 
     def test_comando_se_enseña_antes_y_el_resultado_despues(self):
-        """T5.1: 'enseñando el comando antes de correrlo y el resultado después.
+        """'Enseñando el comando antes de correrlo y el resultado después.
         Nunca en silencio.'"""
         inst = _cargar_instalador()
 
@@ -209,7 +209,7 @@ class SinNadaQueInstalarNoLlamaAPip(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# T5.1, prueba de la especificación: "si el pip simulado falla, el resumen lo
+# Prueba de la especificación: "si el pip simulado falla, el resumen lo
 # dice y el código de salida no es 0".
 # ---------------------------------------------------------------------------------
 class PipSimuladoQueFallaSeCuentaYNoDaCodigoDeSalida0(unittest.TestCase):
@@ -234,7 +234,7 @@ class PipSimuladoQueFallaSeCuentaYNoDaCodigoDeSalida0(unittest.TestCase):
             mensajes)
 
     def test_un_fallo_no_frena_el_resto_de_paquetes(self):
-        """T5.1: 'se dice ... y se sigue con el resto. No se reintenta solo.'"""
+        """'Se dice ... y se sigue con el resto. No se reintenta solo.'"""
         inst = _cargar_instalador()
         llamados = []
 
@@ -319,7 +319,7 @@ def _entorno_con_pip_simulado_que_falla(proj):
 
 
 # ---------------------------------------------------------------------------------
-# T5.1, prueba de la especificación: "ningún gancho instala nada".
+# Prueba de la especificación: "ningún gancho instala nada".
 # ---------------------------------------------------------------------------------
 class NingunGanchoInstalaNada(unittest.TestCase):
     def test_ningun_modulo_declara_un_gancho_de_dependencias(self):
@@ -347,7 +347,7 @@ class NingunGanchoInstalaNada(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# Lo que NO se puede instalar por pip (T5.1): tesseract fuera de Windows, y
+# Lo que NO se puede instalar por pip: tesseract fuera de Windows, y
 # torch/diffusers para taller.py con el comando EXACTO según haya o no GPU NVIDIA.
 # ---------------------------------------------------------------------------------
 class NoInstalablesDicenElComandoDelSistemaSinFingir(unittest.TestCase):

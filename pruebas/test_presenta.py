@@ -1,4 +1,4 @@
-"""`presenta.py` (T5.3): el vídeo de un minuto que genera el
+"""`presenta.py`: el vídeo de un minuto que genera el
 propio paquete.
 
 `presenta.py` no llama a `rutas.resolver()` ni lee stdin al importarse (construye su
@@ -237,7 +237,7 @@ class CliArgumentos(unittest.TestCase):
 
 @unittest.skipUnless(FFMPEG_DISPONIBLE, _MOTIVO_SIN_FFMPEG or 'falta imageio_ffmpeg')
 class GeneracionCompleta(unittest.TestCase):
-    """Las dos pruebas que pide T5.3, llamando a `generar()` en proceso (ver docstring
+    """Las pruebas de esta clase llaman a `generar()` en proceso (ver docstring
     del módulo) — nunca el vídeo largo de verdad."""
 
     def setUp(self):

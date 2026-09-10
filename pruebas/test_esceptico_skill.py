@@ -113,7 +113,8 @@ class DesinstaladorSoloRetiraLaSkillMarcada(unittest.TestCase):
         self.assertFalse(destino.exists(), 'la skill que SÍ instalamos nosotros debe desaparecer')
 
     def test_desinstalar_no_toca_una_skill_ajena_con_el_mismo_nombre(self):
-        """Falsador directo de la ley (T2.6): una carpeta `esceptico/SKILL.md` que
+        """Falsador directo de que `desinstalar()` solo retira la skill copiada si
+        lleva nuestra marca: una carpeta `esceptico/SKILL.md` que
         el usuario ya tuviera puesta por su cuenta (sin nuestra marca) no debe
         borrarse solo porque `--desinstalar esceptico` se ejecute."""
         destino = self.skills_dir / 'esceptico'

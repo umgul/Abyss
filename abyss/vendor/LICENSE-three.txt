@@ -1,4 +1,4 @@
-three.js — vendorizado para abyss/render3d.py (T3.1)
+three.js — vendorizado para abyss/render3d.py
 
 Versión:  0.160.0 (tag "r160" en el repositorio de three.js)
 Fichero:  three.min.js (build UMD con variable global THREE; es la ÚLTIMA versión que
@@ -28,7 +28,7 @@ derivado suyo: es control de órbita propio de este proyecto (licencia del propi
 repositorio, Apache-2.0 — ver LICENSE en la raíz), escrito porque el `OrbitControls`
 oficial de three.js solo se distribuye como módulo ES en `examples/jsm/` desde r152
 y cdnjs no lo aloja (comprobado 7-sep-2026: sin paquete `orbitcontrols` en
-api.cdnjs.com). El propio contrato de T3.1 admite "OrbitControls (o el equivalente
+api.cdnjs.com). El propio encargo admite "OrbitControls (o el equivalente
 embebible)".
 
 ────────────────────────────────────────────────────────────────────────────────

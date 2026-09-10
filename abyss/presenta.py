@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Presenta: el vídeo de un minuto que genera el propio paquete (T5.3).
+"""Presenta: el vídeo de un minuto que genera el propio paquete.
 
     python presenta.py [--salida abyss_1min.mp4] [--idioma es|en] [--segundos 60] [--ancho 1920]
 
@@ -10,7 +10,7 @@ generada en el momento invocando la propia pieza (`varas.py --index`, `vigia.py 
 ve se inventa ni se recorta de una captura vieja: si una pieza cambia, este guion se vuelve a
 correr y el vídeo sale distinto — esa es la garantía.
 
-Bloques (en este orden; T5.3):
+Bloques (en este orden):
     apertura · memoria y continuidad (`varas --index`) · honestidad (`vigia --probar`) ·
     auditoría (`auditar.py`) · sentidos (`cuerpo` + `exterocepcion`) · pintor (`video_pintura.py`) ·
     estilos (`pintor.py`, cuatro estilos) · mundo (`mundo.py` + `pintor.py`) ·
@@ -37,7 +37,7 @@ Tipografía y paleta: las MISMAS que `infografia.py` (`PALETA`, `colores(oscuro=
 paquete, una sola paleta. Fuente `arial.ttf`/`arialbd.ttf` con reserva a la bitmap de Pillow
 (mismo criterio que `lectura_visual._fuente`; no se reimplementa esa función porque es privada
 de otro módulo, pero el criterio es idéntico a propósito). Sin música: quien lo publique le pone
-la suya (T5.3). Texto en el idioma pedido (`--idioma es|en`; por defecto, el de la máquina).
+la suya. Texto en el idioma pedido (`--idioma es|en`; por defecto, el de la máquina).
 
 1920×1080 a 30 fps con `imageio_ffmpeg`, igual que `video_pintura.py` (mismos parámetros de
 `libx264`: `-crf 18 -preset medium -pix_fmt yuv420p -movflags +faststart`). El bloque «pintor»
@@ -47,7 +47,7 @@ anchura final) y el clip resultante se vuelve a leer con el MISMO `ffmpeg` (deco
 `rawvideo`) para empalmarlo en el hilo del vídeo entero: no hay una segunda pasada de
 codificación con otra herramienta, es el mismo binario en los dos sentidos.
 
-Autosuficiente a propósito (T5.1, "no sabemos a qué máquina se va a instalar"): ninguna imagen ni
+Autosuficiente a propósito ("no sabemos a qué máquina se va a instalar"): ninguna imagen ni
 escena de ejemplo vive en `pruebas/datos/` (eso es del árbol de desarrollo, puede no viajar con
 el paquete instalado) — la foto de demostración, el texto para OCR, la "hoja" para fotocopia y
 la escena 3D se generan aquí mismo, con Pillow y un dict, en el momento.
@@ -120,7 +120,7 @@ PISO_BLOQUE = 0.6  # segundos: ningún bloque disponible baja de aquí, aunque e
 COLORES = infografia.colores(oscuro=True)
 PALETA = infografia.PALETA
 
-# Escena 3D de ejemplo (T5.1: nada de `pruebas/datos/` — ver docstring del módulo). Misma forma
+# Escena 3D de ejemplo (nada de `pruebas/datos/` — ver docstring del módulo). Misma forma
 # que acepta `render3d._cargar_escena_json()`: un pedestal con remate, en dos grupos, para que
 # la vista explosionada tenga algo de verdad que separar.
 ESCENA_3D_DEMO = {
@@ -136,7 +136,7 @@ ESCENA_3D_DEMO = {
     "camara": {"pos": [5.0, 3.5, 6.0], "mirar": [0, 1.2, 0], "fov": 50},
 }
 
-# Duración "natural" de cada bloque (T5.3: calibrada para sumar, con apertura+cierre, algo por
+# Duración "natural" de cada bloque (calibrada para sumar, con apertura+cierre, algo por
 # debajo de 60 s cuando TODAS las piezas están disponibles — el minuto de sobra es margen para
 # el bloque «pintor», que es una animación real y no un rótulo estático).
 DURACION_NATURAL = {
@@ -159,7 +159,7 @@ def _idioma_sistema():
     """`ABYSS_IDIOMA`/`LC_ALL`/`LANG`/`LANGUAGE` si alguna empieza por "es"; si no, la
     configuración regional de Python (`locale.getlocale()`, con `getdefaultlocale()` como
     respaldo — deprecado desde 3.11 pero aún presente; nunca revienta si falta). Sin ninguna
-    pista, inglés (mismo criterio que T5.2 describe para `instalar.py`, sin depender de él)."""
+    pista, inglés (mismo criterio que usa `instalar.py`, sin depender de él)."""
     for var in ("ABYSS_IDIOMA", "LC_ALL", "LANG", "LANGUAGE"):
         v = os.environ.get(var)
         if v:

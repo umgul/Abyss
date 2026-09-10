@@ -1,4 +1,4 @@
-"""malo.py — fichero de prueba para `pruebas/test_auditar.py` (T4.2).
+"""malo.py — fichero de prueba para `pruebas/test_auditar.py`.
 
 A propósito para que `auditar.py` lo cace: `sondear()` manda datos a un host que
 NINGÚN README de este paquete de prueba nombra (comprobación 4). No se ejecuta

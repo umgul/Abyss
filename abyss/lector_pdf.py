@@ -112,8 +112,8 @@ def extraer_fitz(ruta_pdf):
             n = len(tamanos)
             # mediana DE VERDAD (media de los dos centrales si n es par) — con
             # `tamanos[n // 2]` (mediana SUPERIOR), una página de EXACTAMENTE
-            # dos líneas (título + una sola línea de cuerpo, el caso mínimo que
-            # T2.4 pone como falsador) daba mediana == p90 == el tamaño del
+            # dos líneas (título + una sola línea de cuerpo, el caso mínimo
+            # usado como falsador) daba mediana == p90 == el tamaño del
             # propio título, y `tamano > mediana` no era nunca cierto: ninguna
             # sección salía detectada en ese caso (fallo medido 7-sep).
             mediana = tamanos[n // 2] if n % 2 else (tamanos[n // 2 - 1] + tamanos[n // 2]) / 2
@@ -189,7 +189,7 @@ def extraer(ruta_pdf):
     ESTE fichero concreto (PDF truncado, cifrado, o un `.pdf` que en realidad es
     otra cosa — texto plano renombrado, por ejemplo) se propagaba entero como
     traceback crudo por stderr (con la ruta del fichero dentro), Y la cascada a
-    `pypdf` nunca llegaba a intentarse (fallo T2.4 medido 7-sep: `indexar()`
+    `pypdf` nunca llegaba a intentarse (fallo medido 7-sep: `indexar()`
     prometía en su propio docstring «nunca revienta» y sí lo hacía). Ahora cada
     motor atrapa su propio fallo (`ImportError` -no instalado- o cualquier otra
     excepción -instalado pero no pudo con este fichero-) y deja que se intente
@@ -240,7 +240,7 @@ def indexar(mem, ruta_pdf):
     `mem/pdf/<sha1>.json`. Devuelve `(indice, None)`, o `(None, mensaje)` si el
     fichero no existe, no hay motor de extracción instalado, o los motores
     instalados no pudieron leer ESTE fichero (PDF roto/cifrado/no-PDF) — nunca
-    revienta con un traceback crudo (fallo T2.4 medido 7-sep, ver `extraer()`)."""
+    revienta con un traceback crudo (fallo medido 7-sep, ver `extraer()`)."""
     if not ruta_pdf or not os.path.isfile(ruta_pdf):
         return None, f'no existe el fichero: {ruta_pdf}'
     sha1 = sha1_fichero(ruta_pdf)

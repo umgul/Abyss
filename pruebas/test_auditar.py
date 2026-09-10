@@ -39,7 +39,7 @@ _GIT_DISPONIBLE = shutil.which('git')
 def _paquete_limpio(tmp, host='api.ejemplo-real.com'):
     """Un paquete SIN nada que cazar: autor real, licencia, repositorio, un
     único host de red y ese mismo host nombrado en su README. Se usa para el
-    falsador explícito que pide T4.2: "paquete limpio → veredicto sin
+    falsador explícito de "paquete limpio → veredicto sin
     hallazgos" — sin él, no habría forma de distinguir un `auditar.py` que
     detecta problemas de verdad de uno que los inventa siempre."""
     (tmp / 'package.json').write_text(json.dumps({
@@ -107,7 +107,7 @@ class PaqueteSinteticoLasTresCosas(unittest.TestCase):
 
 
 class PaqueteLimpioDaVeredictoSinHallazgos(unittest.TestCase):
-    """El falsador explícito de T4.2: si `auditar.py` encontrara cosas también
+    """El falsador explícito: si `auditar.py` encontrara cosas también
     en un paquete sin nada que reprochar, no mediría nada — solo decretaría."""
 
     def test_paquete_limpio_sin_hallazgos(self):
@@ -402,7 +402,7 @@ class Red(unittest.TestCase):
 
 
 class RedHostEnConfigYTercerosEmbebidos(unittest.TestCase):
-    """T4.2 arreglo (auditoría sobre `auditar.py`): el caso real reportado — un
+    """Arreglo (auditoría sobre `auditar.py`): el caso real reportado — un
     paquete con AUTOR real y README limpio cuyo `enviar.py` lee el host de
     `config/ajustes.json` (`cfg['endpoint']`) en vez de escribirlo a mano en el
     `.py`, más un segundo host bajo `vendor/`. Antes del arreglo,
@@ -502,7 +502,7 @@ class FuncionesPuras(unittest.TestCase):
 
 
 class InformeDeclaraLoQueNoMiro(unittest.TestCase):
-    """T4.2 arreglo: un «sin hallazgos» sin decir dónde no miró no distingue
+    """Arreglo: un «sin hallazgos» sin decir dónde no miró no distingue
     «no hay nada» de «no miré ahí» — misma disciplina que `vigia.py` aplica a
     sus propios falsos negativos."""
 

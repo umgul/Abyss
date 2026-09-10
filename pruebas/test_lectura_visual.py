@@ -20,7 +20,7 @@ en `render3d.py`), y la "segunda vía" de `tesseract` se ejercita END-TO-END con
 CABLEADO (elige tesseract cuando WinRT está apagado, agrupa su TSV por línea)
 sin depender de que `tesseract` de verdad esté instalado ni prometer nada sobre
 SU precisión. El escáner WIA se fuerza siempre "sin dato" con
-`ABYSS_LECTURA_VISUAL_SIN_WIA` (T4.3: ese camino no se ejerce contra hardware
+`ABYSS_LECTURA_VISUAL_SIN_WIA` (ese camino no se ejerce contra hardware
 real en esta batería, ni con escáner conectado ni sin él); la cámara, igual,
 con `ABYSS_LECTURA_VISUAL_SIN_CAMARA` — la suite NUNCA abre una webcam de
 verdad. CORRECCIÓN DEL AUTOR (7-sep-2026 19:15) que estas pruebas reflejan:
@@ -94,7 +94,7 @@ def _entorno_con_modulo_bloqueado(proj, nombre):
 def _tesseract_falso_en_path(env, tsv_texto):
     """Añade al PATH un directorio con un `tesseract.cmd` que ignora sus
     argumentos y escribe `tsv_texto` por stdout — para probar el CABLEADO de la
-    "segunda vía" (T4.3) sin depender de que `tesseract` de verdad esté
+    "segunda vía" sin depender de que `tesseract` de verdad esté
     instalado. `shutil.which('tesseract')` en Windows resuelve `tesseract.cmd`
     por `PATHEXT` igual que resolvería `tesseract.exe`."""
     carpeta = Path(tempfile.mkdtemp(prefix='abyss_tesseract_falso_'))
@@ -407,7 +407,7 @@ class ManualHeuristicaPuraSinOCR(unittest.TestCase):
 
     def test_no_ordena_si_falta_el_numero_en_alguna_pagina(self):
         """`manual()` de verdad, pero con `leer()` sustituido: si SOLO una página
-        trae número, se mantiene el ORDEN DE ENTRADA (declarado, T4.3) — no se
+        trae número, se mantiene el ORDEN DE ENTRADA (declarado) — no se
         reordena a medias ni se adivina un hueco. Se comprueba dando "b" (que sí
         detecta página, y detectada muy alta: 99) ANTES que "a" (sin número): si
         el guion reordenase por número, "b" (número 99) saldría después; como no
@@ -488,7 +488,7 @@ class FotocopiaValidacionDeArgumentos(unittest.TestCase):
     análisis de `argv`, antes de tocar `cv2` — no dependen de que esté instalado,
     así que esta clase NO se salta aunque `FotocopiaConCv2Real` sí lo haga.
 
-    Vía normal (corrección del autor, T4.3): `<imagen>` o `--camara`, una de
+    Vía normal (corrección del autor): `<imagen>` o `--camara`, una de
     las dos, nunca las dos ni ninguna. `--escaner` NO participa en este
     conflicto — es una fuente opcional que se intenta antes y cae a la vía
     normal sin error si no hay (ver `FotocopiaEscanerCaeALaViaNormal`)."""
@@ -508,7 +508,7 @@ class FotocopiaValidacionDeArgumentos(unittest.TestCase):
         self.assertIn('--camara', r.stdout)
 
     def test_solo_escaner_sin_via_normal_es_error(self):
-        """`--escaner` nunca basta por sí solo (T4.3): sin `<imagen>` ni
+        """`--escaner` nunca basta por sí solo: sin `<imagen>` ni
         `--camara` es el mismo error de uso que sin nada, y NI SIQUIERA llega
         a preguntar por un escáner de verdad (no hace falta forzar
         `ABYSS_LECTURA_VISUAL_SIN_WIA` para que esta prueba sea determinista)."""
@@ -595,7 +595,7 @@ class EscanerForzadoSinTocarHardware(unittest.TestCase):
 
 
 class EscanerFisicoNoSeProbo(unittest.TestCase):
-    @unittest.skip('T4.3: --escaner NO se ejerce contra el escáner físico en esta batería '
+    @unittest.skip('--escaner NO se ejerce contra el escáner físico en esta batería '
                     '(el encargo lo prohíbe explícitamente); el camino "sin escáner" se prueba '
                     'forzado con ABYSS_LECTURA_VISUAL_SIN_WIA en EscanerForzadoSinTocarHardware')
     def test_no_se_prueba_contra_hardware_real(self):
@@ -604,7 +604,7 @@ class EscanerFisicoNoSeProbo(unittest.TestCase):
 
 @unittest.skipUnless(lv._CV2_OK, 'cv2/numpy no están instalados en esta máquina')
 class FotocopiaEscanerCaeALaViaNormal(unittest.TestCase):
-    """Corrección del autor (T4.3): sin escáner, `fotocopia` NO revienta — avisa
+    """Corrección del autor: sin escáner, `fotocopia` NO revienta — avisa
     y sigue por la vía normal ya dada (`<imagen>` aquí), tal cual si `--escaner`
     no se hubiera puesto."""
 
@@ -658,7 +658,7 @@ class CamaraForzadaSinTocarHardware(unittest.TestCase):
 
 
 class CamaraFisicaNoSeProbo(unittest.TestCase):
-    @unittest.skip('T4.3/regla dura del encargo: la cámara NO se enciende en esta batería '
+    @unittest.skip('Regla dura del encargo: la cámara NO se enciende en esta batería '
                     'salvo lo imprescindible, y nunca por gancho; el camino "sin cámara" se '
                     'prueba forzado con ABYSS_LECTURA_VISUAL_SIN_CAMARA en CamaraForzadaSinTocarHardware')
     def test_no_se_prueba_contra_hardware_real(self):
@@ -671,7 +671,7 @@ class CamaraFisicaNoSeProbo(unittest.TestCase):
 class GuardarPaginasMultiplesEnProceso(unittest.TestCase):
     """`_guardar_paginas()` en proceso, sobre imágenes YA procesadas por
     `_procesar_documento()` (nunca sobre una cámara ni un escáner): el núcleo
-    de `--paginas` (T4.3) es que varias páginas se juntan en UN pdf y que un
+    de `--paginas` es que varias páginas se juntan en UN pdf y que un
     PNG rehúsa llevar más de una."""
 
     def test_una_pagina_igual_que_guardar_imagen(self):

@@ -33,10 +33,10 @@ que en `mate`, el propio normal que trae el fichero de entrada, no el material.
 
 `--html` es el modo normal (SIEMPRE se escribe la página, con o sin la bandera; ésta solo
 sirve para elegir la ruta — a diferencia de `pintor.py`, aquí la página no es un extra
-opcional: es el propio resultado que pide T3.1). Sin ruta explícita:
+opcional: es el propio resultado). Sin ruta explícita:
 `<carpeta_de_la_entrada>/<base>_render3d.html`.
 
-`--holograma` (T4.4): la MISMA escena, la MISMA cámara, en cuatro cuadrantes cuadrados
+`--holograma`: la MISMA escena, la MISMA cámara, en cuatro cuadrantes cuadrados
 alrededor del centro de la pantalla (arriba/abajo/izquierda/derecha), cada uno con la
 imagen espejada horizontalmente y girada 0°/180°/90°/-90° respectivamente — lo que pide
 una pirámide de metacrilato apoyada en el centro de la pantalla (Pepper's ghost): cada cara
@@ -908,7 +908,7 @@ function calcularDirecciones(piezasObjs, centroV) {
 
   const controles = new OrbitaMinima(camera, renderer.domElement, objetivo);
 
-  // T4.4 --holograma: cuatro cuadrantes 2D espejados sobre negro (Pepper's ghost). El
+  // --holograma: cuatro cuadrantes 2D espejados sobre negro (Pepper's ghost). El
   // <canvas> WebGL de siempre sigue existiendo y pintando (es la FUENTE, con `drawImage`);
   // solo se oculta como tal. Ver la convención de ángulos/espejado en el docstring de
   // `renderizar()` — sin dependencias nuevas: dos llamadas de Canvas2D de toda la vida.
@@ -1007,7 +1007,7 @@ canvas{display:block}
   <div class="fila"><input id="chkZ" type="checkbox"><input id="sldZ" type="range" style="flex:1"></div>
   <button id="btnCapturar" type="button">Capturar PNG</button>
 </div>
-<!-- T4.4 --holograma: cuatro cuadrantes 2D (drawImage del <canvas> WebGL de siempre,
+<!-- --holograma: cuatro cuadrantes 2D (drawImage del <canvas> WebGL de siempre,
      que sigue existiendo pero oculto) — ver ESCENA.holograma en __MAIN_JS__. -->
 <div id="holograma">
   <canvas id="cuadArriba"></canvas>
@@ -1169,7 +1169,7 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
     `escena.json` (si la trae) y si tampoco, un encuadre automático a 3/4 sobre el centro
     de toda la escena. `fondo`: `"#rrggbb"` (por defecto `#15151a`; ignorado, forzado a
     `#000000`, si `holograma=True` — ver docstring del módulo). `luz`: calida/fria/neutra.
-    `holograma`: cuatro cuadrantes espejados sobre negro (Pepper's ghost, T4.4). `acabado`:
+    `holograma`: cuatro cuadrantes espejados sobre negro (Pepper's ghost). `acabado`:
     `mate` (por defecto) o `estudio` (metal con reflejos, entorno procedural, sombras suaves,
     suelo oscuro, sin rejilla al arrancar — ver docstring del módulo).
 

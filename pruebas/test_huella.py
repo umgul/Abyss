@@ -1,7 +1,7 @@
 """`huella.py`: todo lo que un hilo toca fuera de
 su carpeta. Las funciones puras (`diferencias`, `debe_fotografiar`,
 `parece_persistente`, `agrupar_por_raiz`, `informe`, `resumen_stop`, `limpiar`)
-se prueban importando el módulo DIRECTAMENTE — igual que `cuerpo.py` (T2.3):
+se prueban importando el módulo DIRECTAMENTE — igual que `cuerpo.py`:
 `huella.py` no toca `rutas.resolver()` ni stdin al importarse, así que
 `foto()` se puede monkeypatchear con `unittest.mock.patch.object` sin lanzar
 ningún proceso real. Los tres ganchos (`--arranque`/`--herramienta`/`--fin`) y
@@ -82,7 +82,7 @@ class Diferencias(unittest.TestCase):
 
 @unittest.skipUnless(os.name == 'nt', 'la exclusión de PIDs propios en foto() solo se ejercita aquí en Windows')
 class FotoExcluyeProcesosPropios(unittest.TestCase):
-    """T2.2, fallo medido 7-sep: sin esto, `foto()` cazaba su propio árbol de
+    """Fallo medido 7-sep: sin esto, `foto()` cazaba su propio árbol de
     procesos (el `python` de este mismo `huella.py`, el shell que lo invocó, y
     el `powershell.exe` que la propia foto acaba de lanzar) como si fueran
     procesos nuevos de la sesión."""
@@ -171,8 +171,8 @@ class InformeConFotoSimulada(unittest.TestCase):
 class ResumenStop(unittest.TestCase):
     """`resumen_stop()` ya NO usa el último snapshot guardado — lo compara con
     una foto FRESCA (`informe()` sin `foto_actual`), así que aquí `foto()` se
-    monkeypatchea para simular esa foto sin lanzar PowerShell de verdad (T2.2,
-    fallo "el snapshot rancio hace tautológico cualquier proceso_nuevo": ver
+    monkeypatchea para simular esa foto sin lanzar PowerShell de verdad (fallo
+    "el snapshot rancio hace tautológico cualquier proceso_nuevo": ver
     docstring de `resumen_stop()`)."""
 
     def test_sin_snapshot_calla(self):
@@ -191,7 +191,7 @@ class ResumenStop(unittest.TestCase):
             self.assertEqual(huella.resumen_stop(mem, sid), '')
 
     def test_con_algo_registrado_pero_ya_muerto_calla(self):
-        """Fallo T2.2 medido 7-sep: con el snapshot rancio, un proceso_nuevo
+        """Fallo medido 7-sep: con el snapshot rancio, un proceso_nuevo
         detectado en la ÚLTIMA foto salía SIEMPRE "vivo" en --fin porque esa
         foto ES la misma en la que se cazó. Con una foto fresca que ya no lo ve,
         --fin debe callar — es justo lo que antes NO pasaba."""
@@ -273,7 +273,7 @@ class LimpiarRespectaCarpetas(unittest.TestCase):
                 os.remove(ruta_tmp)
 
     def test_memory_md_y_fichas_bajo_mem_no_se_borran(self):
-        """Fallo "rompe" medido 7-sep (T2.2): antes CUALQUIER ruta bajo `mem`
+        """Fallo "rompe" medido 7-sep: antes CUALQUIER ruta bajo `mem`
         contaba como borrable (esta misma prueba, antes, se llamaba
         `test_bajo_mem_tambien_se_borra` y afirmaba justo lo contrario), así
         que un `Write` de la sesión sobre la memoria de verdad del usuario
@@ -311,7 +311,7 @@ class LimpiarRespectaCarpetas(unittest.TestCase):
     def test_bajo_una_subcarpeta_generada_de_mem_si_se_borra(self):
         """Lo que SÍ sigue siendo zona borrable: las subcarpetas que este
         paquete genera por su cuenta bajo `mem` (`mem/huella/`, `mem/mapas/`,
-        `mem/pdf/`, T2.2) — el corte no es "nada bajo mem", es "solo lo que
+        `mem/pdf/`) — el corte no es "nada bajo mem", es "solo lo que
         genera este paquete"."""
         proj = ay.nuevo_proyecto()
         mem = str(proj / 'memory')
@@ -387,7 +387,7 @@ class GanchoHerramienta(unittest.TestCase):
 
 
 class CicloDeVidaDeUnProcesoReal(unittest.TestCase):
-    """T2.2, prueba mínima pedida: un Bash que arranca `python -c "import time;
+    """Prueba mínima pedida: un Bash que arranca `python -c "import time;
     time.sleep(30)"` aparece en `--informe`, y `--limpiar --si` lo mata de
     verdad. Se usa un proceso que duerme mucho más que la duración de la
     prueba para que siga vivo en el momento de comprobarlo."""
@@ -535,7 +535,7 @@ class GanchoHerramientaToolInputNoEsDict(unittest.TestCase):
 
 
 class GanchoFinDePuntaAPuntaConBashReal(unittest.TestCase):
-    """El falsador que faltaba (T2.2, fallo medido 7-sep): con la cadena REAL
+    """El falsador que faltaba (fallo medido 7-sep): con la cadena REAL
     arranque -> herramienta (un `Bash` inocuo de verdad, sin mockear `foto()`)
     -> fin, `--fin` no debe decir nada. Antes de este arreglo, un solo `echo
     uno` bastaba para que `--fin` avisara de "3 proceso ... siguen vivos" que

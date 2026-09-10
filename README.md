@@ -602,7 +602,7 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 
 Python 3.12 o superior, biblioteca estándar para casi todo. La vía
 recomendada para lo demás es dejar que el propio paquete lo resuelva
-(quinta tanda, T5.1) en vez de leer [`requirements.txt`](requirements.txt) a
+(quinta tanda) en vez de leer [`requirements.txt`](requirements.txt) a
 mano:
 
 ```
@@ -622,7 +622,7 @@ dice con su última línea de error y se sigue con el resto, sin reintentar
 solo. No existe `--desinstalar-dependencias`: quitar paquetes de Python del
 entorno de alguien es más arriesgado que ponerlos, y se deja a quien lo
 instaló. Las dos banderas — y la casilla «Dependencias…» de la ventana Tk —
-hablan en `--idioma es|en` (por defecto, el del sistema, ver T5.2 más abajo);
+hablan en `--idioma es|en` (por defecto, el del sistema);
 [`requirements.txt`](requirements.txt) lleva la misma lista, toda comentada,
 para quien prefiera instalar a mano sin pasar por `instalar.py`.
 

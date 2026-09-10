@@ -1,7 +1,7 @@
 """Falsador del arreglo de `pintor.py` (arreglo «--html ignora el
 papel y el alfa del estilo»): antes de este arreglo, la plantilla `_HTML` de `--html` pintaba
 SIEMPRE `borra()` sobre `#080607` (el fondo fijo de "oleo") y con alfa 1, sin mirar el `"papel"`
-ni el `"alfa"` que el propio `.json.gz` ya guarda (T3.2) y que `video_pintura.py` sí respeta —
+ni el `"alfa"` que el propio `.json.gz` ya guarda y que `video_pintura.py` sí respeta —
 medido con `pintor.py sintetica.png --estilo tinta --html`: papel del cuadro `#ffffff`, página con
 `#080607`. Lo mismo vale para carbon, acuarela, pastel e impresionista (papeles claros).
 
