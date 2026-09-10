@@ -3,7 +3,10 @@ name: kinetica
 description: >
   Ver por dentro un objeto fotografiado: separa sus COMPONENTES REALES a partir
   de UNA foto (nunca capas de nitidez), los despieza en 3D dentro de un cubo
-  invisible con three.js y deja que la mano los maneje mirando la cámara.
+  invisible con three.js y deja que la mano los maneje mirando la cámara. El
+  usuario solo pone la foto: mirarla, escribir las regiones de cada pieza,
+  quitar el fondo y buscar en la web los datos de cada parte con su fuente lo
+  hace esta skill.
   Actívala con: "haz un despiece de verdad de esto", "sepárame las piezas
   reales de este objeto y déjame moverlas con la mano", "quiero ver por dentro
   esta foto", "abre esta foto como un despiece en 3D que pueda mover con la
@@ -40,9 +43,10 @@ python "${CLAUDE_PLUGIN_ROOT}/abyss/kinetica.py" <foto> [--regiones f.json] [--f
 
 De dónde sale cada cosa, sin adornos:
 
-- **Con `--regiones f.json`** (recomendado): QUÉ pieza hay y DÓNDE está lo
-  decide quien mira la foto, en un fichero de regiones — reconocimiento
-  asistido, declarado como tal, nunca un detector entrenado. Es texto legible:
+- **Con `--regiones f.json`** (recomendado, y **lo escribes tú**: ver «La
+  receta entera» más arriba): QUÉ pieza hay y DÓNDE está lo decide quien mira
+  la foto — reconocimiento asistido, declarado como tal, nunca un detector
+  entrenado. Es texto legible:
   se puede leer y discutir antes de correr el guion. El **borde** de cada
   pieza sí es medido: `cv2.grabCut` sembrado con la máscara de ese polígono
   (su interior erosionado = "primer plano seguro", fuera de una holgura =
@@ -79,6 +83,95 @@ De dónde sale cada cosa, sin adornos:
   se mira TAMBIÉN el nombre del fichero cuando la foto no dio marca, y se
   declara como tal, nunca como si se hubiera leído. Ver el apartado
   "Reconocer el producto, o decir que no".
+
+## La receta entera: de una foto suelta a un despiece, sin que nadie dibuje nada
+
+Esto es lo que TÚ, Claude, tienes que hacer cuando alguien te da una foto de un
+objeto y te pide verlo por dentro. No le pidas que escriba ficheros: los
+escribes tú, y declaras de dónde salió cada cosa.
+
+**Sin esto, la foto de un objeto compacto da UNA sola pieza.** El modo
+automático separa componentes conexos, y un coche, una herramienta o un
+electrodoméstico son una silueta conexa: la carrocería, las ruedas y la
+parrilla son todo lo mismo para ese algoritmo. Si entregas eso, el usuario verá
+una pieza y pensará que la herramienta no funciona.
+
+### 1. Mira la foto
+
+Ábrela y míra la de verdad. Necesitas saber qué objeto es y qué partes tiene,
+porque los dos ficheros que vas a escribir salen de eso.
+
+### 2. Escribe el fichero de regiones
+
+Un polígono por parte, en píxeles de ESA foto (mira sus dimensiones antes:
+las coordenadas son absolutas, no fracciones). El formato exacto está más
+abajo, en «Ejemplo de fichero de regiones». Cuatro consejos que salen de
+haberlo hecho:
+
+- **Un polígono holgado vale**: el borde fino no lo decides tú, lo decide
+  `cv2.grabCut` sembrado desde tu polígono. Tu trabajo es decir *dónde está* la
+  pieza, no recortarla al píxel.
+- **`prioridad` resuelve los solapes**: la pieza que va delante en la foto lleva
+  el número más alto.
+- **`rumbo`** es hacia dónde sale esa pieza al separarse; piensa cómo se
+  desmontaría de verdad.
+- Empieza por las partes GRANDES y evidentes. Ocho piezas bien puestas valen
+  más que veinte adivinadas.
+
+Y lo que no es negociable: esto es **reconocimiento asistido, no un detector
+entrenado**, y `piezas.json` lo dirá con esas palabras. Tú has mirado una foto
+y has dicho dónde te parece que está cada cosa. Eso es honesto y es útil; lo
+deshonesto sería presentarlo como una medida.
+
+### 3. El fondo se quita solo
+
+**No pases `--quitar-fondo` por costumbre.** El módulo mide si las esquinas son
+de un solo color y, si no lo son y hay motor disponible, lo quita él y lo dice
+en la procedencia. Un fondo liso hace la silueta exacta, así que esto mejora el
+despiece, no solo el aspecto. Si la foto ya venía con el fondo quitado —con
+canal alfa— esa máscara ES la silueta y no se estima nada.
+
+Solo pasa `--fondo-tal-cual` si el usuario quiere la foto como vino.
+
+### 4. Busca los datos, y que cada cifra traiga su fuente
+
+Las fichas son lo que convierte un despiece bonito en algo que se lee. Busca en
+la web las características del objeto y repártelas por pieza, de modo que cada
+cartel diga algo que corresponda a lo que se está mirando: la medida del
+neumático en la rueda, el motor en la parrilla, las dimensiones en la
+carrocería.
+
+Reglas que aquí pesan más que la completitud:
+
+- **Cada dato lleva su URL.** El campo `fuente` de cada pieza no es un adorno:
+  es lo que permite comprobarlo. Un dato sin URL no se escribe.
+- **Donde no hay fuente se escribe «sin dato con fuente»**, y el visor lo pinta
+  en su propio color. Un cartel que dice eso es un cartel honesto; uno que
+  rellena el hueco con algo verosímil es una mentira con formato de dato.
+- **Si el objeto tiene varias versiones** —generaciones de un coche, modelos de
+  una herramienta—, di de cuál son tus datos y por qué elegiste esa. Si no
+  puedes saber cuál es el de la foto, DILO en la propia ficha.
+
+### 5. La marca, solo si de verdad se sabe de dónde sale
+
+`--reconocer` lee lo que hay EN LA FOTO con el OCR, y si no lee nada no hay
+enlace. Un logotipo suele ser un dibujo que ningún OCR lee, así que casi
+siempre no habrá.
+
+Con `--permitir-nombre-fichero` se mira TAMBIÉN el nombre del fichero. Úsalo
+cuando el nombre lo diga claramente, y no te preocupes por disimularlo: el
+`como` que queda escrito será `nombre_fichero` y el porqué dirá sin adornos que
+la marca salió del nombre y no de haberla leído en la foto.
+
+### 6. Monta
+
+```
+python "${CLAUDE_PLUGIN_ROOT}/abyss/kinetica.py" <foto>     --regiones <el que escribiste> --fichas <el que escribiste>     --reconocer --permitir-nombre-fichero
+```
+
+Y cuando lo entregues, di las dos cosas que el usuario tiene derecho a saber:
+que las regiones las pusiste tú mirando la foto, y qué carteles se quedaron sin
+dato con fuente.
 
 ## La carpeta que monta
 
