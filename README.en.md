@@ -178,12 +178,12 @@ its own (see "Where the data lives" below).
 ### As a Claude Code plugin
 
 ```
-/plugin marketplace add umgul/abyss
+/plugin marketplace add umgul/Abyss
 /plugin install abyss@abyss
 ```
 
 (that repository path is where publication is planned; adjust it if
-`umgul/abyss` changes). This installs the *skills* under `skills/` and the
+`umgul/Abyss` changes). This installs the *skills* under `skills/` and the
 hooks in [`hooks/hooks.json`](hooks/hooks.json): `continuidad.py --arranque`,
 `huella.py --arranque`, and `cuerpo.py --arranque` on `SessionStart`;
 `continuidad.py --despertar` and `cuerpo.py --despertar` on

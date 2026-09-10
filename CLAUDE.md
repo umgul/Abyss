@@ -80,7 +80,7 @@ Abyss también es un plugin de Claude Code, y por ahí las skills se descubren
 solas sin copiar nada:
 
 ```
-/plugin marketplace add umgul/abyss
+/plugin marketplace add umgul/Abyss
 /plugin install abyss
 ```
 

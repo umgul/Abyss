@@ -171,12 +171,12 @@ por su cuenta (ver "Dónde viven los datos" más abajo).
 ### Como plugin de Claude Code
 
 ```
-/plugin marketplace add umgul/abyss
+/plugin marketplace add umgul/Abyss
 /plugin install abyss@abyss
 ```
 
 (la ruta del repositorio es la prevista para su publicación; ajústala si
-`umgul/abyss` cambia). Esto instala los *skills* de `skills/` y los ganchos de
+`umgul/Abyss` cambia). Esto instala los *skills* de `skills/` y los ganchos de
 [`hooks/hooks.json`](hooks/hooks.json): `continuidad.py --arranque`,
 `huella.py --arranque` y `cuerpo.py --arranque` en `SessionStart`;
 `continuidad.py --despertar` y `cuerpo.py --despertar` en `UserPromptSubmit`;
