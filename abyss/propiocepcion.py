@@ -12,7 +12,12 @@ viven en `mem`, resuelto por `rutas.resolver()` — nunca `dirname(__file__)` (�
 
 Uso: python propiocepcion.py [id-de-sesión]  → escribe mem/propiocepcion.json
      y muestra la sesión pedida (o la más reciente) contra las demás."""
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, glob, json, gzip
 from datetime import datetime
 
@@ -83,7 +88,7 @@ def medir(path):
         sid = base[:-6]
     else:
         sid = base
-    ts = []; turnos = 0; corr = 0; palabras_j = 0; req = {}; tools = 0; fichas = set(); web = 0; sondas = {}
+    ts = []; turnos = 0; turnos_limpios = 0; corr = 0; palabras_j = 0; req = {}; tools = 0; fichas = set(); web = 0; sondas = {}
     with abrir_texto(path) as fh:
         for line in fh:
             try:
@@ -104,6 +109,17 @@ def medir(path):
                     if c.lstrip().startswith('This session is being continued') or c.lstrip().startswith('<command-name>'):
                         continue
                     turnos += 1; palabras_j += len(c.split())
+                    # Y hay MUCHO más que tampoco escribió nadie: avisos de tareas en
+                    # segundo plano, recordatorios del sistema, resultados que vuelven.
+                    # Todos llegan como `user` y todos empiezan por '<'. Medido el
+                    # 8-sep-2026 sobre una sesión de 852 turnos: 314 de esos 852 —el
+                    # 36,9%— no eran texto de nadie. Contarlos infla el denominador y
+                    # hace parecer rarísima cualquier corrección.
+                    # `turnos_usuario` NO cambia: relojes.jsonl es de solo añadir y
+                    # continuidad.py:330 compara ese número para saber si una sesión ya
+                    # está apuntada. Cambiarlo mezclaría dos varas en el mismo fichero.
+                    if not c.lstrip().startswith('<'):
+                        turnos_limpios += 1
                     if CORR.match(c):
                         corr += 1
             elif t == 'assistant':
@@ -135,12 +151,13 @@ def medir(path):
         p = lambda s: datetime.fromisoformat(s.replace('Z', '+00:00'))
         horas = (p(max(ts)) - p(min(ts))).total_seconds() / 3600
     return sid, {'inicio': min(ts)[:16] if ts else None, 'horas': round(horas, 1), 'turnos_usuario': turnos,
+                 'turnos_usuario_limpios': turnos_limpios,
                  'palabras_usuario': palabras_j, 'respuestas': len(req), 'herramientas': tools, 'tokens_salida': out,
                  'tokens_pensados': think, 'cache_leida': cache, 'web': web, 'correcciones_proxy': corr,
                  'fichas_escritas': sorted(fichas), 'sondas': sondas}
 
 
-CLAVES = ('horas', 'turnos_usuario', 'palabras_usuario', 'respuestas', 'herramientas', 'tokens_salida',
+CLAVES = ('horas', 'turnos_usuario', 'turnos_usuario_limpios', 'palabras_usuario', 'respuestas', 'herramientas', 'tokens_salida',
           'tokens_pensados', 'cache_leida', 'web', 'correcciones_proxy')
 
 

@@ -98,7 +98,9 @@ carácter `&` — heurística declarada como tal (un `pip install` largo sin
 ninguna de esas palabras se salta la foto aunque tarde; un `echo start` la
 dispara aunque no arranque nada persistente). El comando en sí SIEMPRE se
 registra, se tome o no la foto — lo caro es la foto, no apuntar el texto.
-En esta máquina medida hoy (~950 ms de mediana con la llamada combinada) el
+En la máquina de desarrollo, remedido el 8-sep-2026 (793 ms de mediana en 5 llamadas
+del gancho entero tras un comando que parece persistente; 96 ms cuando no hay nada
+que fotografiar) el
 heurístico NO llegaría a activarse por defecto (queda por debajo de 1500 ms):
 el mecanismo está implementado y probado con costes inyectados
 (`pruebas/test_huella.py`), no porque esta máquina lo dispare sola.
@@ -126,7 +128,12 @@ ningún subproceso real, y aparte probar el ciclo de vida real (arrancar un
 proceso de verdad, verlo en `--informe`, matarlo con `--limpiar --si`) con el
 propio CLI por subproceso, como al resto de `abyss/`.
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, json, glob, time, subprocess, tempfile
 from pathlib import Path
 from datetime import datetime, timezone

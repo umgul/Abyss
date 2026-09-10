@@ -67,7 +67,12 @@ El código vive donde lo instale `rutas.CODE`; los datos (`parentesis.json`, y e
 `.omitir` que ya vivía en `mem/sesiones/`) viven en `mem`, resuelto por
 `rutas.resolver()` — nunca `dirname(__file__)` (§1 de ESPECIFICACION.md).
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, json, glob, time, shutil
 from datetime import datetime, timezone
 

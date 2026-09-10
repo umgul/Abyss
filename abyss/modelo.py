@@ -34,7 +34,12 @@ literales de un turno dicho DENTRO de un paréntesis en el aviso `[modelo · rev
 — que `continuidad.py --despertar` mete en `additionalContext` y por tanto vuelve a
 viajar a la API en el prompt siguiente, justo lo que el tramo promete impedir.
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, json, time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -108,7 +108,12 @@ funciones son puras y reciben `ruta` como argumento; nada se resuelve con
 mide el propio hilo, audita un paquete de terceros) y por eso no necesita
 proyecto. Solo `if __name__ == '__main__':` toca argv/stdout/ficheros de salida.
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os
 import re
 import json
@@ -125,7 +130,14 @@ EXCLUIR_DIRS_SIEMPRE = {'.git', 'venv', '.venv', 'node_modules', '__pycache__',
 # comprobación 4 los recorre APARTE (`_listar_ficheros_terceros_embebidos`) en vez
 # de callarlos — arreglo T4.2, ver docstring del módulo.
 DIRS_TERCEROS_EMBEBIDOS = {'vendor', 'dist', 'build'}
-EXCLUIR_DIRS = EXCLUIR_DIRS_SIEMPRE | DIRS_TERCEROS_EMBEBIDOS
+# Las pruebas son contenido del paquete, pero sus hosts son ATREZO, no llamadas: un
+# fichero que prueba a un auditor tiene que inventarse dominios para que los cace. Antes
+# se contaban como hallazgos reales — medido el 8-sep-2026 auditando este mismo paquete:
+# `api.declarado.com`, `api.oculto.net`, `api.sinesquema.io` y `cdn.de-terceros.example`
+# salían acusando al paquete de llamar a sitios que no existen. Se leen APARTE y se
+# declaran, con el mismo criterio que vendor/dist/build: nunca callarlas, nunca acusarlas.
+DIRS_PRUEBAS = {'pruebas', 'tests', 'test'}
+EXCLUIR_DIRS = EXCLUIR_DIRS_SIEMPRE | DIRS_TERCEROS_EMBEBIDOS | DIRS_PRUEBAS
 EXT_CODIGO = {'.py', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.ps1', '.sh', '.rb', '.go'}
 # Ficheros de datos/configuración: la comprobación 4 (T4.2 arreglo) también los
 # lee, porque un host puesto aquí y leído por el código (`cfg['endpoint']`) sale
@@ -208,6 +220,20 @@ def _listar_ficheros_terceros_embebidos(ruta, extensiones):
         dirs[:] = [d for d in dirs if d not in EXCLUIR_DIRS_SIEMPRE]
         partes = set(os.path.relpath(raiz, ruta).replace(os.sep, '/').split('/'))
         if not (partes & DIRS_TERCEROS_EMBEBIDOS):
+            continue
+        for nombre in sorted(ficheros):
+            if os.path.splitext(nombre)[1].lower() in extensiones:
+                yield os.path.join(raiz, nombre)
+
+
+def _listar_ficheros_de_pruebas(ruta, extensiones):
+    """Hermano de `_listar_ficheros_terceros_embebidos`, pero para `DIRS_PRUEBAS`.
+    Mismo trato y por la misma razón: son contenido del paquete, pero sus hosts son
+    atrezo. Se leen para declararlos, nunca para acusar."""
+    for raiz, dirs, ficheros in os.walk(ruta):
+        dirs[:] = [d for d in dirs if d not in EXCLUIR_DIRS_SIEMPRE]
+        partes = set(os.path.relpath(raiz, ruta).replace(os.sep, '/').split('/'))
+        if not (partes & DIRS_PRUEBAS):
             continue
         for nombre in sorted(ficheros):
             if os.path.splitext(nombre)[1].lower() in extensiones:
@@ -677,6 +703,12 @@ def extraer_hosts_codigo(ruta):
     return _hosts_en_ficheros(ficheros, ruta)
 
 
+def extraer_hosts_pruebas(ruta):
+    """Los hosts que viven en las carpetas de pruebas. Se declaran, no se acusan: ver
+    el comentario de `DIRS_PRUEBAS`."""
+    return _hosts_en_ficheros(_listar_ficheros_de_pruebas(ruta, EXT_RED), ruta)
+
+
 def extraer_hosts_terceros_embebidos(ruta):
     """Igual que `extraer_hosts_codigo`, pero solo de lo que cae bajo
     `vendor/`, `dist/` o `build/` (T4.2 arreglo): antes esas carpetas se
@@ -690,6 +722,7 @@ def extraer_hosts_terceros_embebidos(ruta):
 def comprobar_red(ruta):
     hosts = extraer_hosts_codigo(ruta)
     hosts_terceros = extraer_hosts_terceros_embebidos(ruta)
+    hosts_pruebas = extraer_hosts_pruebas(ruta)
     texto_readmes = _texto_readmes(ruta).lower()
     hallazgos, sin_declarar = [], []
     for host, apariciones in sorted(hosts.items()):
@@ -707,6 +740,8 @@ def comprobar_red(ruta):
             'hosts_sin_declarar': sin_declarar,
             'hosts_terceros_embebidos': {h: [f'{f}:{n}' for f, n in aps]
                                           for h, aps in sorted(hosts_terceros.items())},
+            'hosts_en_pruebas': {h: [f'{f}:{n}' for f, n in aps]
+                                 for h, aps in sorted(hosts_pruebas.items())},
             'hallazgos': hallazgos}
 
 
@@ -811,7 +846,13 @@ def a_texto(r):
 
 
 def a_markdown(r):
-    L = [f"# Auditoría de `{r['ruta']}`", '', f"**Veredicto**: {r['veredicto']}", '']
+    # En el informe MARKDOWN va el NOMBRE del paquete, no su ruta absoluta: este fichero
+    # se publica, y la ruta de la máquina donde se auditó no es del paquete — puede llevar
+    # el nombre de una persona dentro. (Medido el 8-sep-2026: el informe regenerado con la
+    # ruta entera hacía saltar la prueba de datos personales del propio repositorio.)
+    # Por pantalla y en el JSON sí sale la ruta entera: ahí no se publica nada.
+    L = [f"# Auditoría de `{os.path.basename(os.path.abspath(r['ruta']))}`", '',
+         f"**Veredicto**: {r['veredicto']}", '']
     L.append('## Hallazgos')
     if not r['hallazgos']:
         L.append('')

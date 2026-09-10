@@ -62,7 +62,12 @@ lanzar un subproceso. Solo el bloque `if __name__ == '__main__':` resuelve
 Carpeta de datos: NUNCA `dirname(__file__)`; la resuelve `rutas.resolver()` (§1 de
 ESPECIFICACION.md) — solo dentro de `__main__`, ver arriba.
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os
 import re
 import json

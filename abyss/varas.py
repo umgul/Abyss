@@ -36,7 +36,12 @@ transcripts vivos de `proj` sin mirar el tramo en absoluto, así que MEMORY.md
 —lo primero que el asistente lee al empezar cada hilo— seguía delatando qué
 ficha se consultó en ese rato, aunque el contenido nunca se copiara a ningún
 sitio."""
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, json, glob, time, shutil, unicodedata
 N = unicodedata.normalize
 

@@ -54,7 +54,12 @@ la misma máquina.
 Carpeta de datos: NUNCA `dirname(__file__)`; la resuelve `rutas.resolver()` (§1 de
 ESPECIFICACION.md), solo dentro de `__main__`.
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os
 import re
 import json
@@ -406,6 +411,16 @@ if __name__ == '__main__':
             print('sin resultados'); sys.exit(0)
         for r in resultados:
             print(f"página {r['pagina']}  puntuación {r['puntuacion']}  sección: {r['seccion'] or '(sin sección)'}")
+            # Y un trozo del texto de verdad. Antes salían solo página y puntuación, así que
+            # quien lo lee no podía juzgar NADA sin otra llamada a --leer: se tenía que fiar
+            # del orden. Esto no arregla la búsqueda —sigue siendo frecuencia de términos—,
+            # pero deja que quien lee decida si el candidato pega o no.
+            # `paginas` es una LISTA y la página va en base 1: mismo acceso que usa
+            # `leer()` (línea 345) y `ahorro()` (línea 360)
+            crudo = indice['paginas'][r['pagina'] - 1]
+            trozo = ' '.join(str(crudo).split())[:280]
+            if trozo:
+                print(f"    {trozo}…" if len(trozo) == 280 else f"    {trozo}")
         sys.exit(0)
 
     if modo == '--leer':

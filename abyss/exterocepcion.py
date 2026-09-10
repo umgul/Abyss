@@ -27,7 +27,12 @@ ya consumido y sin `ABYSS_PROYECTO`— no reventamos al que nos llama: cada func
 «sin dato» (fail-closed), salvo el uso manual por `__main__`, que si no hay proyecto avisa
 claro y sale (para eso está `rutas.resolver()`: quien lo teclea a mano necesita saberlo).
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, json, time, urllib.request, urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

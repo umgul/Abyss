@@ -25,7 +25,12 @@ resoluble, cada función dice «sin noticias» en vez de reventar a quien nos im
 
 Uso: python noticias.py [--refrescar] [--auto-preview] [transcript_path]
 """
-import sys; sys.stdout.reconfigure(encoding="utf-8")
+import sys
+try:                       # la consola de Windows y la salida tienen que hablar
+    from . import consola  # el mismo idioma: ver abyss/consola.py
+except ImportError:
+    import consola
+consola.preparar()
 import os, re, json, time, glob, urllib.request, urllib.parse, xml.etree.ElementTree as ET
 from collections import Counter
 
