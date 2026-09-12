@@ -183,44 +183,24 @@ its own (see "Where the data lives" below).
 ```
 
 (that repository path is where publication is planned; adjust it if
-`umgul/Abyss` changes). This installs the *skills* under `skills/` and the
-hooks in [`hooks/hooks.json`](hooks/hooks.json): `continuidad.py --arranque`,
-`huella.py --arranque`, and `cuerpo.py --arranque` on `SessionStart`;
-`continuidad.py --despertar` and `cuerpo.py --despertar` on
-`UserPromptSubmit`; `--cierre` on `SessionEnd`; `huella.py --herramienta` on
-`PostToolUse`; `vigia.py --verificar` and `huella.py --fin` on `Stop`.
-(`modelo.py` has no hook of its own — Claude Code has no «PostModelSwitch»/
-«PreModelSwitch» event; it detects the downgrade as a library used by
-`continuidad.py --despertar`, on every prompt.) Every command uses
-`${CLAUDE_PLUGIN_ROOT}`, the absolute path Claude Code substitutes for
-wherever the plugin was installed — nothing to edit by hand.
+`umgul/Abyss` changes). This installs only the *skills* under `skills/`. The
+plugin declares no hooks: Claude Code would load a `hooks/hooks.json` on its
+own when installing it, and this package deliberately ships none, so that
+nothing runs on every session, every prompt or after every tool unless the
+user chose that module.
 
-**How these hooks find their data without an installer**: each one resolves
-the project's data folder from the JSON Claude Code sends over stdin
-(`transcript_path`/`cwd`), via `abyss/rutas.py` — never a fixed path or a
-variable someone had to set up. That's why the plugin's hooks work on their
-own, in any project, right after installing — **with one limit**: the nine
-hooks in [`hooks/hooks.json`](hooks/hooks.json) invoke plain `python` (they
-can't detect an interpreter, unlike `instalar.py`). That requires `python` to
-be on `PATH` and be Python 3.12+: on Windows, if Python wasn't installed from
-python.org, `python` may be the Microsoft Store alias (it opens the store
-instead of running anything); on modern macOS there's no `python` at all
-(only `python3`), and several Linux distributions lack it too. If that
-happens, the plugin's hooks fail silently — use `instalar.py` instead, which
-detects the real interpreter (`sys.executable`, or `--python <exe>`).
+**Hooks go through `instalar.py`**: `continuidad`, `huella`, `cuerpo` and
+`vigia` are installed module by module with `python instalar.py --instalar …`,
+which detects the real interpreter (`sys.executable`, or `--python <exe>`),
+says what each module touches, and records each hook's signature so it can be
+removed later. Each hook resolves the project's data folder from the JSON
+Claude Code sends over stdin (`transcript_path`/`cwd`), via `abyss/rutas.py`,
+so it works in any project with no paths to configure.
 
-**Cost warning when installing via the plugin**: unlike `instalar.py` (where
-`huella` comes UNCHECKED by default, see below), installing the whole plugin
-also brings `huella`'s hooks — and its `PostToolUse` hook runs after EVERY
-tool call. If that's too heavy, remove those three entries from
-`hooks/hooks.json` by hand, or install with `instalar.py` instead, which does
-let you pick module by module.
-
-What the plugin does **not** bring, because it needs data only a person can
-give: the **telegram** module (needs a bot token and a chat id) and seeding
-the configuration templates (`modelo_preferido.json`, `temas_noticias.json`,
-`imagen_config.json`). For that, or to install without the plugin system,
-there's `instalar.py`.
+What the plugin does not bring either, because it needs data only a person
+can give: the **telegram** module (needs a bot token and a chat id) and
+seeding the configuration templates (`modelo_preferido.json`,
+`temas_noticias.json`, `imagen_config.json`). That's what `instalar.py` is for.
 
 ### With `instalar.py`
 
@@ -306,13 +286,12 @@ made before touching anything.
 <details>
 <summary>Secondary appendix: wiring the hooks BY HAND (NOT recommended)</summary>
 
-Only if for some reason neither the plugin system nor `instalar.py` can be
-used: copy the block from
+Only if for some reason `instalar.py` can't be used: copy the block from
 [`docs/ganchos_settings_ejemplo.json`](docs/ganchos_settings_ejemplo.json)
 into `"hooks"` in `~/.claude/settings.json`, replacing `<RUTA_DEL_PAQUETE>`
 with the real path where `abyss/` ended up and `<PYTHON>` with the
-interpreter to use. Without `instalar.py` or the plugin system there is no
-manifest recording what got installed, so undoing it means remembering by
+interpreter to use. Without `instalar.py` there is no manifest recording what
+got installed, so undoing it means remembering by
 hand what was touched.
 
 </details>
@@ -354,8 +333,8 @@ The data (sessions, clocks, word bags, caught confabulations, location,
 weather, images…) lives **per project**, inside Claude Code's own automatic
 memory folder for that project: `~/.claude/projects/<sanitized-project>/memory/`.
 The only module that decides that path is `abyss/rutas.py`; everything else
-imports it. Since the hooks (from the plugin, or from the global
-`settings.json`) fire in every project, not just the one that was open at
+imports it. Since the hooks in the global `settings.json` fire in every
+project, not just the one that was open at
 install time, each invocation resolves its own project from the
 `transcript_path`/`cwd` it receives — one project's memory never mixes with
 another's.

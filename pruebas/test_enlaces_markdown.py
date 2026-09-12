@@ -1,11 +1,6 @@
-"""Enlaces internos de la documentación publicada (fallo 6-sep, "engaña"):
-`docs/leyes.md` enlazaba a `abyss-sgicp-propio.md`/`abyss-vigia-confabulacion.md` y
-decía que "se quedan tal cual en esta misma carpeta" — MEDIDO: `docs/` solo contiene
-`leyes.md` y `ganchos_settings_ejemplo.json`; los dos enlaces estaban rotos.
-
-Comprueba TODO enlace markdown `[texto](ruta)` de los ficheros de documentación
-publicados que no sea externo (`http://`/`https://`) ni un ancla (`#...`): la ruta
-debe existir de verdad, relativa a la carpeta del propio fichero .md."""
+"""Todo enlace markdown `[texto](ruta)` en la documentación publicada, que no sea
+externo (`http://`/`https://`) ni un ancla (`#...`), debe resolver a un fichero
+real, relativo a la carpeta del propio .md."""
 import re
 import unittest
 from pathlib import Path

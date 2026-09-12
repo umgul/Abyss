@@ -1,31 +1,6 @@
-"""`kinetica.py`: despiece por COMPONENTES REALES de una foto (no capas de nitidez, ver
-`volumen.py`), montado para el visor 3D de `abyss/plantillas/kinetica.html` (leída, no
-tocada por estas pruebas). No llama a `rutas.resolver()` ni lee stdin (guion de fichero a
-fichero, como `volumen.py`/`render3d.py`): se importa DIRECTAMENTE en el proceso de la
-prueba, mismo patrón que `test_volumen.py`.
-
-La imagen es sintética y GEOMÉTRICA a propósito (dos rectángulos de color plano, bien
-separados, sobre un fondo liso de otro color, dibujados con `cv2`): así se sabe de
-antemano que GrabCut debe separarlos del fondo y que, sin regiones, deben salir como DOS
-componentes conexos distintos (no se tocan entre sí).
-
-`opencv-python`/`numpy`/`Pillow` SÍ están instalados en la máquina de desarrollo (medido):
-no hay aquí una prueba de "sin dependencia" — ese patrón ya lo cubren
-`test_imagen_dependencias_opcionales.py`/`test_volumen.py` para el resto del paquete.
-
-NINGUNA prueba de aquí abre una cámara ni un navegador: `montar()` nunca los toca, y las
-pruebas que ejercitan la CLI (`kinetica._cli`) usan siempre `--solo-montar`, que por
-diseño de `_cli` (ver su código) vuelve ANTES de llamar a `servir()` — reforzado abajo
-parcheando `kinetica.servir` para comprobar que, en efecto, nunca se invoca.
-
-`ContratoConLaPlantillaDeVerdad`, al final: las clases de arriba solo comprueban que
-`kinetica.py` es coherente CONSIGO MISMO (abren la ruta que el propio módulo eligió y el
-nombre que el propio módulo escribió) — nunca abren `abyss/plantillas/kinetica.html` ni
-contrastan una sola clave contra lo que ELLA pide. Esa clase sí lee la plantilla de
-verdad, extrae con regex sobre su `<script>` lo que exige (`fetch('...')`,
-`carg.load('...')` literales y el uso de `p.png` por pieza) y lo contrasta contra una
-carpeta montada de verdad, para que cambiar la plantilla o el módulo sin el otro rompa
-esta prueba en vez de romper la pantalla."""
+"""`kinetica.py`: despiece por componentes reales de una foto (no capas de
+nitidez, ver `volumen.py`). La imagen de prueba usa dos rectángulos bien
+separados para que GrabCut los separe siempre en dos piezas distintas."""
 import importlib.util
 import io
 import json
@@ -57,8 +32,8 @@ except ImportError:
 
 
 def _nueva_carpeta_temporal():
-    """Directorio temporal cualquiera (no una memoria de proyecto: `kinetica.py` no llama
-    a `rutas.resolver()`, ver su docstring), borrado al final de cada prueba."""
+    """Directorio temporal cualquiera (no una memoria de proyecto: `kinetica.py`
+    no llama a `rutas.resolver()`), borrado al final de cada prueba."""
     return Path(tempfile.mkdtemp(prefix='abyss_kinetica_'))
 
 
@@ -207,9 +182,9 @@ class CliSoloMontarNoSirveNada(unittest.TestCase):
 
 @unittest.skipIf(kinetica is None, 'opencv-python/numpy/Pillow no disponibles en esta máquina')
 class SinMpAvisaYSigueEnCodigoCero(unittest.TestCase):
-    """`MP_VENDOR` se parchea a una ruta que NO existe, sin importar si esta instalación
-    ya trae `abyss/vendor/mp/` de verdad (otra tanda) o no: así la prueba comprueba el
-    camino "falta mp/" siempre, no solo por casualidad del estado actual del repo."""
+    """`MP_VENDOR` se parchea a una ruta que no existe, sin importar si esta
+    instalación ya trae `abyss/vendor/mp/`: así el camino "falta mp/" se
+    prueba siempre, no solo por casualidad del estado del repo."""
 
     def setUp(self):
         self.tmp = _nueva_carpeta_temporal()
@@ -246,13 +221,9 @@ _RE_VERBO = re.compile(r"""fetch\(\s*['"]([^'"]+)['"]\s*,\s*\{[^}]*method\s*:\s*
 
 
 def _fetches_de_la_plantilla(texto):
-    """`{ruta_literal: opcional}`, leído línea a línea del `<script>`. `opcional` es
-    `True` cuando el propio `fetch(...)` va envuelto en un `try { ... }` en esa misma
-    línea (así declara la plantilla `fichas.json`: lo intenta y sigue con `{}` si
-    falta — `kinetica.py` documenta ese fichero como opcional). Cualquier otro
-    `fetch(...)` de la plantilla es, por tanto, obligatorio.
-
-    Los VERBOS quedan fuera: ver `_verbos_de_la_plantilla`."""
+    """`{ruta_literal: opcional}`, leído línea a línea del `<script>`. `opcional`
+    es `True` si el propio `fetch(...)` va en un `try {...}` en esa misma línea.
+    Los verbos POST quedan fuera: ver `_verbos_de_la_plantilla`."""
     verbos = set(_verbos_de_la_plantilla(texto))
     vistos = {}
     for linea in texto.splitlines():
@@ -264,11 +235,9 @@ def _fetches_de_la_plantilla(texto):
 
 
 def _verbos_de_la_plantilla(texto):
-    """Las rutas que la plantilla pide por POST. NO son ficheros y por eso no se les
-    puede exigir que existan en la carpeta montada: son órdenes que atiende el servidor
-    (hoy `/abrir-enlace`, que abre el sitio oficial FUERA de la ventana para no llevarse
-    la escena por delante). Se les exige otra cosa, más fuerte, en su propia prueba: que
-    el servidor de `kinetica.py` las conteste de verdad."""
+    """Rutas que la plantilla pide por POST: no son ficheros, son órdenes que
+    atiende el servidor (hoy `/abrir-enlace`). Se prueban aparte, más fuerte:
+    que el servidor de `kinetica.py` las conteste de verdad."""
     return sorted({m.group(1) for m in _RE_VERBO.finditer(texto)})
 
 
@@ -278,10 +247,9 @@ def _cargas_literales_de_la_plantilla(texto):
 
 @unittest.skipIf(kinetica is None, 'opencv-python/numpy/Pillow no disponibles en esta máquina')
 class ContratoConLaPlantillaDeVerdad(unittest.TestCase):
-    """Monta una carpeta de verdad con `kinetica.montar()` y la contrasta con lo que
-    `abyss/plantillas/kinetica.html` DE VERDAD pide (leída y parseada aquí, nunca
-    tocada) — no con lo que `kinetica.py` cree haber escrito. Ver docstring del
-    módulo."""
+    """Monta una carpeta de verdad con `kinetica.montar()` y la contrasta con
+    lo que `abyss/plantillas/kinetica.html` pide de verdad (leída y parseada
+    aquí, nunca tocada) — no con lo que `kinetica.py` cree haber escrito."""
 
     def setUp(self):
         self.assertTrue(_RUTA_PLANTILLA.is_file(), f'no existe {_RUTA_PLANTILLA}')
@@ -308,10 +276,9 @@ class ContratoConLaPlantillaDeVerdad(unittest.TestCase):
                     f'y no está en {self.salida}')
 
     def test_cada_verbo_de_la_plantilla_lo_atiende_el_servidor(self):
-        """Un POST de la plantilla no es un fichero: es una orden. Aquí no basta con que
-        no exista en la carpeta — se levanta el servidor DE VERDAD sobre lo montado y se
-        comprueba que contesta a ese verbo y solo a ese. Sin esto, la plantilla podría
-        pedir un verbo que nadie implementa y todas las demás pruebas seguirían verdes."""
+        """Un POST de la plantilla es una orden, no un fichero: se levanta el
+        servidor de verdad sobre lo montado y se comprueba que contesta a ese
+        verbo y solo a ese."""
         import http.client
         import threading
         from http.server import ThreadingHTTPServer
@@ -399,12 +366,9 @@ def _regiones_json_con_ordenes(ruta, orden_a, orden_b):
 
 @unittest.skipIf(kinetica is None, 'opencv-python/numpy/Pillow no disponibles en esta máquina')
 class OrdenSeReindexaAlSalir(unittest.TestCase):
-    """El `orden` del fichero de regiones solo ORDENA: puede numerar 1,2,3 o dejar huecos,
-    pero `kinetica.html` lo usa como índice DENSO 0..N-1 (`piezas.find(q => q.dato.orden
-    === objetivo.aislada-1)` al aislar por dedos extendidos) — con un `orden` no denso ese
-    `find` no encuentra nada, devuelve `undefined` y el `.dato.titulo` siguiente revienta
-    con TypeError en cada fotograma. Aquí se piden 5 y 2 (invertido y con huecos): la
-    salida debe quedar 0/1, en el orden relativo pedido, nunca 5/2 tal cual."""
+    """`orden` en el fichero de regiones solo ordena (puede tener huecos), pero
+    `kinetica.html` lo usa como índice denso 0..N-1 (`piezas.find` al aislar
+    por dedos) — no denso, ese `find` falla y revienta con TypeError."""
 
     def setUp(self):
         self.tmp = _nueva_carpeta_temporal()
@@ -434,11 +398,9 @@ class OrdenSeReindexaAlSalir(unittest.TestCase):
 
 @unittest.skipIf(kinetica is None, 'opencv-python/numpy/Pillow no disponibles en esta máquina')
 class OriginalSiempreEsJpgYLoDeclaraSiRecodifica(unittest.TestCase):
-    """La plantilla carga SIEMPRE 'original.jpg' de forma literal
-    (`carg.load('original.jpg', ...)`, kinetica.html) — con una entrada .png (como la de
-    estas pruebas) el módulo debe recodificar a JPEG, nunca dejar un 'original.png' que
-    la plantilla no sabe pedir (y que solo "funcionaba" por casualidad cuando la entrada
-    ya era .jpg)."""
+    """La plantilla carga siempre 'original.jpg' de forma literal: con una
+    entrada .png el módulo debe recodificar a JPEG, nunca dejar un
+    'original.png' que la plantilla no sabe pedir."""
 
     def setUp(self):
         self.tmp = _nueva_carpeta_temporal()
@@ -468,13 +430,9 @@ class OriginalSiempreEsJpgYLoDeclaraSiRecodifica(unittest.TestCase):
 
 @unittest.skipIf(kinetica is None, 'opencv-python/numpy/Pillow no disponibles en esta máquina')
 class MensajeMediapipeCitaElComandoDelInstalador(unittest.TestCase):
-    """El aviso de "falta mp/" debe mandar al comando de UNA línea que el propio paquete
-    ya trae (`python instalar.py --manos`, ver `instalar.COMANDO_DESCARGAR_MANOS`), no a
-    un procedimiento manual con npm/tar/Node.js — `instalar.py --manos` ya baja los seis
-    ficheros él mismo, con `urllib`, sin Node.js. Se carga `instalar.py` DIRECTAMENTE por
-    ruta de fichero, con su propio nombre de módulo (mismo patrón que
-    `test_instalador_kinetica.py`, para no chocar si otra prueba lo carga en el mismo
-    proceso de `unittest`)."""
+    """El aviso de "falta mp/" debe citar el comando de una línea que ya trae
+    el paquete (`instalar.COMANDO_DESCARGAR_MANOS`), no un procedimiento
+    manual con npm/tar/Node.js."""
 
     def test_mensaje_cita_el_comando_real_y_no_manda_a_npm_ni_node(self):
         ruta = ay.RAIZ / 'instalar.py'

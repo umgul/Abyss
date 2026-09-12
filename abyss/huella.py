@@ -105,8 +105,8 @@ heurístico NO llegaría a activarse por defecto (queda por debajo de 1500 ms):
 el mecanismo está implementado y probado con costes inyectados
 (`pruebas/test_huella.py`), no porque esta máquina lo dispare sola.
 
-Windows: `Get-NetTCPConnection -State Listen` (puerto → pid) y `Get-Process`
-con `StartTime` (pid → nombre + hora ISO), en una sola invocación de
+Windows: `Get-NetTCPConnection -State Listen` (puerto → pid) y `Get-CimInstance
+Win32_Process` (pid → nombre, padre y hora ISO), en una sola invocación de
 `powershell.exe -NoProfile -NonInteractive` con timeout (8 s; agotado o con
 `returncode != 0`: `None`, "sin dato"). Linux/macOS: `ss -ltnp` y, si no existe,
 `lsof -iTCP -sTCP:LISTEN -P -n` para puertos; `ps -eo pid,lstart,comm` para
@@ -233,12 +233,9 @@ def costes_apuntar(mem, ms):
 
 def _powershell(cmd, timeout=8):
     """(stdout, pid) de un script de PowerShell (`-NoProfile -NonInteractive`).
-    `stdout` es `None` si falla, se agota el tiempo, o el proceso no arranca en
-    absoluto. `pid` es el PID del propio `powershell.exe` lanzado — se necesita
-    con `Popen` (no `subprocess.run`, que no lo expone) porque quien fotografía
-    procesos (`foto()`) tiene que poder EXCLUIRSE a sí mismo: mientras este
-    `powershell.exe` ejecuta `Get-Process`, se ve vivo a sí mismo (fallo
-    medido 7-sep, ver docstring del módulo)."""
+    `stdout` es `None` si falla, se agota el tiempo, o el proceso no arranca.
+    `pid` es el del propio `powershell.exe` (por eso `Popen`): `foto()` tiene que
+    poder excluirse a sí misma, porque ese proceso se ve vivo mientras consulta."""
     try:
         proc = subprocess.Popen(['powershell', '-NoProfile', '-NonInteractive', '-Command', cmd],
                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
@@ -273,7 +270,7 @@ def leer_puertos_y_procesos_windows():
     """(puertos, procesos, pid_powershell) de UNA sola llamada combinada a
     PowerShell — ver docstring del módulo para el coste medido de separarlas.
     `puertos` es {puerto_str: pid_str} (pid "0" si `OwningProcess` viene
-    vacío); `procesos` es {pid_str: {'nombre':..., 'inicio': iso}}. Cualquiera
+    vacío); `procesos` es {pid_str: {'nombre':..., 'inicio': iso, 'padre': pid_str|None}}. Cualquiera
     de los dos es `None` si la llamada entera falló o no dio JSON legible
     ("sin dato": nunca un dict vacío fingiendo que se miró y no había nada).
     `pid_powershell` es el PID del propio `powershell.exe` que hizo la
@@ -282,8 +279,9 @@ def leer_puertos_y_procesos_windows():
     salida, pid_ps = _powershell(
         "$p = Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | "
         "Select-Object LocalPort,OwningProcess; "
-        "$q = Get-Process | Where-Object {$_.StartTime} | "
-        "Select-Object Id,ProcessName,@{n='Inicio';e={$_.StartTime.ToString('o')}}; "
+        "$q = Get-CimInstance Win32_Process | Where-Object {$_.CreationDate} | "
+        "Select-Object @{n='Id';e={$_.ProcessId}},@{n='ProcessName';e={$_.Name}},"
+        "@{n='Padre';e={$_.ParentProcessId}},@{n='Inicio';e={$_.CreationDate.ToString('o')}}; "
         "@{puertos=$p; procesos=$q} | ConvertTo-Json -Compress -Depth 4"
     )
     if not salida or not salida.strip():
@@ -295,7 +293,8 @@ def leer_puertos_y_procesos_windows():
     try:
         puertos = {str(int(x['LocalPort'])): str(int(x.get('OwningProcess') or 0))
                    for x in _normalizar_lista(d.get('puertos')) if x.get('LocalPort') is not None}
-        procesos = {str(int(x['Id'])): {'nombre': x.get('ProcessName') or '', 'inicio': x.get('Inicio') or ''}
+        procesos = {str(int(x['Id'])): {'nombre': x.get('ProcessName') or '', 'inicio': x.get('Inicio') or '',
+                                        'padre': None if x.get('Padre') is None else str(int(x['Padre']))}
                     for x in _normalizar_lista(d.get('procesos')) if x.get('Id') is not None}
     except Exception:
         return None, None, pid_ps
@@ -353,56 +352,85 @@ def leer_puertos_posix():
 
 
 def leer_procesos_posix():
-    """{pid_str: {'nombre':..., 'inicio': iso}}|None con `ps -eo pid,lstart,comm`.
-    NO probado en esta máquina (es Windows): escrito contra el formato
-    documentado de `ps`, sin ejecutar ni medir aquí."""
+    """{pid_str: {'nombre':..., 'inicio': iso, 'padre': pid_str}}|None con
+    `ps -eo pid,ppid,lstart,comm`. Escrito contra el formato documentado de `ps`,
+    sin ejecutar ni medir en Windows."""
     try:
-        r = subprocess.run(['ps', '-eo', 'pid,lstart,comm'], capture_output=True, text=True, timeout=5)
+        r = subprocess.run(['ps', '-eo', 'pid,ppid,lstart,comm'], capture_output=True, text=True, timeout=5)
         if r.returncode != 0:
             return None
         out = {}
         for linea in r.stdout.splitlines()[1:]:
-            partes = linea.split(None, 5)
-            if len(partes) < 6:
+            partes = linea.split(None, 6)
+            if len(partes) < 7:
                 continue
-            pid, dow, mon, day, hhmmss_year, resto = partes
+            pid, ppid, dow, mon, day, hhmmss_year, resto = partes
             nombre = resto.split()[-1] if resto.split() else ''
             try:
                 dt = datetime.strptime(f'{dow} {mon} {day} {hhmmss_year}', '%a %b %d %H:%M:%S %Y')
                 inicio = dt.isoformat()
             except Exception:
                 inicio = ''
-            out[pid] = {'nombre': nombre, 'inicio': inicio}
+            out[pid] = {'nombre': nombre, 'inicio': inicio, 'padre': ppid}
         return out
     except Exception:
         return None
 
 
 def _pids_propios(pid_powershell=None):
-    """PIDs del árbol del propio gancho que NUNCA deben contar como
-    "proceso_nuevo" de la sesión (fallo medido 7-sep: con un solo `Bash`
-    inocuo, `diferencias()` cazaba `bash`/`powershell`/`python` — el shell que
-    invocó el gancho, el `python` de este mismo `huella.py`, y el
-    `powershell.exe` que `foto()` acababa de lanzar para MEDIRSE a sí mismo —
-    y `--fin` avisaba de "procesos vivos" que ya habían terminado en el
-    instante en que `--informe`, con una foto fresca, ya no los veía).
-    `os.getpid()` es este proceso; `os.getppid()` es quien lo lanzó (el shell
-    que Claude Code usa para invocar el gancho); `pid_powershell` es el PID
-    del `powershell.exe` que la propia llamada a `foto()` acaba de usar para
-    consultar `Get-Process` (se ve vivo a sí mismo mientras corre)."""
+    """PIDs del árbol del propio gancho, que nunca cuentan como `proceso_nuevo`: este
+    intérprete, quien lo lanzó y el `powershell.exe` que acaba de tomar la foto
+    (se ve vivo a sí mismo mientras corre)."""
     out = {str(os.getpid()), str(os.getppid())}
     if pid_powershell is not None:
         out.add(str(pid_powershell))
     return out
 
 
+_SHELLS = {'cmd', 'bash', 'sh', 'zsh', 'dash', 'powershell', 'pwsh', 'conhost', 'mintty'}
+
+
+def _nombre_base(nombre):
+    n = (nombre or '').lower()
+    return n[:-4] if n.endswith('.exe') else n
+
+
+def _raiz_sesion(procesos):
+    """El primer antepasado de este gancho que no es un shell: el proceso de Claude
+    Code que lanza ganchos y herramientas (o quien lanza las pruebas). None si la
+    tabla no permite seguir la cadena."""
+    if not procesos:
+        return None
+    pid, vistos = str(os.getppid()), set()
+    while pid in procesos and pid not in vistos:
+        vistos.add(pid)
+        info = procesos[pid]
+        if _nombre_base(info.get('nombre')) not in _SHELLS:
+            return {'pid': pid, 'inicio': info.get('inicio')}
+        pid = info.get('padre')
+    return None
+
+
+def _desciende_de(procesos, pid, raiz):
+    """True si `pid` cuelga de `raiz`, False si cuelga de otro proceso vivo, None si
+    la cadena se corta antes (un padre que ya no existe) y no se puede decir."""
+    vistos = set()
+    while pid and pid not in vistos:
+        vistos.add(pid)
+        info = procesos.get(pid)
+        if info is None:
+            return None
+        if pid == raiz['pid']:
+            return info.get('inicio') == raiz['inicio']
+        pid = info.get('padre')
+    return False if pid else None
+
+
 def foto():
-    """({'puertos': {...}|None, 'procesos': {...}|None}, coste_ms) — coste_ms es
-    SOLO el tiempo de esta llamada, para que `registrar_comando()` lo vaya
-    apuntando en `mem/huella/_costes.json`. `procesos` nunca incluye el árbol
-    del propio gancho (`_pids_propios()`): ni este mismo intérprete, ni
-    quien lo invocó, ni el instrumento (`powershell.exe` en Windows) que
-    acaba de tomar la foto — ver `_pids_propios()`."""
+    """({'puertos': {...}|None, 'procesos': {...}|None, 'raiz': {...}|None}, coste_ms).
+    `procesos` nunca incluye el árbol del propio gancho (`_pids_propios()`); `raiz`
+    es el proceso de sesión del que cuelga este gancho (`_raiz_sesion()`), para
+    atribuir los procesos nuevos. `coste_ms` es solo el tiempo de esta llamada."""
     t0 = time.perf_counter()
     if os.name == 'nt':
         puertos, procesos, pid_ps = leer_puertos_y_procesos_windows()
@@ -411,10 +439,11 @@ def foto():
         puertos = leer_puertos_posix()
         procesos = leer_procesos_posix()
         propios = _pids_propios()
+    raiz = _raiz_sesion(procesos)
     if procesos is not None:
         procesos = {pid: info for pid, info in procesos.items() if pid not in propios}
     coste_ms = round((time.perf_counter() - t0) * 1000)
-    return {'puertos': puertos, 'procesos': procesos}, coste_ms
+    return {'puertos': puertos, 'procesos': procesos, 'raiz': raiz}, coste_ms
 
 
 # ---------- heurística de cuándo fotografiar (coste medido, no ley) ----------
@@ -448,20 +477,30 @@ def debe_fotografiar(costes_previos, comando):
 
 def diferencias(anterior, actual):
     """[(tipo, datos)] entre dos fotos: `puerto_nuevo` ({'puerto','pid'}) y
-    `proceso_nuevo` ({'pid','nombre','inicio'}). Un campo en `None` en cualquiera
-    de los dos lados (instrumento sin dato) se salta esa comparación entera — no
-    se puede decir que algo es "nuevo" contra un "no sé"."""
+    `proceso_nuevo` ({'pid','nombre','inicio'} más, si hay raíz de sesión, `seguro`:
+    True si cuelga de ella, False si su cadena de padres se corta antes de poder
+    decirlo). Un proceso nuevo que cuelga de otro proceso vivo ajeno no es de este
+    hilo y no se registra. Un campo en `None` en cualquiera de los dos lados
+    (instrumento sin dato) se salta esa comparación entera."""
     out = []
     ap, an = anterior.get('puertos'), actual.get('puertos')
     if ap is not None and an is not None:
         for puerto in sorted(set(an) - set(ap), key=lambda x: int(x)):
             out.append(('puerto_nuevo', {'puerto': puerto, 'pid': an.get(puerto)}))
     aq, cq = anterior.get('procesos'), actual.get('procesos')
+    raiz = anterior.get('raiz') or actual.get('raiz')
     if aq is not None and cq is not None:
         for pid, info in cq.items():
             previo = aq.get(pid)
-            if previo is None or previo.get('inicio') != info.get('inicio'):
-                out.append(('proceso_nuevo', {'pid': pid, 'nombre': info.get('nombre'), 'inicio': info.get('inicio')}))
+            if previo is not None and previo.get('inicio') == info.get('inicio'):
+                continue
+            datos = {'pid': pid, 'nombre': info.get('nombre'), 'inicio': info.get('inicio')}
+            if raiz is not None:
+                seguro = _desciende_de(cq, pid, raiz)
+                if seguro is False:
+                    continue
+                datos['seguro'] = bool(seguro)
+            out.append(('proceso_nuevo', datos))
     return out
 
 
@@ -501,6 +540,8 @@ def registrar_comando(mem, sid, comando):
     actual, coste_ms = foto()
     costes_apuntar(mem, coste_ms)
     if anterior is not None:
+        if actual.get('raiz') is None:
+            actual['raiz'] = anterior.get('raiz')
         for tipo, datos in diferencias(anterior, actual):
             registrar(mem, sid, {'ts': _ahora(), 'tipo': tipo, 'foto_ms': coste_ms, **datos})
     snapshot_escribir(mem, sid, actual)
@@ -540,7 +581,8 @@ def informe(mem, sid, foto_actual=None):
     for pid, e in procesos_reg.items():
         info = (fq or {}).get(pid)
         if info is not None and info.get('inicio') == e.get('inicio'):
-            procesos_vivos.append({'pid': pid, 'nombre': e.get('nombre'), 'inicio': e.get('inicio')})
+            procesos_vivos.append({'pid': pid, 'nombre': e.get('nombre'), 'inicio': e.get('inicio'),
+                                   'seguro': e.get('seguro', True)})
     puertos_vivos = []
     for puerto, e in puertos_reg.items():
         if fp is not None and puerto in fp:
@@ -571,7 +613,8 @@ def texto_informe(inf):
         L.append('procesos vivos: ninguno')
     else:
         for p in inf['procesos_vivos']:
-            L.append(f"  proceso vivo: pid {p['pid']} {p['nombre']} desde {p['inicio']}")
+            nota = '' if p.get('seguro', True) else ' (atribución incierta: su padre ya no existe)'
+            L.append(f"  proceso vivo: pid {p['pid']} {p['nombre']} desde {p['inicio']}{nota}")
     if inf['sin_dato_puertos']:
         L.append('puertos vivos: sin dato (no se pudo consultar en esta máquina)')
     elif not inf['puertos_vivos']:
@@ -583,23 +626,16 @@ def texto_informe(inf):
 
 
 def resumen_stop(mem, sid):
-    """`--fin` (Stop): comprueba con una foto FRESCA, no con el último snapshot
-    guardado. Antes SÍ usaba el último snapshot para no pagar la foto en cada
-    turno — pero ese snapshot es EXACTAMENTE la foto en la que un
-    `proceso_nuevo`/`puerto_nuevo` se detectó (`registrar_comando()` la guarda
-    como base tras cada diferencia), así que comparar el registro contra ella
-    es tautológico: cualquier cosa cazada como "nueva" sale SIEMPRE "viva" en
-    `--fin`, aunque ya llevara rato muerta (fallo medido 7-sep: un `Bash`
-    con `echo uno` bastaba para que `--fin` avisara de "3 proceso" que en ese
-    mismo instante `--informe`, con una foto fresca, ya no veía). Para no
-    pagar esa foto cuando no hace falta, solo se toma si hay algún
-    `proceso_nuevo`/`puerto_nuevo` registrado que comprobar; sin ninguno,
-    cadena vacía sin fotografiar nada."""
+    """`--fin` (Stop): comprueba con una foto FRESCA (el último snapshot es justo la
+    foto en la que se detectó cada novedad; compararlo contra ella sería tautológico).
+    Solo fotografía si hay algo registrado que comprobar. Los procesos de atribución
+    incierta no cuentan aquí: se ven en `--informe`."""
     evs = eventos(mem, sid)
     if not any(e.get('tipo') in ('proceso_nuevo', 'puerto_nuevo') for e in evs):
         return ''
     inf = informe(mem, sid)  # foto fresca (foto_actual=None por defecto)
-    n_p, n_pu = len(inf['procesos_vivos']), len(inf['puertos_vivos'])
+    n_p = sum(1 for p in inf['procesos_vivos'] if p.get('seguro', True))
+    n_pu = len(inf['puertos_vivos'])
     if n_p == 0 and n_pu == 0:
         return ''
     return f'[huella] {n_p} proceso y {n_pu} puerto abiertos por este hilo siguen vivos: --informe'
@@ -613,13 +649,8 @@ def _bajo(ruta, base):
 
 
 # Subcarpetas de `mem` que ESTE paquete genera por su cuenta (mismo criterio que
-# `instalar.DATOS_GENERADOS`: "solo mem/huella/,
-# mem/mapas/, mem/pdf/"). Fallo "rompe" medido 7-sep: antes CUALQUIER ruta bajo
-# `mem` contaba como borrable, así que un `Write` de la sesión sobre
-# `memory/MEMORY.md` o sobre una ficha nueva (`memory/ficha-nueva.md`) — el rito
-# normal de cierre de este mismo paquete, `instalar.py:88-99` los excluye a
-# propósito de `DATOS_GENERADOS` por ser "lo que él puso o su memoria de verdad"
-# — se borraba sin copia de seguridad con `--limpiar --si`.
+# `instalar.DATOS_GENERADOS`). Nada suelto en la raíz de `mem` (MEMORY.md, fichas
+# *.md, cuerpo.jsonl…) es borrable: eso es memoria o configuración del usuario.
 _MEM_SUBCARPETAS_GENERADAS = ('huella', 'mapas', 'pdf')
 
 

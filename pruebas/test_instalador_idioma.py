@@ -1,43 +1,7 @@
 # -*- coding: utf-8 -*-
-"""`instalar.py`: español e inglés en el propio
-instalador. Todo lo que ve el usuario (ventana, botones, avisos, tabla de
-módulos, mensajes de error, resumen final) pasa por `TEXTOS`/`_texto()`, con
-`--idioma es|en` o, por defecto, el idioma del sistema. Los guiones de
-`abyss/*.py` siguen en castellano siempre — eso NO es lo que se prueba aquí.
-
-Tres pruebas de la especificación:
-  1. `--idioma en --listar` no imprime ni una palabra de la lista castellana de
-     control («módulo», «instalado», «ganchos») — con su falsador: `--idioma es`
-     SÍ debe llevarlas, para que la prueba (1) no sea vacuamente cierta.
-  2. Ningún texto del instalador queda fuera del diccionario: un escaneo por
-     `ast` de `instalar.py` busca cadenas literales (o f-strings con parte
-     literal) que lleguen de verdad a `print`/`input`/`sys.stderr.write`/los
-     diálogos de Tk/`mensajes.append` SIN pasar por `_texto(...)` — con dos
-     excepciones documentadas y comprobadas por su cuenta: el nombre del propio
-     programa ("instalar:", invariante en los dos idiomas, como "git:") y la
-     ÚNICA línea bilingüe a propósito (el error de un `--idioma` inválido, antes
-     de que haya ningún idioma resuelto con el que elegir uno).
-  3. `TEXTOS['es']` y `TEXTOS['en']` declaran EXACTAMENTE las mismas claves —
-     una traducción a medias (con `_texto()` cayendo a castellano en silencio)
-     no debe pasar desapercibida.
-
-Arreglo del 7-sep (hallazgo del revisor sobre instalar.py:534 y :1309): dos
-bloques largos vivían FUERA de `TEXTOS` (la columna «para qué» de
-`--dependencias`, en `DEPENDENCIAS[...]['para']`; y la línea de cada módulo en
-`--listar`, en `MODULOS[...]['linea']`) y salían en castellano crudo con
-`--idioma en`, sin ninguna nota que lo avisara — pese a que el propio
-comentario de cabecera de `TEXTOS` prometía que TODA cadena que ve el usuario
-pasa por su traducción. Ahora cada entrada lleva su `para_en`/`linea_en`
-emparejado (mismo fail-closed que `_texto()`: cae al castellano si falta la
-traducción), elegido por `_para_localizado()`/`_linea_localizada()` — ver
-`IdiomaEnNoDejaBloquesLargosSinTraducir` (falsador con la lista de palabras de
-control del propio hallazgo) y `DependenciasYModulosCaenAlCastellanoSiFaltaLaTraduccion`.
-
-Igual que `test_instalador.py`/`test_instalador_roza.py`: se importa
-`instalar.py` DIRECTAMENTE por ruta de fichero para las pruebas en proceso
-(`_cargar_instalador`), y por `subprocess` (vía `ayudas.ejecutar`) para las que
-miden la salida de la CLI de verdad — la única forma de comprobar qué ve el
-usuario en su terminal tal cual sale."""
+"""`instalar.py`: español e inglés en el propio instalador. Todo lo que ve el usuario pasa
+por `TEXTOS`/`_texto()`, con `--idioma es|en` o el idioma del sistema por defecto; los
+guiones de `abyss/*.py` siguen en castellano. Import directo en proceso, subprocess para la CLI real."""
 import ast
 import os
 import re
@@ -59,10 +23,9 @@ def _cargar_instalador():
 
 
 def _listar(idioma, extra_env=None):
-    """`instalar.py --listar --idioma <idioma>` de verdad, por subprocess, sobre
-    un `settings.json` temporal (nunca el real) — mide la salida TAL COMO la
-    vería el usuario, no una `_listar()` en proceso que podría no coincidir con
-    lo que la CLI hace de verdad."""
+    """`instalar.py --listar --idioma <idioma>` de verdad, por subprocess, sobre un
+    `settings.json` temporal (nunca el real): mide la salida tal como la ve el usuario,
+    no una `_listar()` en proceso que podría no coincidir con la CLI real."""
     tmp = Path(tempfile.mkdtemp(prefix='abyss_listar_idioma_'))
     settings_ruta = tmp / 'settings.json'
     env = dict(os.environ)
@@ -108,11 +71,8 @@ class ListarEnInglesNoLlevaVocabularioDeControlCastellano(unittest.TestCase):
                           f'--idioma en --listar no debe llevar vocabulario de control castellano: {presentes}')
 
     def test_falsador_idioma_es_listar_si_las_lleva(self):
-        """Si esta prueba NO estuviera cazando nada de verdad (p. ej. porque
-        ninguna palabra de control apareciera jamás en la salida, en ningún
-        idioma), la prueba de arriba sería trivialmente cierta y no mediría
-        nada. En castellano («toca: ganchos ...», la etiqueta "instalado"/
-        "no instalado") SÍ deben salir."""
+        """Contraprueba: si ninguna palabra de control apareciera jamás en la salida, la
+        prueba de arriba sería trivialmente cierta. En castellano SÍ deben salir."""
         r = _listar('es')
         self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
         presentes = _palabras_de_control_presentes(r.stdout)
@@ -120,12 +80,9 @@ class ListarEnInglesNoLlevaVocabularioDeControlCastellano(unittest.TestCase):
                                     '(si esto falla, la prueba de arriba no está midiendo nada)')
 
     def test_idioma_en_no_omite_la_documentacion_de_los_modulos(self):
-        """El detalle `toca`/`aviso` SÍ se omite en inglés (decisión de diseño,
-        ver el comentario junto a `TEXTOS` en instalar.py): la línea de cada
-        módulo se sigue viendo en los dos idiomas, pero desde el arreglo del
-        7-sep (ENGAÑA: la especificación promete que TODA cadena que ve el
-        usuario pasa por su traducción) ya NO es el mismo castellano crudo en
-        inglés — `mod['linea_en']` la traduce de verdad."""
+        """El detalle `toca`/`aviso` se omite en inglés a propósito (ver el comentario
+        junto a `TEXTOS` en instalar.py), pero la línea de cada módulo sigue viendo en
+        los dos idiomas: `mod['linea_en']` la traduce de verdad, no castellano crudo."""
         r = _listar('en')
         self.assertIn('continuidad', r.stdout)
         self.assertIn("Stitches memory across threads", r.stdout,
@@ -140,19 +97,17 @@ class ListarEnInglesNoLlevaVocabularioDeControlCastellano(unittest.TestCase):
         self.assertIn('Cose la memoria entre hilos', r.stdout)
 
 
-# Palabras castellanas de control para el falsador de abajo — las mismas
-# cuatro que cita el hallazgo del 7-sep («para», «con», «sin», «lee»), palabra
-# completa e insensible a mayúsculas (para no cazar, p. ej., "lee" dentro de
-# "lees" en inglés... aunque en la práctica esa palabra no aparece en inglés).
+# Palabras castellanas de control para el falsador de abajo, palabra completa e
+# insensible a mayúsculas (para no cazar, p. ej., "lee" dentro de "lees" en inglés...
+# aunque en la práctica esa palabra no aparece en inglés).
 _PALABRAS_DE_CONTROL_ES_BLOQUES_LARGOS = ('para', 'con', 'sin', 'lee')
 _TILDE_O_ENYE = re.compile(r'[áéíóúÁÉÍÓÚñÑ]')
 
 
 def _bloques_largos_sin_traducir_presentes(texto):
-    """Vocabulario de control de `_PALABRAS_DE_CONTROL_ES_BLOQUES_LARGOS`
-    presente como palabra completa, o cualquier tilde/eñe — señal de que un
-    bloque largo (la columna «para qué» de `--dependencias`, o la línea de
-    `--listar`) se quedó en castellano crudo pese a `--idioma en`."""
+    """Vocabulario de control de `_PALABRAS_DE_CONTROL_ES_BLOQUES_LARGOS` presente como
+    palabra completa, o cualquier tilde/eñe: señal de que un bloque largo (la columna «para
+    qué» de `--dependencias`, o la línea de `--listar`) quedó en castellano crudo."""
     hallados = [p for p in _PALABRAS_DE_CONTROL_ES_BLOQUES_LARGOS
                 if re.search(rf'\b{re.escape(p)}\b', texto, re.IGNORECASE)]
     if _TILDE_O_ENYE.search(texto):
@@ -161,18 +116,9 @@ def _bloques_largos_sin_traducir_presentes(texto):
 
 
 class IdiomaEnNoDejaBloquesLargosSinTraducir(unittest.TestCase):
-    """Falsador del hallazgo del revisor (7-sep, instalar.py:534 y :1309): antes
-    de `para_en`/`linea_en`, `--idioma en --dependencias` imprimía las 12 filas
-    con la columna «para qué» ENTERA en castellano (viene de
-    `DEPENDENCIAS[...]['para']`, instalar.py:534, sin pasar por `_texto()`), y
-    `--idioma en --listar` imprimía 22 de sus 24 líneas con la descripción de
-    módulo entera en castellano (`mod['linea']`, instalar.py:1309) — sin
-    ninguna nota que lo avisara para `--dependencias`, y con una nota en
-    `--listar` que además explicaba mal lo que pasaba (justificaba omitir
-    `toca`/`aviso`, control vocabulary pequeño, y dejaba sin explicar el bloque
-    grande que sí se imprimía). Estas pruebas exigen que ninguno de los dos
-    bloques largos quede sin traducir: ni una tilde/eñe, ni las palabras de
-    control «para»/«con»/«sin»/«lee» como palabra completa."""
+    """Ninguno de los dos bloques largos (la columna «para qué» de `--dependencias`, la
+    línea de `--listar`) debe quedar sin traducir con `--idioma en`: ni una tilde/eñe, ni
+    las palabras de control «para»/«con»/«sin»/«lee» como palabra completa."""
 
     def test_dependencias_en_sin_bloques_largos_sin_traducir(self):
         r = _dependencias('en')
@@ -234,11 +180,9 @@ class DependenciasYModulosCaenAlCastellanoSiFaltaLaTraduccion(unittest.TestCase)
         self.assertEqual(inst._linea_localizada('es', mod), 'línea castellana')
 
     def test_todas_las_entradas_de_verdad_declaran_su_traduccion(self):
-        """Falsador de una regresión donde alguien añadiera un módulo o una
-        dependencia nueva y se olvidara de `linea_en`/`para_en`: el fallback
-        haría que la CLI real siguiera pasando esta prueba en silencio, pero
-        aquí se exige la traducción completa sobre los datos reales (no una
-        entrada suelta como arriba)."""
+        """Falsador de una regresión: si un módulo o dependencia nuevo olvidara
+        `linea_en`/`para_en`, el fallback dejaría pasar la CLI en silencio. Aquí se exige
+        la traducción completa sobre los datos reales."""
         inst = _cargar_instalador()
         sin_linea_en = [m['id'] for m in inst.MODULOS if not m.get('linea_en', '').strip()]
         self.assertEqual(sin_linea_en, [], f'módulos sin linea_en: {sin_linea_en}')
@@ -248,17 +192,9 @@ class DependenciasYModulosCaenAlCastellanoSiFaltaLaTraduccion(unittest.TestCase)
 
 
 class NingunTextoQuedaFueraDelDiccionario(unittest.TestCase):
-    """Prueba de la especificación, literal: "ningún texto del instalador
-    queda fuera del diccionario (una prueba que busca literales sospechosos en
-    el código)". Escaneo estático por `ast`: cualquier cadena (o f-string con
-    parte literal) que llegue de verdad al usuario — como argumento de
-    `print`/`input`/`sys.stderr.write`/`messagebox.*`/`simpledialog.askstring`/
-    `root.title`/`tk.Label(text=...)`/`tk.Button(text=...)`, o como argumento de
-    `mensajes.append(...)` (la lista que `instalar()`/`desinstalar()` devuelven
-    para que la CLI/ventana lo impriman) — debe pasar por `_texto(...)`. No es
-    exhaustivo (una cadena compuesta con `+` fuera de esos casos se deja pasar:
-    ver `_literal_sospechoso`), pero si esto encuentra algo, es una cadena
-    suelta de verdad, no un falso positivo de la propia herramienta."""
+    """Escaneo estático por `ast`: cualquier cadena (o f-string con parte literal) que
+    llegue al usuario por `print`/`input`/`sys.stderr.write`/diálogos de Tk/
+    `mensajes.append(...)` debe pasar por `_texto(...)` (no exhaustivo: ver `_literal_sospechoso`)."""
 
     _SINKS = frozenset({'print', 'input', 'write', 'showinfo', 'showerror',
                          'showwarning', 'askyesno', 'askstring', 'title'})
@@ -286,21 +222,17 @@ class NingunTextoQuedaFueraDelDiccionario(unittest.TestCase):
 
     @staticmethod
     def _solo_prefijo_herramienta(estatico):
-        """`True` si, quitando todo lo que no sea letra ASCII, lo único que
-        queda es "instalar" — el nombre del propio programa (`instalar.py`),
-        invariante en los dos idiomas (como "git:" o "npm ERR!"): no es
-        vocabulario de interfaz que haya que traducir."""
+        """`True` si, quitando todo lo que no sea letra ASCII, lo único que queda es
+        "instalar" — el nombre del programa, invariante en los dos idiomas (como "git:"),
+        no vocabulario de interfaz que haya que traducir."""
         limpio = re.sub(r'[^a-zA-Z]', '', estatico).lower()
         return limpio in ('', 'instalar')
 
     @classmethod
     def _texto_estatico(cls, nodo):
-        """Las partes literales de `nodo` si es una cadena o un f-string; `None`
-        si no es ninguna de las dos, o si ya contiene una llamada a `_texto`
-        (en cuyo caso el texto real SÍ sale del diccionario, aunque el nodo
-        entero no sea directamente esa llamada — p. ej. no debería darse en
-        este código, pero un `f'{_texto(...)} fijo'` seguiría contando el
-        texto fijo como sospechoso, que es lo correcto)."""
+        """Las partes literales de `nodo` si es una cadena o un f-string; `None` si no es
+        ninguna de las dos, o si ya contiene una llamada a `_texto` (el texto real sale
+        del diccionario aunque el nodo entero no sea directamente esa llamada)."""
         if isinstance(nodo, ast.Constant) and isinstance(nodo.value, str):
             return nodo.value
         if isinstance(nodo, ast.JoinedStr):
@@ -358,10 +290,9 @@ class NingunTextoQuedaFueraDelDiccionario(unittest.TestCase):
         self.assertEqual(hallazgos, [], 'literales fuera de TEXTOS:\n' + '\n'.join(hallazgos))
 
     def test_el_propio_escaner_caza_una_cadena_suelta_de_verdad(self):
-        """Falsador: sin esto, un escáner que nunca encuentra nada podría estar
-        roto (p. ej. por no reconocer ninguna llamada) en vez de "todo limpio".
-        Un `print('texto suelto en castellano')` de mentira, en un fichero
-        temporal con la misma forma mínima, SÍ debe salir."""
+        """Falsador: sin esto, un escáner roto (que nunca encuentra nada) pasaría por
+        "todo limpio". Un `print('texto suelto en castellano')` de mentira, en un
+        fichero temporal con la misma forma mínima, sí debe salir."""
         tmp = Path(tempfile.mkdtemp(prefix='abyss_escaner_falso_'))
         señuelo = tmp / 'señuelo.py'
         señuelo.write_text(
@@ -410,10 +341,9 @@ class TextoCaeACastellanoAntesQueReventar(unittest.TestCase):
 
 
 class IdiomaPorDefectoEsElDelSistemaSiNoEsElInvalido(unittest.TestCase):
-    """Por defecto, el del sistema (locale.getdefaultlocale(); si no
-    empieza por es, inglés). Se prueba `_idioma_sistema()` en proceso (rápido)
-    monkeypatcheando `locale.getdefaultlocale` — nunca cambia el locale de
-    verdad del proceso de pruebas."""
+    """Por defecto, el del sistema (`locale.getdefaultlocale()`; si no empieza por "es",
+    inglés). Se prueba `_idioma_sistema()` en proceso, monkeypatcheando
+    `locale.getdefaultlocale` — nunca cambia el locale real del proceso de pruebas."""
 
     def test_locale_es_dice_es(self):
         from unittest import mock
@@ -439,14 +369,9 @@ class IdiomaPorDefectoEsElDelSistemaSiNoEsElInvalido(unittest.TestCase):
 
 
 class InstalarYDesinstalarDefectoEsCastellanoSiempre(unittest.TestCase):
-    """`instalar()`/`desinstalar()` NUNCA deben leer el idioma del sistema por
-    su cuenta (eso lo decide la CLI/ventana y se lo pasa ya resuelto) — su
-    propio parámetro por defecto es 'es' literal. Falsador de una regresión
-    donde alguien intentara "simplificar" metiendo `_idioma_sistema()` como
-    valor por defecto de `idioma=` en `instalar()`: eso haría que llamarlas
-    directamente (como hacen `test_instalador.py`/`test_esceptico_skill.py`,
-    que nunca pasan `idioma=`) dependiera del locale de la máquina que corre
-    las pruebas — justo lo que esta prueba impide."""
+    """`instalar()`/`desinstalar()` nunca deben leer el idioma del sistema por su cuenta
+    (eso lo decide la CLI/ventana y se lo pasa ya resuelto): su propio parámetro por
+    defecto debe ser 'es' literal, no `_idioma_sistema()`."""
 
     def test_instalar_por_defecto_es_es_pase_lo_que_pase_en_el_sistema(self):
         from unittest import mock

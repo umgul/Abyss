@@ -1,16 +1,6 @@
-"""`imagen.py pintar`/`video` con Pillow/numpy bloqueados (fallo 6-sep, "engaña"):
-MEDIDO que `import pintor`/`import video_pintura` sin `try/except` dejaban salir la
-traza cruda de `ModuleNotFoundError` (`imagen.py pintar ...` -> Traceback ... File
-"abyss/pintor.py", line 38, in <module> / import numpy as np / ModuleNotFoundError;
-`imagen.py video ...` -> Traceback ... File "abyss/video_pintura.py", line 24 / from
-PIL import Image, ImageDraw / ModuleNotFoundError), mientras el README prometía
-"nunca con una traza cruda".
-
-Se bloquea el import de `numpy`/`PIL` con un `sitecustomize.py` propio en un
-directorio temporal antepuesto a `PYTHONPATH` (mismo método que usó el revisor):
-Pillow y numpy SIGUEN instalados en la máquina real, solo este proceso hijo no los
-ve — nunca se toca el Python real ni sale ninguna petición de red.
-"""
+"""`imagen.py pintar`/`video` sin Pillow/numpy debe fallar con un mensaje claro,
+nunca con una traza cruda. Se bloquea el import con un `sitecustomize.py` propio
+antepuesto a `PYTHONPATH`: Pillow/numpy siguen instalados, solo este proceso no los ve."""
 import sys
 import os
 import textwrap

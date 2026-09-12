@@ -1,22 +1,6 @@
-"""`modelo.py` (ronda 2 de arreglos, 7-sep): fallo "engaña" medido sobre la versión
-viva — `recorrer(tp)` leía el transcript VIVO sin mirar el tramo de `parentesis.py`
-en absoluto, así que `texto(tp)` (librería de `continuidad.py --despertar`, llamada
-en CADA prompt) podía reinyectar hasta 70/90 caracteres LITERALES de un turno dicho
-DENTRO de un paréntesis abierto en el aviso `[modelo · revisión]` — que
-`continuidad.py --despertar` mete en `additionalContext`, así que ese fragmento
-VUELVE A VIAJAR a la API en el siguiente prompt. Es la misma familia de fallo que
-ya se cerró en `vigia.leer_turno()` (`pruebas/test_parentesis.py::IntegracionConVigia`),
-pero peor: aquí el texto no solo queda registrado en local, vuelve al PROMPT.
-
-Con un transcript de 4 líneas donde el turno respondido por otro modelo (`claude-
-opus-99`, con un "secreto" en su respuesta) cae DENTRO de un tramo cerrado y el
-turno siguiente ya responde con el modelo preferido (`claude-fable-5-1`, el valor
-por defecto de `modelo.preferido()` sin `modelo_preferido.json`): sin tramo (caso de
-control) el aviso `[modelo · revisión]` reinyecta el texto secreto; con el tramo
-marcado, `--despertar` no debe mencionarlo en absoluto — igual que exige
-lo que gobierna `parentesis.py` ("lo que el propio asistente vuelve a leer en hilos
-futuros").
-"""
+"""`modelo.py`: `recorrer(tp)`/`texto(tp)` (usada en cada prompt por
+`continuidad.py --despertar`) no debe reinyectar en `[modelo · revisión]` lo
+dicho dentro de un tramo de `parentesis.py` — ese aviso vuelve a la API."""
 import sys
 import os
 import json

@@ -1,17 +1,6 @@
-"""`mundo.py`: motivos del mundo real para `imagen.py
-mundo` — met/artic/commons (sin clave) más streetview/mapillary/webcam (con clave) y
-`contexto()` (Wikidata + Wikipedia, sin clave). Sin red en toda la suite: cada fuente
-se prueba con un `pedir_fn` de pega que sirve las respuestas JSON reales capturadas
-UNA vez el 7-sep en `pruebas/datos/mundo_*.json` (recortadas; ver
-`hacer_fixtures.py` — no forma parte del paquete, solo del proceso de captura) — o,
-para las tres fuentes con clave (que no se pueden capturar sin pagar/registrar), con
-una respuesta sintética de la forma DOCUMENTADA de cada API, igual que
-`test_imagen_crear_vias.py` hace con el servidor A1111 falso.
-
-Cualquier URL que una prueba no espere hace fallar esa prueba con un mensaje claro
-(`AssertionError`), nunca toca la red de verdad — así una fuente mal probada no
-puede colarse como «verde» por accidente.
-"""
+"""`mundo.py`: motivos para `imagen.py mundo` — met/artic/commons (sin clave),
+streetview/mapillary/webcam (con clave), `contexto()` (Wikidata+Wikipedia).
+Sin red: `pedir_fn` de pega; URL no esperada falla la prueba, nunca la toca."""
 import contextlib
 import io
 import json
@@ -36,13 +25,10 @@ def _cargar(nombre):
 
 
 def _pedir_por_ruta(mapa, prohibidas=()):
-    """`pedir_fn` de pega: `mapa` es una lista de `(subcadena_de_la_url, fixture_o_funcion)`.
-    Se usa la primera entrada cuya subcadena aparezca en la URL pedida; si `fixture_o_funcion`
-    es una función se le pasa la URL entera y debe devolver `(cod, cuerpo, content_type)`, si
-    es una cadena se lee como fixture JSON de `pruebas/datos/` con `cod=200`.
-
-    Cualquier URL que contenga algo de `prohibidas`, o que no encaje ninguna entrada de
-    `mapa`, hace fallar la prueba (nunca se cuela una llamada no esperada)."""
+    """`pedir_fn` de pega: primera entrada de `mapa` (`subcadena_url,
+    fixture_o_funcion`) cuya subcadena esté en la URL; función recibe la URL y
+    devuelve `(cod, cuerpo, content_type)`, cadena es un fixture de
+    `pruebas/datos/` (`cod=200`). Sin match, o URL en `prohibidas`: falla la prueba."""
     def _fn(url, datos=None, cabeceras=None, timeout=None, metodo=None):
         for llave in prohibidas:
             if llave in url:
@@ -61,10 +47,9 @@ def _pedir_nunca(*a, **k):
 
 
 def _objeto_met_437394_o_vacio(url):
-    """Para las pruebas de `_buscar_met`/`buscar`: el objeto 437394 (real, con
-    imagen) si la URL lo pide; cualquier otro objectID, el fixture SIN imagen (los
-    demás IDs de `mundo_met_search.json` no se capturaron de verdad — no hace
-    falta: lo que prueba `_buscar_met` es precisamente que los descarta)."""
+    """El objeto 437394 (real, con imagen) si la URL lo pide; cualquier otro
+    objectID, el fixture sin imagen — los demás IDs de `mundo_met_search.json`
+    no se capturaron: `_buscar_met` prueba precisamente que los descarta."""
     if url.endswith('/objects/437394'):
         return 200, _cargar('mundo_met_objeto_437394.json'), 'application/json'
     return 200, _cargar('mundo_met_objeto_sin_imagen.json'), 'application/json'

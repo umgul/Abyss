@@ -1,21 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Tarea C (visor cinético, T6): `instalar.py` sabe bajar el vendor de MediaPipe
-Tasks Vision (JS + wasm + el modelo de manos) que necesita
-`abyss/plantillas/kinetica.html` — sin eso, NO va en el repositorio de git
-(pesa ~27 MB) y el visor no puede correr.
-
-Regla dura 5 del encargo (NADA de esto baja algo real): cada prueba que
-ejercita `descargar_vendor_mp()` monkeypatchea `instalar._descargar_uno` (el
-ÚNICO punto de la función que toca la red de verdad) — nunca sale a la red,
-nunca escribe un fichero de más de unos bytes de mentira. Las pruebas que
-ejercitan `_descargar_uno` en sí mismo monkeypatchean, más abajo,
-`urllib.request.urlopen` con una respuesta en memoria (`io.BytesIO`) — jamás
-un socket real.
-
-Igual que `test_instalador_dependencias.py`: se importa `instalar.py`
-DIRECTAMENTE por ruta de fichero, con su PROPIO nombre de módulo (para no
-chocar con otro test que también cargue `instalar.py` en el mismo proceso de
-`unittest`)."""
+"""`instalar.py` baja el vendor de MediaPipe Tasks Vision para `kinetica.html`
+(no va en git, ~27 MB) sin tocar la red real: se monkeypatchea
+`_descargar_uno` o `urllib.request.urlopen`, cargando el módulo con nombre propio."""
 import sys
 import os
 import io
@@ -41,10 +27,8 @@ def _cargar_instalador():
     return mod
 
 
-# Las seis URL que dio el encargo (medidas: se bajaron y funcionan) — si
-# `VENDOR_MP` cambiara alguna sin querer, esta prueba lo caza. También son,
-# literalmente, la respuesta a "qué comando exacto hay que dar para bajarlas"
-# que pedía el encargo para el mensaje de error de otro módulo.
+# Las seis URL esperadas — si `VENDOR_MP` cambia alguna sin querer, esta
+# prueba lo detecta.
 URLS_MEDIDAS = (
     'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs',
     'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm/vision_wasm_internal.js',
@@ -57,9 +41,7 @@ URLS_MEDIDAS = (
 
 
 # ---------------------------------------------------------------------------------
-# El registro VENDOR_MP: los datos que la plantilla kinetica.html necesita tener
-# en abyss/vendor/mp/ para poder servirse (ver su docstring: vision_bundle.mjs,
-# mp/wasm/*, hand_landmarker.task).
+# VENDOR_MP: los ficheros que `kinetica.html` necesita en abyss/vendor/mp/.
 # ---------------------------------------------------------------------------------
 class RegistroVendorMP(unittest.TestCase):
     def test_las_seis_url_son_exactamente_las_medidas(self):
@@ -83,10 +65,9 @@ class RegistroVendorMP(unittest.TestCase):
             self.assertTrue(v['url'].startswith('https://'), 'nunca http:// sin cifrar')
 
     def test_destinos_son_relativos_con_barra_y_unicos(self):
-        """`destino` es siempre "/" (nunca `os.sep` a pelo, para que
-        `_ruta_vendor_mp` valga en Windows y POSIX por igual) y nunca empieza
-        por "/" ni contiene "..": nunca debe poder escapar de
-        abyss/vendor/mp/."""
+        """`destino` usa siempre "/" (nunca `os.sep`, para valer en Windows y
+        POSIX por igual), nunca empieza por "/" ni contiene "..": no debe
+        poder escapar de abyss/vendor/mp/."""
         inst = _cargar_instalador()
         destinos = [v['destino'] for v in inst.VENDOR_MP]
         self.assertEqual(len(destinos), len(set(destinos)), 'destinos repetidos')
@@ -107,16 +88,13 @@ class RegistroVendorMP(unittest.TestCase):
         self.assertEqual(por_nombre['hand_landmarker.task'], 'hand_landmarker.task')
 
     def test_total_aproximado_es_unos_27_mb_sin_afinar_mas(self):
-        """El encargo mide "unos 27 MB" — ni más fino. Sumar los seis tamaños
-        aproximados y redondear al entero no inventa una cifra más precisa que
-        la medida; solo la agrega."""
         inst = _cargar_instalador()
         total = sum(v['tam_mb'] for v in inst.VENDOR_MP)
         self.assertEqual(round(total), 27)
 
     def test_tamanos_no_mas_finos_que_los_medidos(self):
-        """El encargo dio 137 KB, 210 KB, 9,4 MB, 210 KB, 9,3 MB y 7,8 MB — como
-        mucho un decimal en los MB, sin más cifras inventadas."""
+        """Como mucho un decimal en los tamaños en MB: no debe inventar más
+        cifras que las medidas originales."""
         inst = _cargar_instalador()
         for v in inst.VENDOR_MP:
             if v['tam_txt'].endswith('MB'):
@@ -125,8 +103,8 @@ class RegistroVendorMP(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# `_ruta_vendor_mp` / `_estado_vendor_mp`: comprobación REAL contra el disco
-# (nunca una lista fija), igual que `_import_disponible` con los paquetes de pip.
+# `_ruta_vendor_mp` / `_estado_vendor_mp`: comprobación real contra el disco,
+# nunca una lista fija.
 # ---------------------------------------------------------------------------------
 class RutaYEstadoVendorMP(unittest.TestCase):
     def test_ruta_vendor_mp_usa_os_path_join_no_concatenacion(self):
@@ -233,17 +211,19 @@ class BanderaManosReconocida(unittest.TestCase):
         self.assertIsNone(inst._argumento_no_reconocido(['--manos']))
         self.assertIsNone(inst._argumento_no_reconocido(['--manos', '--idioma', 'en']))
 
-    def test_uso_menciona_manos_en_los_dos_idiomas(self):
+    def test_uso_menciona_manos_y_modelo_en_los_dos_idiomas(self):
         inst = _cargar_instalador()
-        self.assertIn('--manos', inst._uso('es'))
-        self.assertIn('--manos', inst._uso('en'))
+        for idioma in ('es', 'en'):
+            self.assertIn('--manos', inst._uso(idioma))
+            self.assertIn('--modelo', inst._uso(idioma))
 
-    def test_manos_nunca_aparece_en_hooks_json(self):
-        """Mismo criterio que `--dependencias`/`--instalar-dependencias`
-        (`test_instalador_dependencias.py`): esto es un verbo de la CLI a
-        petición explícita, nunca algo que un gancho dispare solo."""
-        texto = (ay.RAIZ / 'hooks' / 'hooks.json').read_text(encoding='utf-8')
-        self.assertNotIn('--manos', texto)
+    def test_manos_nunca_aparece_en_un_gancho(self):
+        """`--manos` es un verbo de la CLI a petición explícita, nunca algo
+        que dispare un gancho por su cuenta."""
+        inst = _cargar_instalador()
+        for mod in inst.MODULOS:
+            for evento, args, timeout in mod.get('hooks', ()):
+                self.assertNotIn('--manos', args, f'{mod["id"]}/{evento}')
 
     def test_descargar_vendor_mp_nunca_se_llama_desde_instalar_o_desinstalar(self):
         inst = _cargar_instalador()
@@ -253,9 +233,8 @@ class BanderaManosReconocida(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# `descargar_vendor_mp()` con un descargador SIMULADO (regla dura 5: nunca baja
-# nada real). Se monkeypatchea `_descargar_uno` — el único punto de la función
-# que toca la red de verdad.
+# `descargar_vendor_mp()` con un descargador simulado: se monkeypatchea
+# `_descargar_uno`, el único punto de la función que toca la red de verdad.
 # ---------------------------------------------------------------------------------
 class DescargarVendorMPConDescargadorSimulado(unittest.TestCase):
     def _con_pkg_temporal(self):
@@ -264,9 +243,8 @@ class DescargarVendorMPConDescargadorSimulado(unittest.TestCase):
         return tmp
 
     def test_avisa_antes_de_bajar_nada_de_donde_y_cuanto_ocupa(self):
-        """T6: "se ensena que se va a bajar, de donde y cuanto ocupa antes de
-        empezar" — las URL y tamaños deben estar YA en `mensajes` antes de que
-        se llame a `_descargar_uno` la primera vez."""
+        """Las URL y tamaños deben estar en `mensajes` antes de la primera
+        llamada a `_descargar_uno`."""
         inst = _cargar_instalador()
         tmp = self._con_pkg_temporal()
 
@@ -278,9 +256,8 @@ class DescargarVendorMPConDescargadorSimulado(unittest.TestCase):
         with mock.patch.object(inst, 'PKG', tmp), \
              mock.patch.object(inst, '_escribir_licencia_mediapipe'), \
              mock.patch.object(inst, '_descargar_uno', side_effect=falso):
-            # `mensajes` es la lista COMPLETA que ve el usuario, en orden: se
-            # comprueba que las 6 URL/tamaños ya están ahí ANTES de la primera
-            # línea "descargado" (nunca se anuncia después de empezar).
+            # `mensajes` es la lista completa, en orden: las 6 URL/tamaños
+            # deben ir antes de la primera línea "descargado".
             mensajes, ok = inst.descargar_vendor_mp(idioma='es')
         self.assertTrue(ok)
         primera_linea_descargado = next(i for i, m in enumerate(mensajes) if 'descargado' in m)
@@ -328,8 +305,8 @@ class DescargarVendorMPConDescargadorSimulado(unittest.TestCase):
         self.assertEqual(len(llamadas), len(inst.VENDOR_MP) - 1)
 
     def test_sin_red_para_todo_de_golpe_limpio_y_sin_traza(self):
-        """T6: "si no hay red, se dice y se sale limpio, sin traza" — UN solo
-        intento (no 6), UN aviso, sin la palabra "Traceback"."""
+        """Sin red: un solo intento (no 6), un aviso, sin "Traceback" en la
+        salida."""
         inst = _cargar_instalador()
         tmp = self._con_pkg_temporal()
         llamadas = []
@@ -423,22 +400,17 @@ class DescargarVendorMPConDescargadorSimulado(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# `--manos` desde la CLI real (subprocess, como un usuario) — con
-# `ABYSS_INSTALADOR_TEST_SIN_RED` no existe: se fuerza sin red monkeypatcheando
-# en proceso, así que aquí se comprueba solo lo que no toca la red: el flag se
-# reconoce y no cuelga con `--help`.
+# `--manos` sin lanzar un subproceso real (golpearía la red): se comprueba en
+# proceso solo lo que no toca la red.
 # ---------------------------------------------------------------------------------
 class ManosPorCLIEnProceso(unittest.TestCase):
     def test_manos_llama_a_descargar_vendor_mp_y_respeta_su_ok(self):
-        """Sin lanzar un subproceso de verdad (que sí golpearía la red): se
-        comprueba que el bloque de `--manos` en `__main__` usa el resultado de
+        """El bloque de `--manos` en `__main__` usa el resultado de
         `descargar_vendor_mp` para el código de salida, imprimiendo cada
-        mensaje — mismo patrón que `--instalar-dependencias`."""
+        mensaje."""
         inst = _cargar_instalador()
         fuente = inspect.getsource(inst)
         self.assertIn("if '--manos' in argv:", fuente)
-        # el bloque debe llamar a descargar_vendor_mp e imprimir sus mensajes,
-        # igual que el de --instalar-dependencias con instalar_dependencias.
         i = fuente.index("if '--manos' in argv:")
         bloque = fuente[i:i + 260]
         self.assertIn('descargar_vendor_mp(', bloque)
@@ -471,9 +443,8 @@ class DescargarUnoEscribeAtomicoYClasificaLosFallos(unittest.TestCase):
         self.assertFalse(os.path.exists(destino + '.tmp-abyss'))
 
     def test_escritura_no_deja_crlf_en_disco(self):
-        """El propio proyecto ya tiene un bug conocido de CRLF (ver
-        `_escribir_json`); aquí el contenido es binario y `_descargar_uno`
-        escribe en modo 'wb', así que no debe traducir NADA."""
+        """El contenido es binario y `_descargar_uno` escribe en modo 'wb':
+        no debe traducir ningún byte."""
         inst = _cargar_instalador()
         destino = os.path.join(self.tmp, 'archivo.bin')
         contenido = b'linea1\nlinea2\n'
@@ -520,9 +491,8 @@ class DescargarUnoEscribeAtomicoYClasificaLosFallos(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------------
-# La licencia de MediaPipe: Apache License 2.0, registrada donde el paquete
-# guarda las licencias de terceros (mismo patrón que `LICENSE-three.txt`), pero
-# ESCRITA por el instalador — nunca commiteada (el vendor entero es descargado).
+# Licencia de MediaPipe (Apache 2.0): la escribe el instalador, nunca se
+# commitea, igual que el resto del vendor descargado.
 # ---------------------------------------------------------------------------------
 class LicenciaMediaPipe(unittest.TestCase):
     def test_texto_declara_apache_2_0_y_el_paquete_vendorizado(self):

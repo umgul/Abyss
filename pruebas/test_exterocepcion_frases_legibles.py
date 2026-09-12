@@ -1,17 +1,6 @@
-"""`exterocepcion.py` `__main__` (fallo 6-sep, "roza"): dos salidas documentadas en
-`skills/exterocepcion/SKILL.md` imprimían la representación cruda de un dict de
-Python, o la palabra `None`, en vez de una frase. MEDIDO con HOME falso:
-`exterocepcion.py --refrescar-ip --proyecto "$(pwd)"` con red imprimía
-`{'nombre': '...', ..., 'ts': 1788729270.9143646}` (repr, con el timestamp en
-crudo), y sin red imprimía exactamente `None`. Lo mismo `--dicho "estoy en
-Madrid"` sin red: «aprendido: None». Contradice el punto 5 de la filosofía del
-README ("sin red no hay lugar ni meteo: la respuesta siempre es 'sin dato'"), que
-el resto del paquete sí cumple.
-
-`_texto_lugar_ip`/`_texto_aprendido` son funciones puras nuevas (se extrajeron del
-`__main__` para poder probarlas sin red ni subprocess); las pruebas de subprocess
-de abajo comprueban además que el `__main__` de verdad las usa.
-"""
+"""`exterocepcion.py`: toda salida debe ser una frase legible, nunca el repr
+crudo de un dict ni la palabra `None`. `_texto_lugar_ip`/`_texto_aprendido` son
+funciones puras, probadas aquí sin red ni subprocess."""
 import sys
 import os
 from pathlib import Path
@@ -50,9 +39,8 @@ class TextoAprendidoNuncaEsNone(unittest.TestCase):
 
 
 class CliDeVerdadUsaLasFrasesLegibles(unittest.TestCase):
-    """Subprocess real, sin red (regla dura 2 del encargo): comprueba que el
-    `__main__` de `exterocepcion.py` de verdad llama a las funciones de arriba, no
-    solo que existan."""
+    """Subprocess real, sin red: comprueba que el `__main__` de `exterocepcion.py`
+    llama de verdad a las funciones de arriba, no solo que existan."""
 
     def test_refrescar_ip_sin_red_dice_sin_dato_no_none(self):
         proj = ay.nuevo_proyecto()

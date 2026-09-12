@@ -1,19 +1,6 @@
-"""`lienzo.py`: operar con imágenes reales, sin modelo.
-Ningún verbo de este fichero resuelve un proyecto de Claude Code salvo `borrar --metodo
-taller` (no probado con red real: ver `test_imagen_buscar.py` para el patrón de servidor
-local falso usado en el resto del paquete si algún día se cablea `taller.py` de verdad ahí),
-así que aquí se importa `lienzo` directamente y se llama a sus funciones en proceso — más
-rápido, sin subprocess, y sin riesgo de que un guion con `rutas.resolver()` a nivel de módulo
-aborte el proceso de pruebas (`lienzo.py` no lo hace: se comprobó leyendo el código).
-
-Casos mínimos de la tarea:
-  - `fundir` con alfa 0 devuelve la primera imagen y con alfa 1 la segunda, píxel a píxel.
-  - `collage` de 4 imágenes -> ancho pedido y 4 zonas no negras.
-  - `restaurar` sube el contraste de una imagen "lavada" (medido, no afirmado).
-  - `numeros` produce exactamente N entradas de paleta.
-  - `borrar` sobre una imagen con textura y un rectángulo negro de 30x30 -> el error medio en
-    esa zona baja por debajo de la mitad del error inicial (medido, no afirmado).
-"""
+"""`lienzo.py`: operar con imágenes reales, sin modelo. Se importa directamente (sin
+subprocess) y se llama a sus funciones en proceso; ningún verbo resuelve un proyecto de
+Claude Code salvo `borrar --metodo taller` (no probado con red real)."""
 import json
 import os
 import sys
@@ -166,28 +153,9 @@ class Restaurar(unittest.TestCase):
 
 
 class RestaurarReduceRuidoDeVerdad(unittest.TestCase):
-    """T2.lienzo (7-sep), fallo MEDIDO con una foto real degradada a propósito
-    (viraje amarillo, contraste 0.55, ruido gaussiano sigma 9, desenfoque 0.8,
-    12 arañazos; fuera de este repo): `restaurar --sin-aranazos` bajaba el
-    error frente al original (44.7 -> 25.2) pero SU PROPIA métrica de ruido
-    subía de 43.69 a 83.88 — los niveles
-    automáticos estiraban el contraste (y con él, el grano) ANTES de que la
-    reducción de ruido pudiera compensarlo, y la vara vieja (percentil de
-    gradiente) además cambiaba de escala con el contraste, así que ni siquiera
-    medía lo mismo antes y después. Aquí, con una foto SINTÉTICA degradada del
-    mismo modo (terreno suave con variedad tonal amplia —para que el
-    estiramiento de niveles se comporte como en una foto real, no como en un
-    bloque de pocos tonos planos— más dos parches REALMENTE planos —para que
-    la medida de ruido en bloques de 8 px mida ruido de verdad, no la
-    pendiente de un degradado—, viraje + contraste reducido + ruido gaussiano
-    + desenfoque): `--nitidez 0` porque afilar amplifica cualquier detalle
-    fino que quede, ruido incluido — un efecto distinto y ya declarado del que
-    arregla este fallo (el orden ruido-antes-que-niveles); con nitidez
-    puesta, el "ruido no reducido" que reporta la propia función en ese caso
-    es la salida HONESTA que pide el fallo, no un error. Verificado por
-    mutación (deshaciendo el reordenado — ruido después de niveles, como
-    antes— este test falla porque el ruido medido sube en vez de bajar;
-    restaurado el orden, vuelve a verde)."""
+    """`restaurar --sin-aranazos` sobre una foto sintética degradada (viraje de color,
+    contraste reducido, ruido gaussiano, desenfoque) debe bajar el ruido medido en bloques
+    planos, no solo el error frente al original. `nitidez=0` evita que afilar amplifique el ruido."""
 
     def _foto_sintetica_y_su_version_vieja(self, d, ancho=220, alto=170, semilla=11):
         yy, xx = np.mgrid[0:alto, 0:ancho].astype(np.float32)
@@ -260,15 +228,9 @@ class Numeros(unittest.TestCase):
         self.assertTrue(os.path.exists(r['color']))
 
     def test_contorno_pinta_pixeles_en_la_frontera_entre_zonas(self):
-        """Fallo "roza": los contornos de `numeros` no tenían falsador —
-        medido por mutación (convertir `_dibujar_contornos` en un `return`
-        inmediato, dejando la plantilla SIN ninguna línea entre zonas, que es
-        lo único que la hace pintable), las 19 pruebas anteriores seguían en
-        verde. Aquí se cuentan los píxeles del color de contorno
-        (`(160, 160, 160)`, el valor por defecto de `_dibujar_contornos`) en el
-        cuerpo de la plantilla (sin el pie de paleta) y se exige que haya al
-        menos uno — la imagen sintética tiene bloques de color contiguos, así
-        que SIEMPRE hay una frontera que dibujar."""
+        """Cuenta los píxeles del color de contorno `(160, 160, 160)` (valor por defecto
+        de `_dibujar_contornos`) en el cuerpo de la plantilla (sin el pie de paleta): la
+        imagen sintética tiene bloques contiguos, así que siempre hay una frontera que dibujar."""
         d = _tmp()
         n = 4
         img = self._imagen_de_n_bloques(d / 'bloques3.png', n, ancho=120, alto=90)
@@ -276,21 +238,15 @@ class Numeros(unittest.TestCase):
         plantilla = np.asarray(Image.open(r['plantilla']).convert('RGB'))
         cuerpo = plantilla[:90, :, :]  # sin el pie de paleta (los últimos 40 px)
         contorno = np.all(cuerpo == (160, 160, 160), axis=-1)
-        # con el contorno de verdad, las dos fronteras (horizontal y vertical)
-        # entre los 4 bloques suman ~210 píxeles en esta imagen; un `return`
-        # inmediato deja como mucho el antialiasing incidental de algún número
-        # (medido: 1 píxel) — el tope de 20 separa limpiamente ambos casos.
+        # con el contorno de verdad, las dos fronteras (horizontal y vertical) entre los 4
+        # bloques suman ~210 píxeles en esta imagen; el tope de 20 separa limpiamente el
+        # caso sin contorno (solo antialiasing incidental de algún número).
         self.assertGreater(int(contorno.sum()), 20,
                             'debe haber una frontera de verdad entre zonas, no ruido incidental')
 
     def test_con_salida_los_nombres_no_llevan_numeros_de_mas(self):
-        """Fallo "roza" medido 7-sep: el docstring del módulo y `skills/imagen/
-        SKILL.md` prometían, con `--salida base`, `<base>_numeros_plantilla.png`
-        y `<base>_numeros_color.png` — MEDIDO: `numeros(..., salida='pn')` da
-        de verdad `pn_plantilla.png`/`pn_color.png` (SIN el `_numeros` de más);
-        `pn_numeros_plantilla.png` no existe. Este test fija el nombre EXACTO,
-        no solo que algún fichero exista (lo que ya cubría la prueba de
-        arriba)."""
+        """Con `--salida base`, los nombres deben ser exactamente `<base>_plantilla.png` y
+        `<base>_color.png`, sin el infijo `_numeros` de más."""
         d = _tmp()
         n = 4
         img = self._imagen_de_n_bloques(d / 'bloques4.png', n, ancho=40, alto=30)
@@ -331,22 +287,9 @@ class Numeros(unittest.TestCase):
 
 
 class NumerosFusionaZonasPequenas(unittest.TestCase):
-    """T2.lienzo (7-sep), fallo MEDIDO con una foto real de 768×768 (paisaje
-    pintado, fuera de este repo): `numeros --colores 12 --ancho 1200` daba
-    24157 zonas, y `--colores 8 --ancho 1200 --min-zona 400` daba 16255 — un
-    libro de pintar por números de verdad tiene decenas o cientos de zonas,
-    no miles: `--min-zona` descartaba el NÚMERO de la zona chica pero la
-    dejaba ahí sin fundir, así que el contorno seguía lleno de islas. Aquí,
-    sintético (sin la foto real: la suite no toca ficheros externos): 3
-    bloques de color más ruido sal-y-pimienta en manchas de 3×3 (no de 1 solo
-    píxel: MEDIDO en desarrollo — el filtro de moda por sí solo ya limpia el
-    ruido de 1 píxel, así que un falsador con manchas de 1 píxel no distingue
-    si lo que las quita es el filtro de moda o la fusión; con manchas de 3×3
-    sí hace falta la fusión) deben dar exactamente 3 zonas tras `numeros`, no
-    cientos ni docenas. Verificado por mutación: haciendo que
-    `_fusionar_zonas_pequenas` devuelva `(etiquetas, num_zonas)` sin fundir
-    nada (un `return` inmediato), este test falla (salían 15 zonas con esta
-    semilla en vez de 3); restaurada la fusión, vuelve a verde."""
+    """`numeros` debe fundir zonas de ruido chicas: 3 bloques de color con ruido
+    sal-y-pimienta en manchas de 3×3 (no de 1 píxel, que el filtro de moda ya limpia solo)
+    deben dar exactamente 3 zonas, no cientos."""
 
     def _bloques_con_ruido_sal_y_pimienta(self, ruta, ancho=240, alto=180, semilla=7,
                                             fraccion_ruido=0.08, tam_mancha=3):
@@ -436,19 +379,9 @@ class Borrar(unittest.TestCase):
 
 @unittest.skipUnless(lienzo.cv2 is not None, 'OpenCV no disponible: borrar --metodo telea/ns lo necesita')
 class BorrarAvisaBorronProbable(unittest.TestCase):
-    """T2.lienzo (7-sep), fallo MEDIDO con fotos reales (fuera de este repo): una
-    estación meteorológica de 240×350 px sobre matorral oscuro en una foto de
-    2048×1536, y una cosechadora de 960×360 px en un montaje — el relleno
-    clásico (`cv2.inpaint`) deja un borrón visible en los dos casos, y ni el
-    docstring ni la skill lo avisaban: prometían "objetos pequeños", sin decir
-    que un objeto grande o un fondo con textura fallan. Aquí, sintético: una
-    imagen con textura fuerte y una caja grande debe llevar 'aviso'; una línea
-    fina sobre fondo liso NO debe llevar aviso, y el error en la zona debe
-    bajar a menos de la mitad (el caso en que el relleno clásico sí funciona,
-    declarado en el docstring). Verificado por mutación: forzando que
-    `_evaluar_aviso_borron` siempre devuelva `(None, {})`, el primer test de
-    aquí abajo falla porque no hay 'aviso' donde tenía que haberlo; restaurada
-    la medida, vuelve a verde."""
+    """El relleno clásico (`cv2.inpaint`) deja un borrón visible sobre textura fuerte o con
+    una caja grande: debe llevar 'aviso'. Una línea fina sobre fondo liso no debe avisar, y
+    el error en la zona debe bajar a menos de la mitad (el caso en que el relleno sí funciona)."""
 
     def test_textura_fuerte_y_caja_grande_lleva_aviso(self):
         d = _tmp()
@@ -533,13 +466,9 @@ class CLI(unittest.TestCase):
 
 
 class DocstringNoSobreafirmaElTaller(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: la cabecera del docstring del módulo decía que
-    `borrar --metodo taller` habla con un servidor "que TÚ tienes en tu propia
-    máquina (nunca sale de casa)" — nada en el código garantiza eso:
-    `_inpaint_taller()` manda la imagen a la URL tal cual venga de `taller_url`
-    en `imagen_config.json`, sin comprobar que sea loopback ni red local. El
-    propio módulo se corrige más abajo ("eso solo llega a la máquina que TÚ
-    configures en `taller_url`") — es la cabecera la que debía decir lo mismo."""
+    """La cabecera del docstring del módulo no debe prometer que `borrar --metodo taller`
+    "nunca sale de casa": `_inpaint_taller()` manda la imagen a lo que sea que diga
+    `taller_url` en `imagen_config.json`, sin comprobar que sea loopback o red local."""
 
     def test_cabecera_no_promete_nunca_sale_de_casa_sin_matiz(self):
         doc = lienzo.__doc__ or ''

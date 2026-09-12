@@ -1,14 +1,6 @@
-"""`continuidad.py` (fallo 6-sep, "roza"): cada arranque y cada cierre por debajo del
-umbral en frío escribían en `mem/varas.log` la MISMA línea de aviso ("sin vara
-todavía", y ahora también "sin índice ni fichas todavía"). MEDIDO: en un proyecto
-virgen, tras un solo ciclo arranque+cierre el fichero ya llevaba dos entradas
-idénticas salvo la fecha. Con las 8 sesiones que exige el umbral son al menos 16
-entradas repetidas de un aviso que no es un fallo, y el fichero crece sin tope.
-
-Ahora esos avisos ESPERADOS de un pase silencioso (arranque en frío, proyecto
-virgen) se filtran igual que ya se filtraba la línea de confirmación "índice
-reescrito N bytes": si no queda nada más, `varas.log` ni se toca.
-"""
+"""`continuidad.py`: los avisos esperados de un pase silencioso (arranque en frío,
+proyecto virgen — "sin vara todavía", "sin índice ni fichas todavía") no deben
+escribirse en `mem/varas.log`; si no queda nada más, el fichero ni se crea."""
 import sys
 import os
 import json
@@ -31,8 +23,8 @@ class CierresEnFrioNoLlenanVarasLog(unittest.TestCase):
             r = ay.ejecutar(ay.script('continuidad.py'), ['--cierre'], env, entrada=entrada)
             self.assertEqual(r.returncode, 0, r.stderr)
 
-        # con el fallo, varas.log existía con DOS entradas del mismo aviso «sin vara
-        # todavía»/«sin índice ni fichas todavía» — un aviso esperado, no un fallo.
+        # «sin vara todavía» y «sin índice ni fichas todavía» son avisos esperados,
+        # no un fallo: no deben quedar registrados en varas.log.
         self.assertFalse(varas_log.exists(),
                           f'varas.log no debería existir solo por avisos esperados de arranque en frío: '
                           f'{varas_log.read_text(encoding="utf-8") if varas_log.exists() else ""}')

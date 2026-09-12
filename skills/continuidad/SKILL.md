@@ -41,9 +41,9 @@ Dos comandos manuales:
 
 ## Cómo se ejecuta
 
-Los tres ganchos ya están en `hooks/hooks.json` y corren solos. Para invocarlo a
-mano (diagnóstico, o porque el usuario lo pide directamente) desde el cwd del
-proyecto:
+Los tres ganchos los pone `python instalar.py --instalar continuidad` en
+`settings.json`. Para invocarlo a mano (diagnóstico, o porque el usuario lo pide
+directamente) desde el cwd del proyecto:
 
 ```
 python "${CLAUDE_PLUGIN_ROOT}/abyss/continuidad.py" --comprimir 30 --proyecto "$(pwd)"

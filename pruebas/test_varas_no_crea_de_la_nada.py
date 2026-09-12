@@ -1,11 +1,5 @@
-"""`varas.py --index` (fallo 6-sep, "engaña"): escribía MEMORY.md SIEMPRE, exista o
-no. MEDIDO: en un proyecto virgen (memory/ vacío) el gancho SessionEnd (que dispara
-en TODOS los proyectos, settings.json es global) dejaba un MEMORY.md de 147 bytes
-con solo la leyenda — el fichero de memoria automática que Claude Code inyecta en
-contexto, con una leyenda que no explica nada de ese proyecto. Efecto secundario:
-además convertía el fichero a CRLF (medido con `cat -A`), así que un MEMORY.md con
-finales LF cambiaba entero en cada cierre de sesión.
-"""
+"""`varas.py --index` no debe escribir `MEMORY.md` en un proyecto sin fichas ni
+índice previo, y al escribirlo no debe convertir finales de línea LF a CRLF."""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -28,9 +22,8 @@ class ProyectoVirgenNoCreaMemoryDeLaNada(unittest.TestCase):
                           'con el fallo, esto dejaba un MEMORY.md de la nada solo con la leyenda')
 
     def test_con_una_ficha_pero_sin_indice_si_puede_escribir(self):
-        """Contraprueba: el guardián es "ni índice NI fichas" — si YA hay al menos
-        una ficha, --index puede seguir actuando con normalidad (no se bloquea la
-        primera vez que alguien arranca un índice sobre fichas ya existentes)."""
+        """Contraprueba: el guardián es "ni índice NI fichas" — con al menos una
+        ficha ya existente, --index sigue actuando con normalidad."""
         proj = ay.nuevo_proyecto()
         mem = proj / 'memory'
         mem.mkdir(parents=True, exist_ok=True)

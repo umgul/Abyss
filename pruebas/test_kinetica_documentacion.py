@@ -1,39 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Falsador del gesto viejo: la documentación no puede prometer una captura que
-ya no existe.
-
-Fallo medido el 8-sep, "engaña". `abyss/plantillas/kinetica.html` cambió el
-gesto de la palma: la mano abierta y quieta ya no dispara ninguna captura, abre
-un HOLOGRAMA (cuatro copias espejadas de la pieza que se esté viendo, al modo
-de la figura que se proyecta sobre una pirámide de metacrilato — la propia
-pantalla dice que no es un holograma de verdad) y, dentro de él, CERRAR la mano
-abre el sitio oficial, pero solo si la ficha trae `reconocimiento` con
-evidencia. La documentación se quedó una versión atrás en dos sitios:
-
-- `skills/kinetica/SKILL.md`: «mano abierta y quieta 3 s | captura un PNG
-  (descarga local del navegador)» — falso desde que existe el holograma.
-- `skills/ojo/SKILL.md`: «mano abierta y quieta un segundo captura PNG» —
-  doblemente desfasado: ni es un segundo (la constante del visor es otra), ni
-  captura nada; `gestos.py` solo publica la etiqueta `gesto_completado` en su
-  JSON y nadie la consume.
-
-Cuatro reglas, todas derivadas del código (nunca escritas a mano aquí), para
-que la prueba caiga si se revierte el texto O si se revierte el código:
-
-(a) ninguna de las dos skills puede decir que la mano abierta capture un PNG;
-(b) si una skill nombra el gesto de la palma, tiene que nombrar el holograma;
-(c) los segundos que diga la skill para ese gesto tienen que ser los de
-    `SEG_QUIETA` en `abyss/plantillas/kinetica.html` — y los del gesto de
-    quietud de `gestos.py` que cita `skills/ojo/SKILL.md`, los de
-    `VOCABULARIO['segundos_captura_quieta']` en `abyss/gestos.py`, que NO son
-    los mismos (los dos vocabularios han divergido a propósito);
-(d) si una skill menciona el enlace al sitio oficial, tiene que decir también
-    que sin reconocimiento no hay enlace.
-
-Y una quinta, del lado del código: la plantilla tiene que seguir teniendo el
-holograma y la puerta del enlace — si alguien deshace ese cambio, esta prueba
-se pone en rojo antes que la documentación quede mintiendo al revés.
-"""
+"""Las skills de kinetica/ojo no deben prometer el gesto viejo (capturar PNG):
+deben describir el holograma y su enlace condicionado. Las varas se leen del
+código (`SEG_QUIETA`/`segundos_captura_quieta`, que divergen a propósito)."""
 import re
 import unittest
 from pathlib import Path
@@ -95,8 +63,8 @@ class ConstantesDelCodigo(unittest.TestCase):
             m, "abyss/gestos.py debe declarar 'segundos_captura_quieta' en su vocabulario")
 
     def test_la_plantilla_sigue_teniendo_holograma_y_puerta_del_enlace(self):
-        # falsador del lado del CÓDIGO: si alguien devuelve el gesto a "capturar
-        # un PNG", esto cae antes de que la documentación pase a mentir al revés.
+        # falsador del lado del código: si el gesto vuelve a "capturar un PNG",
+        # esto cae antes de que la documentación quede mintiendo al revés.
         html = PLANTILLA.read_text(encoding='utf-8')
         for marca in ('abrirHolograma(', 'RECON.url', 'holoAbierto'):
             self.assertIn(marca, html,
@@ -170,8 +138,8 @@ class LosSegundosSalenDelCodigo(unittest.TestCase):
                     f'declara SEG_QUIETA = {esperado:g}')
 
     def test_ojo_cita_bien_el_segundo_de_quietud_de_gestos_py(self):
-        # el otro vocabulario, el de gestos.py, tiene su propia constante: la skill
-        # de `ojo` la cita, y tiene que ser la del código, no la del visor.
+        # gestos.py tiene su propia constante; la skill de ojo debe citar esa,
+        # no la del visor.
         v = _seg_gestos()
         texto = _leer(SKILLS['skills/ojo/SKILL.md'])
         escrito = ('%.1f' % v).replace('.', ',')

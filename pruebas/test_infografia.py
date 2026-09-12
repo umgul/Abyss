@@ -1,10 +1,6 @@
-"""`infografia.py`: de un CSV/JSON a un SVG con la
-biblioteca estándar. No usa `mem` ni red, así que se prueba en proceso (más rápido) e
-independiente de `rutas.py`; solo el paso por la CLI (`_cli`) se cubre por subprocess una
-vez, para comprobar que también funciona invocado como los demás guiones del paquete.
-
-Casos mínimos de la tarea: CSV de 5 filas -> tantos `<rect>` como filas en barras, una
-`<polyline>` por serie en líneas, título escapado (`<` -> `&lt;`)."""
+"""`infografia.py`: de un CSV/JSON a un SVG con la biblioteca estándar. Sin
+`mem` ni red: se prueba en proceso; solo `_cli` se cubre por subprocess una
+vez, para comprobar que también funciona invocado como los demás guiones."""
 import csv
 import json
 import os
@@ -83,13 +79,9 @@ class InfografiaBarras(unittest.TestCase):
 
 
 class InfografiaPaleta(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: la paleta no tenía falsador. Mutando
-    `paleta_color()` para que devolviera siempre `"none"` (todas las barras,
-    líneas y la leyenda sin color) la SUITE ENTERA seguía en verde. Con UNA
-    sola categoría y 6 series, los `<rect>` salen en el mismo orden que las
-    series (`j=0..5`): deben ser los 5 tonos de `PALETA`, y la 6ª repetir el
-    color de la 1ª (el docstring de `infografia.py` dice: "Paleta sobria fija de 5
-    tonos (se repiten si hay más de 5 series)")."""
+    """Con una categoría y 6 series, los `<rect>` salen en orden de serie
+    (`j=0..5`): deben ser los 5 tonos de `PALETA`, y la 6ª repite la 1ª
+    ("paleta sobria fija de 5 tonos", docstring de `infografia.py`)."""
 
     def test_seis_series_usan_los_5_tonos_y_la_sexta_repite_la_primera(self):
         d = Path(tempfile.mkdtemp(prefix='abyss_infog_'))
@@ -140,12 +132,9 @@ class InfografiaLineas(unittest.TestCase):
 
 
 class InfografiaColumnasInexistentes(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: `--x`/`--y` con una columna que no existe se
-    tragaba en silencio (`r.get(col)` da `None`, no revienta) y producía un SVG
-    MUDO con código 0 — contra ESPECIFICACION.md §3 ("cualquier argumento que no
-    encaje ... sale con código 1 y un mensaje claro, nunca se traga en
-    silencio"). El hermano `--y noexiste` sí fallaba, pero con un motivo
-    engañoso ("no es numérica en alguna fila")."""
+    """`--x`/`--y` con una columna inexistente debe reventar con el nombre en
+    el mensaje (ESPECIFICACION.md §3), nunca colarse en silencio ni con un
+    motivo engañoso ("no es numérica")."""
 
     def test_x_inexistente_revienta_con_el_nombre_en_el_mensaje(self):
         d = Path(tempfile.mkdtemp(prefix='abyss_infog_'))
@@ -235,10 +224,9 @@ class InfografiaCLI(unittest.TestCase):
 
 
 class InfografiaAnchoAltoFueraDeRango(unittest.TestCase):
-    """T2 revisor (7-sep): `--ancho`/`--alto` negativos o cero se aceptaban sin
-    avisar (rc 0) y dejaban un SVG con `width`/`height` negativos que ningún
-    navegador dibuja — contra ESPECIFICACION.md §3. El mínimo sale de los propios
-    márgenes del módulo (`_margenes`), no de un número decretado."""
+    """`--ancho`/`--alto` negativos o cero no deben aceptarse en silencio
+    (ESPECIFICACION.md §3): el mínimo sale de los propios márgenes del módulo
+    (`_margenes`), no de un número decretado."""
 
     def test_ancho_negativo_sale_con_codigo_no_cero_sin_escribir_svg(self):
         d = Path(tempfile.mkdtemp(prefix='abyss_infog_'))

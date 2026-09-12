@@ -1,17 +1,6 @@
-"""`taller.py` (encargo directo): servidor local mínimo de
-texto→imagen, boquilla A1111 (`POST /sdapi/v1/txt2img`, `GET /health`).
-
-`diffusers` NO está instalado en esta máquina (comprobado): el caso "sin diffusers" se prueba
-tal cual, sin tocar nada. El caso "con diffusers" inyecta un paquete `diffusers` FALSO por
-`PYTHONPATH` (un `sitecustomize`-like: un directorio con su propio `diffusers/__init__.py`
-antepuesto al `PYTHONPATH` del proceso hijo) que imita la única API que usa `taller.py`
-(`StableDiffusionPipeline.from_pretrained(...).to(dispositivo)(prompt=...)` -> objeto con
-`.images`) y devuelve una imagen sintética al instante — nunca se descarga ni se ejecuta un
-modelo de verdad, y `torch` (SÍ instalado de verdad aquí, sin CUDA) se usa tal cual.
-
-El servidor se lanza en segundo plano (`--puerto 0`: puerto libre elegido por el sistema
-operativo, léase de la primera línea de stdout) y se mata al acabar cada prueba — nunca
-queda escuchando, y nunca en otra interfaz que no sea 127.0.0.1 (lo fija el propio guion)."""
+"""`taller.py`: servidor local mínimo de texto→imagen, boquilla A1111 (`POST
+/sdapi/v1/txt2img`, `GET /health`). El caso "con diffusers" inyecta un paquete falso por
+`PYTHONPATH` que imita su API sin ejecutar un modelo real; usa `--puerto 0` y se mata tras cada prueba, sin escuchar fuera de 127.0.0.1."""
 import json
 import os
 import queue
@@ -176,13 +165,9 @@ class TallerSinDiffusers(unittest.TestCase):
 
 
 class TallerSoloEscuchaEnLoopback(unittest.TestCase):
-    """Fallo "roza": el docstring de la propia prueba afirmaba el límite
-    ("nunca en otra interfaz que no sea 127.0.0.1") sin que ninguna prueba lo
-    comprobara — medido por mutación (cambiar `('127.0.0.1', puerto)` por
-    `('0.0.0.0', puerto)`), las 5 pruebas de antes seguían en verde. Se llama
-    directamente a `construir_servidor()` (sin subproceso: no necesita
-    `torch`/`diffusers`, `estado` solo se usa dentro de los manejadores) y se
-    afirma el `server_address` real."""
+    """Llama directamente a `construir_servidor()` (sin subproceso: no necesita
+    `torch`/`diffusers`) y afirma el `server_address` real: nunca debe ligar a otra
+    interfaz que 127.0.0.1."""
 
     def test_construir_servidor_liga_a_127_0_0_1(self):
         srv = tl.construir_servidor(0, {})

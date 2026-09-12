@@ -1,35 +1,6 @@
-"""`lectura_visual.py`: OCR y sus tres usos.
-
-`lectura_visual.py`, como `render3d.py`/`pintor.py`, no llama a `rutas.resolver()`
-a nivel de módulo (solo dentro de `_cli()`), así que es seguro IMPORTARLO en el
-propio proceso de la prueba — se hace así para las funciones puras (clasificación
-de líneas, guiones de corte, número de página, vCard...) y por `subprocess` para
-lo que cubre la CLI completa (verbos, códigos de salida, ficheros por defecto),
-igual que separa `test_render3d.py`.
-
-Motor de OCR: en ESTA máquina de desarrollo, el de Windows (WinRT) está medido
-disponible y `tesseract` NO está en el PATH. Las
-clases que necesitan un motor real de verdad usan `skipUnless` sobre lo que la
-propia `lectura_visual` mide en caliente (`motor_winrt_disponible()`,
-`shutil.which('tesseract')`) — nunca se asume por `os.name` a secas — para que
-la prueba se SALTE con motivo en vez de fallar en cualquier otra máquina. El
-camino "sin ningún motor" se fuerza siempre con `ABYSS_LECTURA_VISUAL_SIN_WINRT`
-y `ABYSS_LECTURA_VISUAL_SIN_TESSERACT` (mismo patrón que `ABYSS_RENDER3D_NAVEGADOR`
-en `render3d.py`), y la "segunda vía" de `tesseract` se ejercita END-TO-END con un
-`tesseract` FALSO puesto en el PATH (un `.cmd` que imprime un TSV fijo): prueba el
-CABLEADO (elige tesseract cuando WinRT está apagado, agrupa su TSV por línea)
-sin depender de que `tesseract` de verdad esté instalado ni prometer nada sobre
-SU precisión. El escáner WIA se fuerza siempre "sin dato" con
-`ABYSS_LECTURA_VISUAL_SIN_WIA` (ese camino no se ejerce contra hardware
-real en esta batería, ni con escáner conectado ni sin él); la cámara, igual,
-con `ABYSS_LECTURA_VISUAL_SIN_CAMARA` — la suite NUNCA abre una webcam de
-verdad. CORRECCIÓN DEL AUTOR (7-sep-2026 19:15) que estas pruebas reflejan:
-la vía NORMAL de `fotocopia` es `<imagen>` o `--camara` (una de las dos,
-obligatoria); `--escaner` es una fuente OPCIONAL MÁS que se intenta ANTES,
-y si no hay escáner NO es un error — se avisa y se cae a la vía normal ya
-dada, así que `--escaner` puede combinarse con `<imagen>` o con `--camara`
-sin que eso sea un conflicto (lo que sí es conflicto: `<imagen>` y `--camara`
-juntas, o ninguna de las dos)."""
+"""`lectura_visual.py`: OCR y sus tres usos. No llama a `rutas.resolver()` a nivel de
+módulo: las funciones puras se prueban con import directo, la CLI por subprocess. El
+motor real se comprueba en caliente (`skipUnless`, nunca por `os.name`); todo se fuerza "sin dato" por env para que la suite nunca dependa de hardware real."""
 import sys
 import os
 import json
@@ -68,9 +39,8 @@ def _entorno_sin_ningun_motor(proj):
 
 
 def _entorno_con_modulo_bloqueado(proj, nombre):
-    """Bloquea el import de `nombre` (p. ej. 'cv2' o 'PIL') SOLO en el proceso
-    hijo, con un `sitecustomize.py` propio antepuesto a `PYTHONPATH` — mismo
-    método que `test_imagen_dependencias_opcionales.py` (Pillow/numpy/cv2 SIGUEN
+    """Bloquea el import de `nombre` (p. ej. 'cv2' o 'PIL') solo en el proceso hijo, con
+    un `sitecustomize.py` propio antepuesto a `PYTHONPATH` (Pillow/numpy/cv2 siguen
     instalados en la máquina real; solo este proceso hijo no los ve)."""
     bloqueo_dir = Path(tempfile.mkdtemp(prefix='abyss_bloqueo_lv_'))
     (bloqueo_dir / 'sitecustomize.py').write_text(textwrap.dedent(f'''
@@ -92,11 +62,9 @@ def _entorno_con_modulo_bloqueado(proj, nombre):
 
 
 def _tesseract_falso_en_path(env, tsv_texto):
-    """Añade al PATH un directorio con un `tesseract.cmd` que ignora sus
-    argumentos y escribe `tsv_texto` por stdout — para probar el CABLEADO de la
-    "segunda vía" sin depender de que `tesseract` de verdad esté
-    instalado. `shutil.which('tesseract')` en Windows resuelve `tesseract.cmd`
-    por `PATHEXT` igual que resolvería `tesseract.exe`."""
+    """Añade al PATH un directorio con un `tesseract.cmd` que ignora sus argumentos y
+    escribe `tsv_texto` por stdout, para probar el cableado de la "segunda vía" sin
+    depender de que `tesseract` esté instalado (`shutil.which` resuelve `.cmd` por `PATHEXT`)."""
     carpeta = Path(tempfile.mkdtemp(prefix='abyss_tesseract_falso_'))
     marcador = carpeta / 'salida.tsv'
     marcador.write_text(tsv_texto, encoding='utf-8')
@@ -146,10 +114,9 @@ class SinNingunMotorOCR(unittest.TestCase):
 # ───────────────────────────── segunda vía: tesseract (cableado, sin hardware) ─────────────────────────────
 
 class TesseractComoSegundaViaFalso(unittest.TestCase):
-    """`ABYSS_LECTURA_VISUAL_SIN_WINRT=1` apaga la primera vía; un `tesseract.cmd`
-    falso en el PATH prueba que `leer()` cae a la segunda vía y agrupa su TSV
-    por línea — nunca prueba precisión de reconocimiento real (eso lo mide
-    `SegundaViaConTesseractReal`, saltada en esta máquina)."""
+    """`ABYSS_LECTURA_VISUAL_SIN_WINRT=1` apaga la primera vía; un `tesseract.cmd` falso en
+    el PATH prueba que `leer()` cae a la segunda vía y agrupa su TSV por línea — nunca
+    prueba precisión de reconocimiento real (eso lo mide `SegundaViaConTesseractReal`)."""
 
     def test_cli_texto_usa_tesseract_y_agrupa_por_linea(self):
         proj = ay.nuevo_proyecto()
@@ -292,10 +259,9 @@ class TarjetaConMotorReal(unittest.TestCase):
 
 
 class TarjetaHeuristicaPuraSinOCR(unittest.TestCase):
-    """`_clasificar_lineas()`/`_nombre_cargo_empresa()`/`vcard_de()` en proceso,
-    sobre líneas SINTÉTICAS (sin tocar ningún motor de OCR): la heurística de
-    tamaño/posición y la generación de vCard son deterministas y no dependen de
-    Windows ni de que exista `tesseract`."""
+    """`_clasificar_lineas()`/`_nombre_cargo_empresa()`/`vcard_de()` en proceso, sobre
+    líneas sintéticas (sin motor de OCR): la heurística de tamaño/posición y la
+    generación de vCard son deterministas y no dependen de Windows ni de `tesseract`."""
 
     def test_nombre_es_la_linea_de_mayor_caja_y_empresa_por_sufijo(self):
         lineas = [
@@ -406,12 +372,9 @@ class ManualHeuristicaPuraSinOCR(unittest.TestCase):
         self.assertEqual(texto_libre, 'Solo una frase cualquiera')
 
     def test_no_ordena_si_falta_el_numero_en_alguna_pagina(self):
-        """`manual()` de verdad, pero con `leer()` sustituido: si SOLO una página
-        trae número, se mantiene el ORDEN DE ENTRADA (declarado) — no se
-        reordena a medias ni se adivina un hueco. Se comprueba dando "b" (que sí
-        detecta página, y detectada muy alta: 99) ANTES que "a" (sin número): si
-        el guion reordenase por número, "b" (número 99) saldría después; como no
-        reordena nada, sale en el orden en que se dio, primero."""
+        """Si SOLO una página trae número, se mantiene el orden de entrada: no se reordena
+        a medias ni se adivina un hueco. "b" detecta página 99 (alta) pero se da ANTES que
+        "a" (sin número); si reordenase por número, "b" saldría después."""
         from unittest import mock
         paginas = {
             'a.png': [{'texto': 'sin numero aqui'}],
@@ -484,14 +447,9 @@ class FotocopiaConCv2Real(unittest.TestCase):
 
 
 class FotocopiaValidacionDeArgumentos(unittest.TestCase):
-    """Errores de USO (argumentos incompatibles): se detectan durante el propio
-    análisis de `argv`, antes de tocar `cv2` — no dependen de que esté instalado,
-    así que esta clase NO se salta aunque `FotocopiaConCv2Real` sí lo haga.
-
-    Vía normal (corrección del autor): `<imagen>` o `--camara`, una de
-    las dos, nunca las dos ni ninguna. `--escaner` NO participa en este
-    conflicto — es una fuente opcional que se intenta antes y cae a la vía
-    normal sin error si no hay (ver `FotocopiaEscanerCaeALaViaNormal`)."""
+    """Errores de uso (argumentos incompatibles) se detectan en el propio análisis de `argv`,
+    antes de tocar `cv2`. Vía normal: `<imagen>` o `--camara`, una de las dos; `--escaner`
+    no participa en ese conflicto — es opcional y cae a la vía normal si no hay."""
 
     def test_dos_flags_de_modo_a_la_vez_es_error(self):
         proj = ay.nuevo_proyecto()
@@ -508,10 +466,9 @@ class FotocopiaValidacionDeArgumentos(unittest.TestCase):
         self.assertIn('--camara', r.stdout)
 
     def test_solo_escaner_sin_via_normal_es_error(self):
-        """`--escaner` nunca basta por sí solo: sin `<imagen>` ni
-        `--camara` es el mismo error de uso que sin nada, y NI SIQUIERA llega
-        a preguntar por un escáner de verdad (no hace falta forzar
-        `ABYSS_LECTURA_VISUAL_SIN_WIA` para que esta prueba sea determinista)."""
+        """`--escaner` nunca basta por sí solo: sin `<imagen>` ni `--camara` es el mismo
+        error de uso que sin nada, y ni siquiera llega a preguntar por un escáner real
+        (no hace falta forzar `ABYSS_LECTURA_VISUAL_SIN_WIA`)."""
         proj = ay.nuevo_proyecto()
         env = ay.entorno(proj)
         r = ay.ejecutar(ay.script('lectura_visual.py'), ['fotocopia', '--escaner'], env)
@@ -524,14 +481,9 @@ class FotocopiaValidacionDeArgumentos(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
 
     def test_imagen_y_escaner_a_la_vez_NO_es_error(self):
-        """Cambio de comportamiento respecto a la versión anterior de este
-        módulo: `--escaner` YA NO es exclusivo con `<imagen>` — es una fuente
-        opcional que se intenta antes, y si falla cae a la imagen (ver
-        `FotocopiaEscanerCaeALaViaNormal` para el camino completo con
-        `ABYSS_LECTURA_VISUAL_SIN_WIA`). Aquí solo se comprueba que la
-        combinación de argumentos, por sí sola, ya no se rechaza (con
-        `--salida` a un temporal: sin ella escribiría junto a `OCR_PAPEL`,
-        dentro de `pruebas/datos/`, y este módulo no toca esa carpeta)."""
+        """`--escaner` no es exclusivo con `<imagen>`: es una fuente opcional que se
+        intenta antes y cae a la imagen si falla. Aquí solo se comprueba que la
+        combinación no se rechaza (`--salida` a un temporal, para no escribir en `pruebas/datos/`)."""
         proj = ay.nuevo_proyecto()
         env = ay.entorno(proj)
         env['ABYSS_LECTURA_VISUAL_SIN_WIA'] = '1'
@@ -573,11 +525,9 @@ class FotocopiaSinCv2(unittest.TestCase):
 
 class EscanerForzadoSinTocarHardware(unittest.TestCase):
     def test_funcion_escanear_wia_forzada_no_lanza_powershell(self):
-        """`escanear_wia()` con la variable puesta devuelve directamente
-        `ok: False` SIN ejecutar ningún `subprocess.run` — se comprueba con un
-        mock que registra si se llamó, no solo mirando el resultado (un
-        resultado "ok: False" por sí solo no distingue "no llegó a intentarlo"
-        de "lo intentó y falló")."""
+        """`escanear_wia()` con la variable puesta devuelve `ok: False` sin ejecutar ningún
+        `subprocess.run`: se comprueba con un mock que registra si se llamó, no solo el
+        resultado ("ok: False" no distingue "no lo intentó" de "lo intentó y falló")."""
         from unittest import mock
         viejo = os.environ.get('ABYSS_LECTURA_VISUAL_SIN_WIA')
         os.environ['ABYSS_LECTURA_VISUAL_SIN_WIA'] = '1'
@@ -604,9 +554,8 @@ class EscanerFisicoNoSeProbo(unittest.TestCase):
 
 @unittest.skipUnless(lv._CV2_OK, 'cv2/numpy no están instalados en esta máquina')
 class FotocopiaEscanerCaeALaViaNormal(unittest.TestCase):
-    """Corrección del autor: sin escáner, `fotocopia` NO revienta — avisa
-    y sigue por la vía normal ya dada (`<imagen>` aquí), tal cual si `--escaner`
-    no se hubiera puesto."""
+    """Sin escáner, `fotocopia` no revienta: avisa y sigue por la vía normal ya dada
+    (`<imagen>` aquí), igual que si `--escaner` no se hubiera puesto."""
 
     def test_escaner_mas_imagen_forzado_sin_wia_usa_el_fichero_sin_error(self):
         proj = ay.nuevo_proyecto()
@@ -627,10 +576,9 @@ class FotocopiaEscanerCaeALaViaNormal(unittest.TestCase):
 
 class CamaraForzadaSinTocarHardware(unittest.TestCase):
     def test_funcion_capturar_camara_forzada_no_abre_video_capture(self):
-        """Mismo patrón que `test_funcion_escanear_wia_forzada_no_lanza_powershell`:
-        con `ABYSS_LECTURA_VISUAL_SIN_CAMARA` puesta, `capturar_camara()`
-        devuelve `ok: False` SIN llegar a `_abrir_camara()`/`cv2.VideoCapture` —
-        se comprueba con un mock que registra la llamada, no solo el resultado."""
+        """Mismo patrón que la prueba equivalente del escáner: con
+        `ABYSS_LECTURA_VISUAL_SIN_CAMARA` puesta, `capturar_camara()` devuelve `ok: False`
+        sin llegar a `_abrir_camara()`/`cv2.VideoCapture`, comprobado con un mock de llamada."""
         from unittest import mock
         viejo = os.environ.get('ABYSS_LECTURA_VISUAL_SIN_CAMARA')
         os.environ['ABYSS_LECTURA_VISUAL_SIN_CAMARA'] = '1'
@@ -669,10 +617,9 @@ class CamaraFisicaNoSeProbo(unittest.TestCase):
 
 @unittest.skipUnless(lv._CV2_OK and lv._PIL_OK, 'cv2/numpy/Pillow no están instalados en esta máquina')
 class GuardarPaginasMultiplesEnProceso(unittest.TestCase):
-    """`_guardar_paginas()` en proceso, sobre imágenes YA procesadas por
-    `_procesar_documento()` (nunca sobre una cámara ni un escáner): el núcleo
-    de `--paginas` es que varias páginas se juntan en UN pdf y que un
-    PNG rehúsa llevar más de una."""
+    """`_guardar_paginas()` en proceso, sobre imágenes ya procesadas por
+    `_procesar_documento()` (nunca cámara ni escáner): varias páginas se juntan en un
+    PDF, y un PNG rehúsa llevar más de una."""
 
     def test_una_pagina_igual_que_guardar_imagen(self):
         final, _recortado = lv._procesar_documento(lv.cv2.imread(str(OCR_PAPEL)), modo='color')

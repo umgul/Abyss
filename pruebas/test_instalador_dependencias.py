@@ -1,16 +1,7 @@
 # -*- coding: utf-8 -*-
-"""`instalar.py`: el instalador resuelve las
-dependencias de terceros de cada módulo por sí mismo, con consentimiento y sin
-mentir. Regla dura 6 del encargo: NADA de esto instala un paquete de verdad —
-cada prueba que ejercita `--instalar-dependencias`/`instalar_dependencias()`
-monkeypatchea `subprocess.run` (en proceso, sobre el módulo cargado) o lo
-sustituye en un proceso hijo por `sitecustomize.py` (mismo método que
-`test_imagen_dependencias_opcionales.py`) — nunca sale a la red, nunca llama a
-un `pip` real.
-
-Igual que `test_instalador.py`/`test_instalador_roza.py`: se importa
-`instalar.py` DIRECTAMENTE por ruta de fichero (no hace red ni
-`rutas.resolver()` a nivel de módulo)."""
+"""`instalar.py`: el instalador resuelve las dependencias de terceros de cada módulo, con
+consentimiento y sin mentir. Nada de esto instala un paquete real: se monkeypatchea
+`subprocess.run` o se sustituye por `sitecustomize.py`; se importa directo por ruta de fichero (sin red ni `rutas.resolver()`)."""
 import sys
 import os
 import re
@@ -274,11 +265,9 @@ class PipSimuladoQueFallaSeCuentaYNoDaCodigoDeSalida0(unittest.TestCase):
         self.assertTrue(any('pip' in m.lower() for m in mensajes), mensajes)
 
     def test_cli_de_verdad_sale_con_codigo_distinto_de_cero(self):
-        """Extremo a extremo por subprocess (mismo método que
-        `test_imagen_dependencias_opcionales.py`: un `sitecustomize.py` propio
-        antepuesto a PYTHONPATH sustituye `subprocess.run` en el PROCESO HIJO) —
-        confirma que `ok=False` de arriba de verdad se traduce en un código de
-        salida distinto de 0 en la CLI, sin tocar la red ni un pip real."""
+        """Extremo a extremo por subprocess: un `sitecustomize.py` propio antepuesto a
+        PYTHONPATH sustituye `subprocess.run` en el proceso hijo. Confirma que `ok=False`
+        se traduce en código de salida distinto de 0, sin tocar la red ni un pip real."""
         proj = ay.nuevo_proyecto()
         env = _entorno_con_pip_simulado_que_falla(proj)
         r = ay.ejecutar(ay.RAIZ / 'instalar.py', ['--instalar-dependencias', 'imagen'], env)
@@ -288,11 +277,9 @@ class PipSimuladoQueFallaSeCuentaYNoDaCodigoDeSalida0(unittest.TestCase):
 
 
 def _entorno_con_pip_simulado_que_falla(proj):
-    """`sitecustomize.py` propio antepuesto a `PYTHONPATH` (mismo método que
-    `pruebas/test_imagen_dependencias_opcionales.py`): sustituye
-    `subprocess.run` DEL PROCESO HIJO por una versión que dice "falta todo" a
-    cada comprobación de import y "error simulado" a cada `pip install` — en
-    ningún caso llega a la red ni a un pip de verdad."""
+    """`sitecustomize.py` propio antepuesto a `PYTHONPATH`: sustituye `subprocess.run` del
+    proceso hijo por una versión que dice "falta todo" a cada import y "error simulado" a
+    cada `pip install`; nunca llega a la red ni a un pip real."""
     bloqueo_dir = Path(tempfile.mkdtemp(prefix='abyss_pip_falso_'))
     (bloqueo_dir / 'sitecustomize.py').write_text(textwrap.dedent('''
         import subprocess as _sp
@@ -328,12 +315,7 @@ class NingunGanchoInstalaNada(unittest.TestCase):
             for evento, args, timeout in mod.get('hooks', ()):
                 self.assertNotIn('--instalar-dependencias', args, f'{mod["id"]}/{evento}')
                 self.assertNotIn('--dependencias', args, f'{mod["id"]}/{evento}')
-
-    def test_hooks_json_del_plugin_no_menciona_dependencias_ni_instalar_py(self):
-        texto = (ay.RAIZ / 'hooks' / 'hooks.json').read_text(encoding='utf-8')
-        self.assertNotIn('--instalar-dependencias', texto)
-        self.assertNotIn('--dependencias', texto)
-        self.assertNotIn('instalar.py', texto, 'instalar.py no es un guion de gancho')
+                self.assertNotIn('instalar.py', ' '.join(map(str, args)), 'instalar.py no es un guion de gancho')
 
     def test_instalar_dependencias_nunca_se_llama_desde_instalar_o_desinstalar(self):
         """`instalar()`/`desinstalar()` (lo que SÍ corre, indirectamente, desde

@@ -17,7 +17,8 @@ Claude Code). Regla:
 - `CODE = dirname(__file__)` es solo código. Nada se escribe ahí salvo `config.json` (instalador).
 - `proj` se resuelve, por este orden: (1) `dirname(transcript_path)` del JSON de stdin del gancho;
   (2) `cwd` del mismo JSON, saneado como lo sanea Claude Code (`re.sub(r'[^A-Za-z0-9]', '-', cwd)`)
-  bajo `~/.claude/projects/`; (3) argumento `--proyecto <cwd>`; (4) variable `ABYSS_PROYECTO`.
+  bajo `~/.claude/projects/`; (3) argumento `--proyecto <cwd>`; (4) variable `ABYSS_PROYECTO`
+  (ruta de `proj`; un nombre sin separadores se toma como carpeta bajo `~/.claude/projects/`).
   Si nada, se aborta con un mensaje claro: sin proyecto no hay datos.
 - `mem = proj/memory` (se crea si no existe). `sesiones/`, `relojes.jsonl`, `bolsas.json`,
   `.despertados/`, `.vivo/`, `.omitir`, `confabulaciones.jsonl`, `lugar.json`, `meteo.json`,

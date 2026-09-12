@@ -1,12 +1,6 @@
-"""`pintor.pintar()` con `--acabado` y `--suave` (ESPECIFICACION.md §6, tarea B item 1a):
-importa `pintor` directamente en el proceso de la prueba — a diferencia de los guiones
-con gancho, `pintor.py` no llama a `rutas.resolver()` ni conoce `mem` (README: "no
-conoce el concepto de memory"), así que aquí SÍ es seguro importarlo sin subprocess
-(ver la nota de este mismo tipo en `ayudas.py`).
-
-Las dos corridas de cada prueba usan la MISMA imagen sintética y la MISMA semilla,
-para que la única diferencia sea la opción que se está midiendo.
-"""
+"""`pintor.pintar()` con `--acabado` y `--suave` (ESPECIFICACION.md §6). A diferencia
+de los guiones con gancho, `pintor.py` no llama a `rutas.resolver()` ni conoce `mem`,
+así que aquí es seguro importarlo directamente, sin subprocess."""
 import sys
 import os
 import tempfile

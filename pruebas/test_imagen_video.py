@@ -1,8 +1,6 @@
-"""`imagen.py video` (ESPECIFICACION.md §6, tarea B item 1b): un vídeo corto codificado
-desde el `.json.gz` que deja `pintor.pintar()`. Todo en local (sin red). Si falta
-`imageio_ffmpeg` (dependencia OPCIONAL, requirements.txt), la prueba se salta con el
-motivo en vez de fallar.
-"""
+"""`imagen.py video` (ESPECIFICACION.md §6): codifica un vídeo corto desde el
+`.json.gz` que deja `pintor.pintar()`, todo en local (sin red). Si falta
+`imageio_ffmpeg` (opcional, requirements.txt) la prueba se salta en vez de fallar."""
 import sys
 import os
 import tempfile

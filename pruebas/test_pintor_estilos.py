@@ -1,11 +1,6 @@
-"""`pintor.pintar(..., estilo=...)`: motor
-único, un dict de parámetros por estilo. Importa `pintor` directamente en el proceso de la
-prueba, como `test_pintor_acabado_suave.py` (no toca `rutas.resolver()` ni conoce `mem`).
-
-Cada valor de este fichero (pinceladas, fracción blanca, desviación entre canales) es una MEDIDA
-tomada en el propio desarrollo de esta tarea sobre las fotos sintéticas de aquí — no un umbral
-inventado; ver el margen con el que pasa cada aserción antes de tocar los estilos.
-"""
+"""`pintor.pintar(..., estilo=...)`: motor único, un dict de parámetros por estilo. Importa
+`pintor` directamente en el proceso (no toca `rutas.resolver()` ni conoce `mem`). Los umbrales
+de este fichero son medidas sobre las fotos sintéticas de aquí, no valores arbitrarios."""
 import sys
 import os
 import gzip
@@ -53,13 +48,9 @@ def _foto_clara(ruta, ancho=150, alto=100):
 
 
 def _mascara_cubierta(trazos_gz, margen=2):
-    """Repinta la huella (línea + dos círculos) de cada trazo en una máscara aparte — igual que
-    `pintor.pintar()` dibuja cada pincelada — para saber, píxel a píxel, qué zona del lienzo
-    tocó de verdad alguna pincelada (de cualquier capa) y cuál no. `margen` engorda cada trazo
-    un poco al repintarlo: sin él, un par de píxeles justo en el BORDE de un trazo (donde
-    `ImageDraw` redondea) pueden colar como "sin pincelada" por una diferencia de redondeo entre
-    esta reconstrucción y el trazo original — medido, no hipotético — y el "sin pincelada" debe
-    ser el interior de verdad, no el borde."""
+    """Repinta cada trazo (línea + dos círculos) en una máscara aparte para saber qué zona del
+    lienzo tocó alguna pincelada. `margen` engorda el trazo al repintarlo: sin él, el redondeo
+    de `ImageDraw` en el borde puede colar como "sin pincelada" por diferencia con el original."""
     with gzip.open(trazos_gz, 'rt', encoding='utf-8') as fh:
         datos = json.load(fh)
     W, H = datos['W'], datos['H']
@@ -121,9 +112,8 @@ class EstilosDelPintor(unittest.TestCase):
                          'acuarela: radios más gordos y menos capas que óleo — debe salir con menos pinceladas')
 
     def test_acuarela_deja_el_papel_donde_no_llega_ninguna_pincelada(self):
-        # radios pequeños a propósito (frente a los 40,22,12,7 por defecto): con el pincel
-        # grande de serie, un puñado de trazos ya cubre el lienzo entero y la prueba sería
-        # vacía (medido: 0 px sin trazo con los parámetros por defecto en este lienzo).
+        # radios pequeños a propósito: con el pincel grande por defecto, un puñado de
+        # trazos ya cubre el lienzo entero y la prueba quedaría vacía.
         r = pintor.pintar(self.foto, salida=os.path.join(self.d, 'acuarela_chica'), ancho=150,
                            semilla=7, estilo='acuarela', radios=[10, 5], umbral=[130, 110],
                            longitud=[3, 3], avisar=lambda *a: None)

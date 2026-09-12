@@ -1,25 +1,6 @@
-"""`lienzo.py cubista`/`surrealista` (encargo 9-sep: "dos estilos pictóricos NUEVOS" para
-rehacer el vídeo del David). Import directo de `lienzo` en proceso, como hace
-`test_lienzo.py` (ningún verbo de aquí toca `mem` ni resuelve un proyecto de Claude Code).
-
-Por qué un fichero aparte de `test_lienzo.py` y no más clases dentro de él: son dos verbos
-grandes (triangulación, campo de deformación) con su propia batería de casos — separarlos
-deja `test_lienzo.py` centrado en los verbos "clásicos" y este en los dos nuevos.
-
-Casos mínimos de la tarea:
-  - `cubista` produce PNG + facetas > 0; con desplazamiento=giro=0 las facetas cubren el
-    100% del lienzo EXACTO (Delaunay de un conjunto de puntos que cubre el rectángulo
-    entero no deja huecos); con desplazamiento > 0 la cobertura BAJA de forma medible (los
-    huecos entre facetas movidas dejan ver el fondo) — así se falsa que el desplazamiento
-    de verdad mueve algo, no solo que la función no revienta.
-  - `surrealista` con fuerza=0 y viraje=0 devuelve la foto EXACTA (sin desplazamiento ni
-    viraje, remuestrear con el campo idéntico a la rejilla original no debe tocar ni un
-    píxel); con fuerza>0 el desplazamiento medido sube con la fuerza pedida, y el viraje
-    de tono se nota en la media del canal H.
-  - los dos, sin OpenCV, no revientan (caen a su fallback declarado) — igual que
-    `Numeros`/`Restaurar` en `test_lienzo.py`.
-  - `--pasos N --pasos-dir DIR`: el ÚLTIMO paso es idéntico al PNG final, en los dos verbos.
-"""
+"""`lienzo.py cubista`/`surrealista`: dos estilos pictóricos (triangulación,
+campo de deformación) — fichero aparte de `test_lienzo.py` por tener su propia
+batería de casos. Import directo de `lienzo`, sin tocar `mem` ni resolver proyecto."""
 import json
 import math
 import os
@@ -79,19 +60,17 @@ class Cubista(unittest.TestCase):
             self.assertEqual(im.size, Image.open(self.foto).size)
 
     def test_sin_desplazamiento_ni_giro_las_facetas_cubren_el_lienzo_entero(self):
-        # medido en desarrollo con esta misma foto sintética: 0.0/0.0 -> cobertura 1.0
-        # exacta (una Delaunay de puntos que ya cubren el rectángulo entero no deja
-        # huecos); es el caso de referencia para el siguiente test.
+        # con desplazamiento=giro=0, una Delaunay de puntos que cubre el rectángulo
+        # entero no deja huecos: cobertura debe ser 1.0 exacta. Caso de referencia
+        # para el siguiente test.
         r = lienzo.cubista(str(self.foto), facetas=120, desplazamiento=0.0, giro=0.0,
                             semilla=5, salida=str(self.d / 'c_quieto.png'))
         self.assertEqual(r['cobertura_facetas'], 1.0,
                           'sin mover ni girar nada, la triangulación debe cubrir el 100% del lienzo')
 
     def test_mas_desplazamiento_baja_la_cobertura_de_forma_medible(self):
-        # falsador de que "desplazamiento" mueve algo de verdad: si `cubista()` ignorase
-        # el parámetro (p. ej. un `dx = dy = 0` fijo por error), las tres cifras saldrían
-        # iguales a 1.0 y este test fallaría. Medido con esta foto: 0.0->1.0,
-        # 0.07->0.9689, 0.25->0.845 (semilla 5, 120 facetas).
+        # falsador de que "desplazamiento" mueve algo de verdad: si `cubista()`
+        # ignorase el parámetro, las tres cifras saldrían iguales a 1.0.
         quieto = lienzo.cubista(str(self.foto), facetas=120, desplazamiento=0.0, giro=0.0,
                                  semilla=5, salida=str(self.d / 'c0.png'))
         poco = lienzo.cubista(str(self.foto), facetas=120, desplazamiento=0.07, giro=7.0,
@@ -112,12 +91,10 @@ class Cubista(unittest.TestCase):
                           '--sin-contorno debe cambiar de verdad el PNG (quita la línea de junta)')
 
     def test_bordes_reales_siembran_mas_facetas_donde_hay_un_contorno_nitido(self):
-        # con una figura de bordes nítidos, los puntos semilla de _puntos_de_bordes
-        # deben caer sobre el contorno del rectángulo (no en cualquier sitio): se
-        # comprueba indirectamente pidiendo pocas facetas y viendo que salen puntos
-        # de borde de verdad (más de la mitad de los pedidos, con esta figura de
-        # bordes limpios) en vez de quedarse vacíos por falta de bordes que Canny
-        # pueda encontrar.
+        # los puntos semilla de _puntos_de_bordes deben caer sobre el contorno real
+        # (no en cualquier sitio): se comprueba pidiendo pocas facetas y viendo que
+        # salen más de la mitad, en vez de quedar vacíos por falta de bordes que
+        # Canny detecte.
         foto = _foto_con_figura(self.d / 'figura.png')
         gris = np.asarray(Image.open(foto).convert('L'))
         rnd = np.random.RandomState(1)
@@ -125,11 +102,9 @@ class Cubista(unittest.TestCase):
         self.assertGreater(len(pts), 20, 'una figura con un borde nítido de verdad debe dar bastantes puntos de borde')
 
     def test_facetas_pedidas_de_mas_en_una_foto_minuscula_no_revienta(self):
-        # una foto de 12x10 con 500 facetas pedidas: MEDIDO — salen 0 facetas válidas
-        # (los triángulos que caben en un lienzo tan pequeño quedan todos por debajo
-        # del umbral de área de 3 px² que descarta esquirlas degeneradas), no un
-        # error. "No revienta" es el caso a probar aquí, no un mínimo de facetas: con
-        # un lienzo de 120 px² no hay sitio material para 500 triángulos de verdad.
+        # con un lienzo de 12x10 px, los triángulos quedan todos por debajo del
+        # umbral de área (3 px²) que descarta esquirlas degeneradas: 0 facetas es
+        # lo esperado, no un error. Lo que se prueba es que no revienta.
         chica = self.d / 'chica.png'
         Image.new('RGB', (12, 10), (80, 90, 100)).save(chica)
         r = lienzo.cubista(str(chica), facetas=500, salida=str(self.d / 'c_chica.png'))
@@ -156,9 +131,8 @@ class Cubista(unittest.TestCase):
         final = np.asarray(Image.open(r['salida']))
         ultimo = np.asarray(Image.open(r['pasos'][-1]))
         np.testing.assert_array_equal(final, ultimo, 'el último paso debe ser exactamente el cuadro acabado')
-        # y el PRIMER paso NO debe ser una copia del último: si `_dibujar` ignorase
-        # `hasta` (p. ej. por el fallo de reproducibilidad del jitter que describe el
-        # comentario de `cubista()`), pasos[0] y pasos[-1] saldrían iguales.
+        # el primer paso no debe copiar el último: si `_dibujar` ignorara `hasta`
+        # (ver el jitter no determinista que documenta `cubista()`), saldrían iguales.
         primero = np.asarray(Image.open(r['pasos'][0]))
         self.assertFalse(np.array_equal(primero, final),
                           'el primer paso (pocas facetas) no debe coincidir con el cuadro acabado')

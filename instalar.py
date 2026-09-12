@@ -234,7 +234,7 @@ MODULOS = [
          # Claude Code (comprobado 6-sep contra la documentación de ganchos: los eventos
          # reales son PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart,
          # SessionEnd, UserPromptSubmit, PreCompact, Notification). Antes se declaraba
-         # aquí y en hooks/hooks.json un gancho que nunca se disparaba. `modelo.py` es
+         # aquí un gancho que nunca se disparaba. `modelo.py` es
          # ahora solo una librería que usa `continuidad.py --despertar` en cada prompt.
          toca='sin gancho propio (lo usa continuidad --despertar); ficheros mem/modelo_preferido.json',
          hooks=[],
@@ -1402,6 +1402,7 @@ TEXTOS = {
             "  python instalar.py --dependencias\n"
             "  python instalar.py --instalar-dependencias [mod1,mod2]\n"
             "  python instalar.py --manos                     (baja MediaPipe Tasks Vision para el visor 3D)\n"
+            "  python instalar.py --modelo                    (baja U^2-Net p para quitar el fondo de una foto)\n"
             "  python instalar.py --sin-ventana                (equivale a --listar)\n"
             "  python instalar.py                              (ventana Tk; sin entorno gráfico, --listar)\n"
             "Comunes: --settings <ruta>  --python <exe>  --proyecto <cwd>  --skills-dir <ruta>  --idioma es|en\n"
@@ -1527,6 +1528,7 @@ TEXTOS = {
             "  python instalar.py --dependencias\n"
             "  python instalar.py --instalar-dependencias [mod1,mod2]\n"
             "  python instalar.py --manos                     (downloads MediaPipe Tasks Vision for the 3D viewer)\n"
+            "  python instalar.py --modelo                    (downloads U^2-Net p to remove a photo's background)\n"
             "  python instalar.py --sin-ventana                (same as --listar)\n"
             "  python instalar.py                              (Tk window; no display -> --listar)\n"
             "Common: --settings <path>  --python <exe>  --proyecto <cwd>  --skills-dir <path>  --idioma es|en\n"
@@ -1761,8 +1763,7 @@ def _construir_command(ejecutable, args):
 
     Medido 6-sep: el esquema REAL de un gancho de `settings.json` de Claude Code es
     `{type, command, timeout}` con la línea de órdenes ENTERA dentro de `command` —
-    no existe un campo `args` aparte (así lo escribe ya `hooks/hooks.json:8`, el
-    gancho del propio plugin). La versión anterior de este instalador escribía
+    no existe un campo `args` aparte. La versión anterior de este instalador escribía
     `{"command": "<python.exe>", "args": ["<script>", "--bandera"]}`, que Claude Code
     no sabe interpretar: ejecutaría `python.exe` pelado, sin guion."""
     return ' '.join(_quotar(a) for a in ([ejecutable] + list(args)))
@@ -2719,6 +2720,12 @@ if __name__ == '__main__':
 
     ids_instalar = _lista_flag(argv, '--instalar')
     ids_desinstalar = _lista_flag(argv, '--desinstalar')
+
+    desconocidos = [i for i in (ids_instalar or []) + (ids_desinstalar or []) if i not in MODULOS_POR_ID]
+    if desconocidos:
+        for i in desconocidos:
+            sys.stderr.write(_texto(idioma, 'modulo_desconocido', id=i) + '\n')
+        sys.exit(2)
 
     if ids_instalar:
         proj, mem = _resolver_mem(argv)

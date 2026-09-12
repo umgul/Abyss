@@ -1,17 +1,6 @@
-"""`instalar.py` (fallo 6-sep, "roza"): cualquier bandera desconocida caía de largo
-hasta `_abrir_ventana()` + `mainloop()`, sin salida — MEDIDO: `python instalar.py
---help` no volvió en 120 s (hubo que localizar el proceso y matarlo), abriendo de
-paso una ventana Tk en el escritorio. `__main__` solo miraba `--listar`,
-`--instalar`, `--desinstalar` y `--sin-ventana`; cualquier otra cosa (`--help`, un
-typo como `--instaler`, o cualquier invocación no interactiva sin banderas) se
-tragaba hasta la ventana.
-
-Ahora `argv` se valida ANTES de decidir qué hacer: `-h`/`--help` imprime el uso y
-sale con 0; cualquier bandera que no encaje sale con 2 y un mensaje que la nombra
-— nunca llega a `_abrir_ventana()`. Las pruebas de subprocess usan un timeout corto
-(10 s, muy por debajo de los 120 s medidos) para que un cuelgue real falle rápido
-en vez de colgar la propia suite.
-"""
+"""`instalar.py`: `argv` se valida ANTES de decidir qué hacer — `-h`/`--help`
+imprime el uso y sale con 0, cualquier bandera que no encaje sale con 2 y un
+mensaje que la nombra, sin llegar nunca a `_abrir_ventana()`/`mainloop()`."""
 import sys
 import os
 import json
@@ -59,10 +48,9 @@ class ValidacionDeArgvDirecta(unittest.TestCase):
 
 
 class InstaladorCliNoSeCuelga(unittest.TestCase):
-    """Subprocess de verdad contra `instalar.py`, tal como lo teclearía alguien:
-    el fallo real era que el PROCESO no volvía. `--settings` apunta a un fichero
-    temporal para no tocar nunca el `~/.claude/settings.json` real de quien corra
-    la prueba (regla dura 1 del encargo)."""
+    """Subprocess real contra `instalar.py`, tal como lo teclearía alguien.
+    `--settings` apunta a un fichero temporal: nunca toca el
+    `~/.claude/settings.json` real de quien corra la prueba."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix='abyss_instalador_cli_'))
@@ -76,7 +64,6 @@ class InstaladorCliNoSeCuelga(unittest.TestCase):
         )
 
     def test_help_sale_rapido_sin_abrir_ventana(self):
-        # con el fallo: TimeoutExpired (medido: no volvía ni a los 120 s)
         try:
             r = self._correr(['--help'])
         except subprocess.TimeoutExpired:

@@ -1,8 +1,6 @@
 """`continuidad.py --comprimir` (ESPECIFICACION.md §2.4): gzipea las sesiones más
-viejas que el corte y los lectores (aquí, `frases_usuario` a través de
-`continuidad.py --falsar`, que llama a `hacer_bolsas()`) deben poder seguir
-leyendo el `.jsonl.gz` igual que el `.jsonl` sin comprimir.
-"""
+viejas que el corte. Los lectores (aquí, `frases_usuario()` vía `--falsar`, que
+llama a `hacer_bolsas()`) deben leer el `.jsonl.gz` igual que el `.jsonl` sin comprimir."""
 import sys
 import os
 import time

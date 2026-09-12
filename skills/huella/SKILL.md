@@ -25,8 +25,11 @@ Con el módulo instalado, tres ganchos registran en
   (recortado a 200 caracteres) y la DIFERENCIA de puertos/procesos contra la
   foto anterior — puertos nuevos en escucha, procesos nuevos.
 - **`Stop`**: una línea `[huella] N proceso(s) y M puerto(s) abiertos por este
-  hilo siguen vivos: --informe` — solo si de verdad queda algo vivo; si no,
-  silencio total.
+  hilo siguen vivos: --informe` — solo si de verdad queda algo vivo que cuelgue
+  del proceso de esta sesión; si no, silencio total. Un proceso nuevo cuyo padre
+  ya no existe no se puede atribuir con certeza: no cuenta aquí y `--informe` lo
+  lista como «atribución incierta». Uno que cuelga de otro proceso vivo ajeno no
+  es de este hilo y no se registra.
 
 ## Cómo se ejecuta
 

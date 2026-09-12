@@ -1,21 +1,6 @@
-"""`auditar.py`: las cinco comprobaciones sobre
-un paquete, con evidencia de fichero y línea.
-
-`auditar.py` no llama a `rutas.resolver()` ni lee stdin (no guarda nada en
-`mem`: audita un paquete de terceros, no mide el propio hilo) — así que, a
-diferencia de `huella.py`/`lector_pdf.py`, TODAS las funciones puras se prueban
-importando el módulo directamente, sin monkeypatch de por medio. Solo la CLI
-(`CliPorSubproceso`) se ejercita como subproceso, igual que el resto de
-`abyss/` — con `ay.entorno()` de todos modos, por si algún día una importación
-compartida acabase tocando `rutas` (red de seguridad, no porque haga falta hoy).
-
-`paquete_sintetico` (`pruebas/datos/paquete_sintetico/`) es el paquete sucio
-que pide el encargo, con las TRES cosas a la vez: un `package.json` sin autor,
-un gancho `UserPromptSubmit` (`sondeo.py`) que su propio `README.md` no nombra,
-y `malo.py` con una llamada de red a un host que tampoco nombra ningún README.
-El paquete "limpio" (para el falsador "sin hallazgos") se construye al vuelo en
-cada prueba con `tempfile`, para no tener que mantener un segundo fixture fijo.
-"""
+"""`auditar.py`: las cinco comprobaciones sobre un paquete, con evidencia de fichero y
+línea. No llama a `rutas.resolver()` ni lee stdin: las funciones puras se prueban con
+import directo, solo la CLI por subproceso; `paquete_sintetico` trae sin autor, gancho y host de red no declarados a la vez."""
 import sys
 import os
 import json
@@ -37,11 +22,9 @@ _GIT_DISPONIBLE = shutil.which('git')
 
 
 def _paquete_limpio(tmp, host='api.ejemplo-real.com'):
-    """Un paquete SIN nada que cazar: autor real, licencia, repositorio, un
-    único host de red y ese mismo host nombrado en su README. Se usa para el
-    falsador explícito de "paquete limpio → veredicto sin
-    hallazgos" — sin él, no habría forma de distinguir un `auditar.py` que
-    detecta problemas de verdad de uno que los inventa siempre."""
+    """Un paquete sin nada que cazar: autor real, licencia, repositorio, un único host de
+    red y ese mismo host nombrado en su README. Falsador explícito de que un paquete
+    limpio da veredicto "sin hallazgos"."""
     (tmp / 'package.json').write_text(json.dumps({
         'name': 'limpio', 'version': '1.0.0', 'author': 'Vera Comprobada',
         'license': 'MIT', 'repository': 'https://github.com/vera/limpio',
@@ -97,10 +80,9 @@ class PaqueteSinteticoLasTresCosas(unittest.TestCase):
         self.assertIn('dominio-no-declarado.net', texto.splitlines()[hs[0]['linea'] - 1])
 
     def test_malo_py_nunca_se_ejecuta(self):
-        """`sondear()` de `malo.py` haría una petición de red de verdad si se
-        importase y llamase — auditar.py solo lo LEE como texto, nunca lo
-        ejecuta. Se falsa poniendo un centinela que revienta cualquier
-        conexión real y comprobando que la auditoría entera sigue pasando."""
+        """`sondear()` de `malo.py` haría una petición de red real si se importase y
+        llamase; `auditar.py` solo lo LEE como texto. Se falsa con un centinela que
+        revienta cualquier conexión real, comprobando que la auditoría sigue pasando."""
         with mock.patch('socket.socket.connect', side_effect=AssertionError('¡se intentó conectar de verdad!')):
             r = auditar.auditar(str(RUTA_SINTETICO))
         self.assertEqual(r['veredicto'], 'rompe')  # llegó hasta el final sin tocar la red real
@@ -402,12 +384,9 @@ class Red(unittest.TestCase):
 
 
 class RedHostEnConfigYTercerosEmbebidos(unittest.TestCase):
-    """Arreglo (auditoría sobre `auditar.py`): el caso real reportado — un
-    paquete con AUTOR real y README limpio cuyo `enviar.py` lee el host de
-    `config/ajustes.json` (`cfg['endpoint']`) en vez de escribirlo a mano en el
-    `.py`, más un segundo host bajo `vendor/`. Antes del arreglo,
-    `auditar.py` daba "sin hallazgos": la comprobación 4 solo miraba
-    `EXT_CODIGO` (nunca `.json`) y `vendor/` se saltaba en silencio."""
+    """Un paquete con autor y README limpios cuyo `enviar.py` lee el host de red desde
+    `config/ajustes.json` (no lo escribe en el `.py`), más un segundo host bajo `vendor/`:
+    la comprobación de red debe mirar también `.json` y tratar `vendor/` aparte."""
 
     def _paquete(self, tmp):
         os.makedirs(os.path.join(tmp, 'config'))
@@ -450,9 +429,8 @@ class RedHostEnConfigYTercerosEmbebidos(unittest.TestCase):
         self.assertFalse(any('terceros' in h['fichero'] for h in r['hallazgos'] if h.get('fichero')))
 
     def test_repository_del_manifiesto_no_cuenta_como_host_oculto(self):
-        """Regresión del propio arreglo: al ampliar la comprobación 4 a `.json`
-        hay que excluir los manifiestos (`RUTAS_MANIFIESTO`) o cualquier
-        `repository` de GitHub legítimo se leería como un host sin declarar."""
+        """Al comprobar hosts en `.json`, los manifiestos (`RUTAS_MANIFIESTO`) deben
+        excluirse, o un `repository` de GitHub legítimo se leería como host oculto."""
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / 'package.json').write_text(json.dumps({
                 'name': 'x', 'author': 'Vera Comprobada', 'license': 'MIT',
@@ -502,9 +480,8 @@ class FuncionesPuras(unittest.TestCase):
 
 
 class InformeDeclaraLoQueNoMiro(unittest.TestCase):
-    """Arreglo: un «sin hallazgos» sin decir dónde no miró no distingue
-    «no hay nada» de «no miré ahí» — misma disciplina que `vigia.py` aplica a
-    sus propios falsos negativos."""
+    """Un «sin hallazgos» que no dice dónde no miró no distingue «no hay nada» de «no miré
+    ahí» — misma disciplina que `vigia.py` aplica a sus propios falsos negativos."""
 
     def test_texto_sin_hallazgos_dice_en_lo_que_esta_vara_mira_y_lista_lo_que_no_leyo(self):
         with tempfile.TemporaryDirectory() as d:

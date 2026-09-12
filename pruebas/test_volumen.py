@@ -1,19 +1,6 @@
-"""`volumen.py`: despiece por capas (2,5D, GrabCut +
-nitidez/luminancia) y `prompt3d` (paleta k-medias, proporciones, horizonte, formas por
-circularidad de contorno). `volumen.py` no llama a `rutas.resolver()` (guion de fichero a
-fichero, como `render3d.py`/`pintor.py`, ver su propio docstring) — se puede importar
-DIRECTAMENTE en el proceso de la prueba, igual que `test_render3d.py` importa `render3d`.
-
-Las imágenes son sintéticas y GEOMÉTRICAS a propósito (formas de color plano dibujadas con
-`cv2`): así se sabe de antemano qué debería separar GrabCut y qué círculo/rectángulo/óvalo
-debería salir de la clasificación por circularidad — nada de esto se afirma "reconocido",
-se afirma "medido de ESTA imagen concreta, construida para dar ese resultado".
-
-`opencv-python`/`numpy` SÍ están instalados en la máquina de desarrollo (medido):
-las pruebas de "sin dependencia" bloquean `cv2` con un
-`sitecustomize.py` propio por `PYTHONPATH` (mismo método que
-`test_imagen_dependencias_opcionales.py`) en vez de desinstalar nada de verdad.
-"""
+"""`volumen.py`: despiece por capas (GrabCut) y `prompt3d` (paleta k-medias,
+horizonte, formas por circularidad). Imágenes sintéticas y geométricas, para
+saber de antemano el resultado. Sin dependencia: bloquea `cv2` vía `sitecustomize.py`."""
 import sys
 import os
 import json
@@ -260,13 +247,9 @@ class Horizonte(unittest.TestCase):
         self.assertAlmostEqual(frac, 120 / 200, delta=0.05)
 
     def test_da_igual_la_forma_que_devuelva_houghlinesp(self):
-        # Falsador de la línea 368 (antes del arreglo): `cv2.HoughLinesP` devuelve (N,1,4)
-        # en unas versiones de OpenCV y (N,4) en otras (medido: opencv-contrib-python 5.0.0
-        # da (N,4) en esta máquina). El código viejo hacía
-        # `for x1, y1, x2, y2 in lineas[:, 0]`, que asume (N,1,4): con (N,4),
-        # `lineas[:, 0]` es un vector de escalares y el desempaquetado revienta con
-        # "TypeError: cannot unpack non-iterable numpy.int32 object". Se monkeypatchea
-        # `cv2.HoughLinesP` con las DOS formas y se exige el MISMO resultado en ambas.
+        # cv2.HoughLinesP puede devolver forma (N,1,4) o (N,4) según la versión de
+        # OpenCV: el código debe soportar ambas sin reventar. Se monkeypatchea con
+        # las dos formas y se exige el mismo resultado.
         img = np.full((200, 400, 3), (30, 30, 30), np.uint8)
         linea = [10, 120, 390, 122]
         forma_n_1_4 = np.array([[linea]], dtype=np.int32)  # (1, 1, 4)

@@ -176,45 +176,24 @@ por su cuenta (ver "Dónde viven los datos" más abajo).
 ```
 
 (la ruta del repositorio es la prevista para su publicación; ajústala si
-`umgul/Abyss` cambia). Esto instala los *skills* de `skills/` y los ganchos de
-[`hooks/hooks.json`](hooks/hooks.json): `continuidad.py --arranque`,
-`huella.py --arranque` y `cuerpo.py --arranque` en `SessionStart`;
-`continuidad.py --despertar` y `cuerpo.py --despertar` en `UserPromptSubmit`;
-`--cierre` en `SessionEnd`; `huella.py --herramienta` en `PostToolUse`;
-`vigia.py --verificar` y `huella.py --fin` en `Stop`. (`modelo.py` no lleva
-gancho propio — Claude Code no tiene un evento «PostModelSwitch»/
-«PreModelSwitch»; detecta el downgrade como librería de `continuidad.py
---despertar`, en cada prompt.) Cada comando usa `${CLAUDE_PLUGIN_ROOT}`, la
-ruta absoluta que Claude Code sustituye por donde quedó instalado el plugin —
-no hace falta tocar nada a mano.
+`umgul/Abyss` cambia). Esto instala solo los *skills* de `skills/`. El plugin
+no declara ningún gancho: Claude Code cargaría por sí solo un
+`hooks/hooks.json` al instalarlo, y este paquete no lo lleva a propósito, para
+que nada corra en cada sesión, en cada mensaje o tras cada herramienta sin que
+el usuario lo haya elegido módulo a módulo.
 
-**Cómo encuentran sus datos estos ganchos sin instalador**: cada uno resuelve
-la carpeta de datos del proyecto a partir del JSON que Claude Code manda por
-stdin (`transcript_path`/`cwd`), vía `abyss/rutas.py` — nunca de una ruta fija
-ni de una variable que alguien tuviera que configurar. Por eso los ganchos del
-plugin funcionan solos, en cualquier proyecto, nada más instalarlo — **con un
-límite**: los nueve ganchos de [`hooks/hooks.json`](hooks/hooks.json) invocan
-`python` a secas (no admiten detección de intérprete, a diferencia de
-`instalar.py`). Eso exige que `python` esté en el `PATH` y sea Python 3.12+: en
-Windows, si no se instaló Python desde python.org, `python` puede ser el alias
-de la Microsoft Store (abre la tienda en vez de ejecutar nada); en macOS
-moderno no existe `python` (solo `python3`), y en varias distribuciones Linux
-tampoco. Si eso pasa, los ganchos del plugin fallan en silencio — usa
-`instalar.py` en su lugar, que detecta el intérprete real (`sys.executable`, o
-`--python <exe>`).
+**Los ganchos van por `instalar.py`**: `continuidad`, `huella`, `cuerpo` y
+`vigia` se instalan módulo a módulo con `python instalar.py --instalar …`, que
+detecta el intérprete real (`sys.executable`, o `--python <exe>`), dice qué
+toca cada módulo y apunta la firma de cada gancho para poder quitarlo después.
+Cada gancho resuelve la carpeta de datos del proyecto a partir del JSON que
+Claude Code manda por stdin (`transcript_path`/`cwd`), vía `abyss/rutas.py`,
+así que funciona en cualquier proyecto sin configurar rutas.
 
-**Aviso de coste, instalando por el plugin**: a diferencia de `instalar.py`
-(donde `huella` viene DESMARCADO por defecto, ver abajo), instalar el plugin
-entero trae también los ganchos de `huella` — y su gancho `PostToolUse` corre
-tras CADA herramienta. Si eso pesa demasiado, quita esas tres entradas de
-`hooks/hooks.json` a mano, o instala con `instalar.py` en su lugar, que sí deja
-elegir módulo por módulo.
-
-Lo que el plugin **no** trae, porque necesita datos que solo puede dar una
+Lo que el plugin tampoco trae, porque necesita datos que solo puede dar una
 persona: el módulo **telegram** (pide un token de bot y un chat id) y el
 sembrado de plantillas de configuración (`modelo_preferido.json`,
-`temas_noticias.json`, `imagen_config.json`). Para eso, o para instalar sin
-usar el sistema de plugins, está `instalar.py`.
+`temas_noticias.json`, `imagen_config.json`). Para eso está `instalar.py`.
 
 ### Con `instalar.py`
 
@@ -299,13 +278,12 @@ que se hace antes de tocar nada.
 <details>
 <summary>Apéndice secundario: cablear los ganchos A MANO (NO recomendado)</summary>
 
-Solo si por lo que sea no se puede usar ni el sistema de plugins ni
-`instalar.py`: copiar el bloque de
+Solo si por lo que sea no se puede usar `instalar.py`: copiar el bloque de
 [`docs/ganchos_settings_ejemplo.json`](docs/ganchos_settings_ejemplo.json)
 dentro de `"hooks"` en `~/.claude/settings.json`, sustituyendo
 `<RUTA_DEL_PAQUETE>` por la ruta real donde quedó `abyss/` y `<PYTHON>` por el
-intérprete que se vaya a usar. Sin `instalar.py` ni el sistema de plugins no
-hay manifiesto ni registro de qué se instaló, así que deshacerlo exige
+intérprete que se vaya a usar. Sin `instalar.py` no hay manifiesto ni registro
+de qué se instaló, así que deshacerlo exige
 recordar a mano qué se tocó.
 
 </details>
@@ -346,7 +324,7 @@ El código de Abyss se instala una vez (como plugin, o donde lo pongas con
 meteo, imágenes…) viven **por proyecto**, dentro de la memoria automática de
 Claude Code para ese proyecto: `~/.claude/projects/<proyecto-saneado>/memory/`.
 El único módulo que decide esa ruta es `abyss/rutas.py`; el resto la importa.
-Como los ganchos (de plugin o de `settings.json` global) disparan en todos los
+Como los ganchos de `settings.json` global disparan en todos los
 proyectos, no solo en el que estaba abierto al instalar, cada uno resuelve su
 propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 — nunca se mezcla la memoria de un proyecto con la de otro.

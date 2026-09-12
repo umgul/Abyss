@@ -50,7 +50,7 @@ __pycache__/
 #
 # Los .txt de licencia SÍ se quedan: son texto, documentan qué se va a bajar, y
 # tienen que poder leerse antes de bajar nada.
-abyss/vendor/mp/
+abyss/vendor/mp/*
 !abyss/vendor/mp/LICENSE-*.txt
 abyss/vendor/modelos/*
 !abyss/vendor/modelos/LICENSE-*.txt

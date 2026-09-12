@@ -1,13 +1,5 @@
-"""`propiocepcion.py` — el tramo de `parentesis.py`
-debe quedar FUERA de la medida, igual que `continuidad.frases_usuario()`.
-
-Fallo medido 7-sep: `medir()` nunca llamaba a `parentesis.en_parentesis()`, así
-que los turnos/palabras/fichas de dentro de un tramo abierto SÍ entraban en
-`mem/propiocepcion.json` (y de ahí al reloj de la sesión vía
-`continuidad.hacer_reloj()`) — cuando la propiocepción debía ignorar el
-tramo. `test_arranque_en_frio.py` ya cubre el arranque en frío de
-este mismo módulo; aquí solo el tramo.
-"""
+"""Los turnos dentro de un tramo abierto de `parentesis.py` no deben contar en
+`mem/propiocepcion.json`, igual que ya excluye `continuidad.frases_usuario()`."""
 import sys
 import os
 import json
@@ -40,15 +32,13 @@ class TramoNoEntraEnPropiocepcion(unittest.TestCase):
 
         medido = json.loads((proj / 'memory' / 'propiocepcion.json').read_text(encoding='utf-8'))
         self.assertIn(sid, medido)
-        # con el fallo, esto daba 5 (los 5 turnos, incluidos los 2 del tramo)
         self.assertEqual(medido[sid]['turnos_usuario'], 3,
                           'los 2 turnos dentro del tramo no deben contar')
         self.assertEqual(medido[sid]['palabras_usuario'], 11,
                           '"segundo dentro secreto uno" y "tercero dentro secreto dos" (4+4 palabras) no deben sumar')
 
     def test_sin_ningun_tramo_no_cambia_nada(self):
-        """Sin `parentesis.json`, `en_parentesis()` siempre da False: el nuevo
-        filtro no debe restar ni un turno a una sesión sin ningún tramo."""
+        """Sin `parentesis.json`, `en_parentesis()` da False y no resta turnos."""
         proj = ay.nuevo_proyecto()
         sid = 'ses-sin-tramo-1'
         tp = proj / f'{sid}.jsonl'

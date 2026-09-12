@@ -1,22 +1,6 @@
-"""Fallo medido 6-sep ("rompe"): `continuidad.py --arranque` hace red (ipinfo.io vía
-`exterocepcion.py`, portada + hasta 8 temas vía `noticias.py`) SIN presupuesto: con
-la red en agujero negro (paquetes descartados — wifi caída, portal cautivo,
-cortafuegos) cada llamada consumía su timeout entero (6-8 s) y el total crecía con
-el NÚMERO de llamadas — medido 38-78 s, por encima del timeout de 60 s del propio
-gancho SessionStart, perdiendo el JSON entero de `additionalContext`.
-
-Arreglo: `rutas.Presupuesto`, compartido entre todas las llamadas de red de una
-misma invocación — agotado, las llamadas siguientes fallan al instante (sin tocar
-la red), y `noticias.recoger()` ya no intenta los temas si la portada falló (antes
-repetía el mismo fallo hasta 8 veces más).
-
-Estas pruebas importan `exterocepcion.py`/`noticias.py` DIRECTAMENTE (no por
-subprocess): a diferencia de `continuidad.py`/`vigia.py`/`varas.py`/`propiocepcion.py`,
-ninguno de los dos hace `rutas.resolver()` a nivel de módulo (solo dentro de
-funciones), así que importarlos aquí no aborta el proceso de `unittest` (ver
-docstring de `ayudas.py`). SIEMPRE se sustituye `urllib.request.urlopen` por un
-doble de prueba: en ningún caso debe salir una petición real (regla dura 2 del
-encargo: "sin red en la suite")."""
+"""`rutas.Presupuesto` acota el tiempo total de red de una misma invocación de
+`continuidad.py --arranque`: agotado, las llamadas siguientes fallan al instante
+sin tocar la red, y `noticias.recoger()` deja de intentar temas si la portada ya falló."""
 import sys
 import os
 from pathlib import Path
@@ -26,6 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'abyss'))
 import unittest
 import ayudas as ay
 
+# exterocepcion.py y noticias.py, a diferencia de continuidad.py/vigia.py/varas.py/
+# propiocepcion.py, no llaman a rutas.resolver() al importarse (solo dentro de
+# funciones): por eso aquí se importan directamente, sin subprocess.
 import rutas
 import exterocepcion
 import noticias
@@ -66,8 +53,6 @@ class PresupuestoCortaLaRedExterocepcion(unittest.TestCase):
                 exterocepcion._get('https://ipinfo.io/json', presupuesto=presupuesto)
 
     def test_abyss_sin_red_corta_al_instante_sin_presupuesto(self):
-        """`ABYSS_SIN_RED=1` (fallo 6-sep, "la suite no es independiente de la red"):
-        corta la red al instante, INCLUSO sin ningún presupuesto de por medio."""
         with mock.patch.dict(os.environ, {'ABYSS_SIN_RED': '1'}):
             with mock.patch('urllib.request.urlopen', _UrlopenNuncaLlamado()):
                 with self.assertRaises(Exception):
@@ -95,11 +80,6 @@ class PresupuestoCortaLaRedNoticias(unittest.TestCase):
 
 
 class RecogerSaltaLosTemasSiLaPortadaFalla(unittest.TestCase):
-    """Antes: si la portada fallaba (sin red), `recoger()` intentaba IGUAL hasta 8
-    temas más — cada uno repetía el mismo fallo, multiplicando por 9 el tiempo total
-    en agujero negro (el núcleo medible del fallo 6-sep). Ahora se salta el resto en
-    cuanto la portada falla."""
-
     def setUp(self):
         self.proj = ay.nuevo_proyecto()
         (self.proj / 'memory').mkdir(parents=True, exist_ok=True)
@@ -123,10 +103,8 @@ class RecogerSaltaLosTemasSiLaPortadaFalla(unittest.TestCase):
             llamadas.append(url)
             raise RuntimeError('red caída (simulada)')
 
-        # autoactualizar_temas no se mide aquí (tiene su propio candado de red vía
-        # `nombres_propios_recurrentes`, que importa `continuidad.py` — módulo que
-        # SÍ resuelve `rutas.resolver()` al importarse; se sustituye por un no-op
-        # para no arrastrar ese import al proceso de esta prueba).
+        # autoactualizar_temas importa continuidad.py (SÍ resuelve rutas.resolver()
+        # al importarse); se sustituye por un no-op para no arrastrar ese import aquí.
         with mock.patch.object(noticias, 'autoactualizar_temas', return_value=({}, [])), \
              mock.patch.object(noticias, 'rss', side_effect=rss_falla_siempre):
             out = noticias.recoger(tp=None)
@@ -138,8 +116,6 @@ class RecogerSaltaLosTemasSiLaPortadaFalla(unittest.TestCase):
         self.assertEqual(out['temas'], {})
 
     def test_intenta_los_temas_si_la_portada_sale_bien(self):
-        """Contraprueba: si la portada SÍ responde, los temas se siguen intentando
-        con normalidad (el salto es solo cuando la portada falla, no siempre)."""
         llamadas = []
 
         def rss_falso(url, n, timeout=3, presupuesto=None):

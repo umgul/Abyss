@@ -1,22 +1,6 @@
 """`instalar.py` (ESPECIFICACION.md §4 y §6): fusiona ganchos en `settings.json`
-SIN perder uno ajeno, y `desinstalar()` devuelve el mismo CONTENIDO original (salvo
-lo que puso abyss) — no el mismo fichero byte a byte: `_escribir_json()` siempre
-reescribe con su propio `indent=2`, así que si el `settings.json` de partida usaba
-otro formato (otro indent, arrays en una línea, otro orden de claves…) el texto
-final difiere aunque el JSON cargado sea idéntico. El fixture de abajo usa a
-propósito un formato AJENO al de `_escribir_json` para no dar por buena una
-igualdad que solo se cumpliría porque el fixture ya viniera en NUESTRO formato.
-
-`instalar.py` no hace ninguna llamada de red ni ningún `rutas.resolver()` a nivel
-de módulo (eso vive dentro de `_resolver_mem()`, que solo se usa desde su CLI), así
-que aquí se importa DIRECTAMENTE por ruta de fichero — a diferencia de los guiones
-de gancho (`continuidad.py`, `vigia.py`, `varas.py`, `propiocepcion.py`), que
-siempre se prueban por subprocess (ver `ayudas.py`).
-
-Se sobreescribe `PKG` del módulo cargado para que `_escribir_config_codigo()` (el
-único fichero que el instalador escribe en la carpeta del código) NO toque el
-`abyss/` real del repositorio, sino una carpeta temporal propia de la prueba.
-"""
+sin perder uno ajeno, y `desinstalar()` restaura el mismo CONTENIDO original (no
+el mismo fichero byte a byte: `_escribir_json()` siempre reescribe con su propio indent)."""
 import sys
 import os
 import json
@@ -29,6 +13,9 @@ import unittest
 import ayudas as ay
 
 
+# instalar.py no hace red ni `rutas.resolver()` a nivel de módulo (vive dentro de
+# _resolver_mem(), solo usado por su CLI): se importa aquí directamente por ruta,
+# a diferencia de los guiones de gancho, que se prueban por subprocess.
 def _cargar_instalador():
     ruta = ay.RAIZ / 'instalar.py'
     spec = importlib.util.spec_from_file_location('abyss_instalador_bajo_prueba', str(ruta))
@@ -49,13 +36,9 @@ class InstaladorFusionaYRestauraElContenido(unittest.TestCase):
         self.mem = self.tmp / 'proyecto' / 'memory'
         self.mem.mkdir(parents=True, exist_ok=True)
 
-        # Formato deliberadamente AJENO al de `_escribir_json` (indent=2, un elemento
-        # por línea): indent de 4, arrays compactos en una sola línea, orden de
-        # claves distinto (showThinkingSummaries antes que hooks). El gancho ajeno usa
-        # el esquema REAL de Claude Code — {type, command, timeout}, la línea de
-        # órdenes ENTERA dentro de `command`, SIN campo `args` (medido 6-sep contra
-        # hooks/hooks.json:8: un fixture con `args` medía su propio error, no el del
-        # instalador, porque las dos formas eran igual de inválidas)."""
+        # formato deliberadamente AJENO al de `_escribir_json` (si el fixture ya viniera
+        # en NUESTRO formato, la comparación de contenido no mediría nada). El gancho ajeno
+        # usa el esquema REAL de Claude Code: {type, command, timeout}, sin campo `args`.
         self.texto_original = (
             '{\n'
             '    "showThinkingSummaries": false,\n'
@@ -94,11 +77,9 @@ class InstaladorFusionaYRestauraElContenido(unittest.TestCase):
         self.assertEqual(Path(backups[0]).read_text(encoding='utf-8'), self.texto_original)
 
     def test_gancho_escrito_en_un_solo_command_sin_args(self):
-        """Falsador directo del fallo 6-sep: el esquema real de un gancho de
-        settings.json de Claude Code es {type, command, timeout} con la línea de
-        órdenes ENTERA en `command`; no existe un campo `args`. Antes el instalador
-        escribía {"command": "<python.exe>", "args": ["<script>", "--bandera"]},
-        que ejecutaría python.exe pelado, sin guion."""
+        """El esquema real de un gancho de `settings.json` de Claude Code es
+        {type, command, timeout}: la línea de órdenes ENTERA va dentro de `command`,
+        sin un campo `args` aparte."""
         self.inst.instalar(
             ['vigia'], settings_ruta=str(self.settings_ruta),
             python_exe='C:\\Py\\python.exe', mem=str(self.mem))
@@ -112,11 +93,8 @@ class InstaladorFusionaYRestauraElContenido(unittest.TestCase):
         self.assertIn('--verificar', nuestra['command'])
 
     def test_gancho_escrito_sin_statusmessage(self):
-        """Fallo 6-sep, "roza": `statusMessage` no aparece en el esquema de gancho
-        documentado (skill oficial `hook-development`: {type, command, timeout} para
-        un gancho `command`) ni en ningún `settings.json` real de esta máquina — se
-        quitó de `hooks/hooks.json`, `docs/ganchos_settings_ejemplo.json` y de aquí,
-        `_anadir_hook`."""
+        """`statusMessage` no forma parte del esquema de gancho documentado
+        ({type, command, timeout}) ni de ningún `settings.json` real: abyss no debe escribirlo."""
         self.inst.instalar(
             ['continuidad', 'vigia'], settings_ruta=str(self.settings_ruta),
             python_exe='python-de-prueba', mem=str(self.mem))
@@ -151,6 +129,17 @@ class InstaladorFusionaYRestauraElContenido(unittest.TestCase):
 
         manifiesto = json.loads((self.mem / 'abyss_manifiesto.json').read_text(encoding='utf-8'))
         self.assertEqual(manifiesto['modulos_instalados'], [])
+
+
+class ModuloDesconocidoEnLaCli(unittest.TestCase):
+    def test_instalar_un_id_inexistente_sale_con_2_sin_tocar_nada(self):
+        proj = ay.nuevo_proyecto()
+        settings = proj / 'settings.json'
+        env = ay.entorno(proj)
+        r = ay.ejecutar(ay.RAIZ / 'instalar.py', ['--instalar', 'noexiste', '--settings', str(settings)], env)
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn('noexiste', r.stderr)
+        self.assertFalse(settings.exists(), 'un id desconocido no debe escribir settings.json')
 
 
 if __name__ == '__main__':

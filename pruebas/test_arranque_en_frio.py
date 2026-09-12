@@ -1,9 +1,6 @@
 """Arranque en frío (ESPECIFICACION.md §2.2): con menos de
-`propiocepcion.UMBRAL_FRIO` (8) sesiones medidas, ni `propiocepcion.py` inventa un
-percentil ni `continuidad.py` (la sala de los relojes) despierta nada — aunque el
-prompt sea CASI IDÉNTICO al contenido de una sesión guardada. Se prueba con 0 y con
-3 sesiones, tal como pide §6.
-"""
+`propiocepcion.UMBRAL_FRIO` (8) sesiones, ni `propiocepcion.py` inventa percentil
+ni `continuidad.py` despierta, aunque el prompt sea casi idéntico a una sesión guardada."""
 import sys
 import os
 import json

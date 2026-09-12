@@ -205,7 +205,8 @@ def resolver(argv=None, stdin_json=None):
       1. `stdin_json['transcript_path']` → `proj = dirname(abspath(transcript_path))`.
       2. `stdin_json['cwd']` saneado → `proj = CLAUDE_PROJECTS/<saneado>`.
       3. `--proyecto <cwd>` en `argv` → mismo saneado que (2).
-      4. `os.environ['ABYSS_PROYECTO']` → se usa TAL CUAL, ya es `proj`.
+      4. `os.environ['ABYSS_PROYECTO']` → es `proj` (una ruta); un nombre sin
+         separadores se toma como `CLAUDE_PROJECTS/<nombre>`, nunca relativo al cwd.
 
     Crea `mem = proj/memory` si no existe y devuelve `(proj, mem)`.
 
@@ -237,7 +238,7 @@ def resolver(argv=None, stdin_json=None):
     if not proj:
         var = os.environ.get('ABYSS_PROYECTO')
         if var:
-            proj = var
+            proj = var if ('/' in var or os.sep in var) else os.path.join(CLAUDE_PROJECTS, var)
 
     if not proj:
         sys.stderr.write(

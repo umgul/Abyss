@@ -1,16 +1,6 @@
-"""`render3d.py`. `render3d.py` no usa `rutas.resolver()`
-(no hay `mem`/proyecto que resolver: es un guion de fichero a fichero, como `pintor.py`) así
-que, a diferencia de otros guiones de `abyss/`, SÍ se puede importar en el propio proceso de
-la prueba (igual que `test_pintor_acabado_suave.py` importa `pintor`) — se hace así para las
-pruebas de los distintos formatos (más rápidas, no dependen de cómo lo invoque la CLI) y por
-`subprocess` para las que cubren la CLI completa (nombres de fichero por defecto, códigos de
-salida, JSON de salida — igual que `test_imagen_pintar.py` con `imagen.py pintar`).
-
-`--png` con navegador de verdad se prueba SOLO si `render3d._buscar_navegador()` encuentra
-uno en esta máquina (`skipUnless`); el camino "sin navegador" se fuerza siempre con
-`ABYSS_RENDER3D_NAVEGADOR=''` (pensado exactamente para esto, ver su docstring), así que no
-depende de qué haya instalado la máquina que corre la suite.
-"""
+"""`render3d.py` no usa `rutas.resolver()` (guion de fichero a fichero): se importa
+directamente para las pruebas de formato, y por `subprocess` para las que cubren la CLI
+completa. `--png` con navegador real solo corre si lo encuentra `_buscar_navegador()`; sin él, se fuerza con `ABYSS_RENDER3D_NAVEGADOR=''`."""
 import sys
 import os
 import re
@@ -117,13 +107,9 @@ class EscenaJsonCLI(unittest.TestCase):
 
 
 class AcabadoEstudioCLI(unittest.TestCase):
-    """`--acabado estudio|mate` (ver docstring de `render3d.py`): `mate` por defecto, para no
-    cambiarle el resultado a nadie que ya use este guion; `estudio` calca la receta de
-    `pintor_demo/tornillo/tornillo.html`. El JS de la página es UNO SOLO para los dos modos
-    (`ESCENA.acabado` decide en el navegador, ver `AcabadoEstudioFuente` más abajo) así que
-    aquí, a nivel de CLI, solo se comprueba lo que SÍ cambia en el HTML escrito: el propio
-    dato `acabado` embebido y la casilla de rejilla (que sale de una plantilla distinta según
-    el modo, `__REJILLA_CHECKED__`) — no cadenas que estén siempre presentes por narices."""
+    """`--acabado estudio|mate`: `mate` es el valor por defecto; `estudio` sigue la receta
+    de `pintor_demo/tornillo/tornillo.html`. El JS es el mismo para los dos modos (decide en
+    tiempo de ejecución), así que aquí solo se comprueba lo que cambia en el HTML escrito."""
 
     def test_mate_por_defecto_y_rejilla_marcada(self):
         tmp = tempfile.mkdtemp(prefix="abyss_render3d_acabado_")
@@ -159,11 +145,9 @@ class AcabadoEstudioCLI(unittest.TestCase):
 
 
 class AcabadoEstudioFuente(unittest.TestCase):
-    """El JS de `_MAIN_JS` es COMPARTIDO por "mate" y "estudio" (decide `ESCENA.acabado` en
-    tiempo de ejecución, en el navegador, no `_construir_html()` en Python) — así que la
-    prueba de verdad de que la receta de estudio está DE VERDAD ahí es leer el propio
-    `_MAIN_JS`, igual que hace `DocumentacionFrenteACodigo` más abajo con otras dos piezas de
-    este mismo guion."""
+    """`_MAIN_JS` es compartido por "mate" y "estudio" (`ESCENA.acabado` decide en el
+    navegador, no `_construir_html()` en Python): la prueba real de que la receta de
+    estudio está ahí es leer `_MAIN_JS` directamente."""
 
     def test_receta_de_estudio_presente_y_guardada_tras_el_if(self):
         js = render3d._MAIN_JS
@@ -212,11 +196,9 @@ class PngConNavegador(unittest.TestCase):
         self.assertEqual(_dimensiones_png(ruta_png), (800, 500))
 
     def test_vista_explosionada_separa_los_grupos(self):
-        """Con `--explosion` alto, el grupo "remate" (una sola pieza, sin nada más en su
-        grupo) debe acabar lejos del resto: comprobado indirectamente por bytes de PNG
-        distintos entre explosión 0 y una alta (si fuera la misma imagen, pesarían casi
-        igual tras comprimir; distinto encuadre de las piezas cambia el PNG de forma
-        apreciable) — una prueba de humo, no un examen de píxeles."""
+        """Comprobado indirectamente por tamaño de PNG: si `--explosion` no cambiara el
+        encuadre, el PNG comprimiría a un tamaño similar. Prueba de humo, no un examen
+        de píxeles."""
         tmp = tempfile.mkdtemp(prefix="abyss_render3d_")
         pngs = {}
         for explosion in ("0", "1.5"):
@@ -379,15 +361,13 @@ class FormatosDirectos(unittest.TestCase):
 
 
 class DocumentacionFrenteACodigo(unittest.TestCase):
-    """Dos claims del docstring/LICENSE que no coincidían con lo que hace el código
-    (arreglos de render3d.py del 7-sep): (1) el aviso de
-    obsolescencia de three.js NO se borra, solo se le recorta el esquema a sus URLs; (2)
-    `document.title` no es una señal que nadie lee — la captura decide solo por peso de
-    fichero, y el primer fotograma es síncrono."""
+    """Dos claims del docstring/LICENSE que no coincidían con el código: (1) el aviso de
+    obsolescencia de three.js no se borra, solo pierde el esquema de sus URLs; (2)
+    `document.title` no es señal de nada — la captura decide por peso, y el primer fotograma se pinta antes de animar."""
 
     def test_aviso_three_no_se_borra_solo_pierde_esquema_de_sus_urls(self):
         crudo = render3d._leer_vendor("three.min.js")
-        # las 3 cadenas http distintas que trae el vendor tal cual se descargó (medido):
+        # las 3 cadenas http distintas que trae el vendor tal cual se descargó:
         # threejs.org (aviso de obsolescencia), discourse.threejs.org (aviso de color,
         # repetido dos veces) y el namespace XHTML.
         self.assertIn("https://threejs.org", crudo)
@@ -396,8 +376,7 @@ class DocumentacionFrenteACodigo(unittest.TestCase):
         self.assertIn("are deprecated", crudo, "el aviso de obsolescencia debe seguir en el vendor")
 
         incrustado = render3d._texto_three_embebido()
-        # el aviso NO se borra (LICENSE-three.txt ya no dice "se quita la primera línea"):
-        # sigue el texto del console.warn, solo sin el esquema de sus URLs.
+        # el aviso NO se borra: sigue el texto del console.warn, solo sin el esquema de sus URLs.
         self.assertIn("are deprecated", incrustado, "_texto_three_embebido() no debe borrar líneas")
         self.assertNotIn("https://threejs.org", incrustado)
         self.assertNotIn("https://discourse.threejs.org", incrustado)
@@ -414,8 +393,7 @@ class DocumentacionFrenteACodigo(unittest.TestCase):
         fuente_main = render3d._MAIN_JS
         self.assertNotIn("document.title", fuente_main,
                           "no debe quedar una señal declarada que ningún camino del código lee")
-        # el primer fotograma se pinta ANTES de arrancar el bucle rAF (síncrono de verdad,
-        # no una promesa en un comentario muerto).
+        # el primer fotograma se pinta antes de arrancar el bucle rAF (síncrono de verdad).
         pos_primer_render = fuente_main.index("renderer.render(escena3d, camera);")
         pos_animar = fuente_main.index("function animar()")
         self.assertLess(pos_primer_render, pos_animar)

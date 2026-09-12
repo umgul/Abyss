@@ -1,34 +1,6 @@
-"""`presenta.py`: el vídeo de un minuto que genera el
-propio paquete.
-
-`presenta.py` no llama a `rutas.resolver()` ni lee stdin al importarse (construye su
-propio proyecto de ejemplo en un directorio temporal y solo invoca `varas.py`/
-`vigia.py` por `subprocess` DENTRO de `generar()`, ver su docstring) — a diferencia de
-`varas.py`/`vigia.py`, es seguro importarlo directo en el proceso de la prueba (mismo
-criterio que `test_render3d.py` con `render3d`, o `test_auditar.py` con `auditar`):
-más rápido que un subproceso por prueba. Solo el análisis de argumentos de la CLI
-(`_cli`) se ejercita por subprocess, para probar el argv real (mensajes, código de
-salida) sin depender de que el proceso de la prueba no haya tocado ya `sys.argv`.
-
-Piezas naturalmente opcionales, forzadas ausentes con las banderas que YA declaran sus
-propios módulos (nunca se depende de qué tenga instalado la máquina que corre la
-suite, ni se toca la red — reglas de esta suite):
-`ABYSS_SIN_RED` (mundo.py, vía la propia comprobación de `presenta.py` — `mundo.py` no
-mira esa variable por su cuenta), `ABYSS_RENDER3D_NAVEGADOR=''` (render3d.py: sin
-navegador sin cabeza), `ABYSS_LECTURA_VISUAL_SIN_WINRT`/`SIN_TESSERACT` (lectura_visual.py:
-sin motor OCR — el sub-verbo `fotocopia` de "el ojo" sigue vivo mientras haya OpenCV,
-así que para dejar ese bloque REALMENTE sin nada que enseñar hace falta además la
-variable de abajo). Los bloques que no dependen de nada opcional (memoria/honestidad/
-auditoría/sentidos/pintor/estilos: son el propio paquete, no una integración externa)
-se fuerzan ausentes, cuando una prueba lo necesita, con `ABYSS_PRESENTA_FORZAR_AUSENTE`
-— variable de prueba propia de `presenta.py`, documentada en su propio código, mismo
-patrón que las de arriba (lista de ids separados por comas: `memoria,honestidad,...`).
-
-No se genera aquí el vídeo largo de verdad (60 s con todo disponible): eso lo hace el
-integrador una vez. Todas las pruebas de generación completa usan un `--segundos`
-corto, y las piezas más lentas (red, navegador sin cabeza) van forzadas ausentes para
-que la suite no dependa de ellas ni las toque.
-"""
+"""`presenta.py`: el vídeo de un minuto que genera el propio paquete. Se importa
+directamente (no llama a `rutas.resolver()` ni lee stdin); solo `_cli` se ejercita por
+subprocess. Las piezas opcionales (red, navegador, OCR) van forzadas ausentes por env; nunca se genera aquí el vídeo largo real."""
 import sys
 import os
 import re
@@ -129,9 +101,8 @@ class AjustarPresupuesto(unittest.TestCase):
 
 class ProyectoDeEjemplo(unittest.TestCase):
     """`_construir_proyecto_ejemplo()` + `varas.py --index` (subprocess, como lo invoca
-    `_bloque_memoria`): comprueba que el proyecto sintético de este guion cruza de
-    verdad `propiocepcion.UMBRAL_FRIO` y que los pesos ◆ se RECALCULAN (no "sin vara
-    todavía") — la ficha citada Y leída debe acabar con más ◆ que la que nadie usa."""
+    `_bloque_memoria`): el proyecto sintético cruza `propiocepcion.UMBRAL_FRIO` y los
+    pesos ◆ se recalculan de verdad, no "sin vara todavía"."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix='abyss_test_presenta_')

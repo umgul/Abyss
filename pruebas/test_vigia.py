@@ -1,16 +1,6 @@
-"""`vigia.py` (ESPECIFICACION.md §6):
-- caza un número inventado en la última respuesta, pero NO uno que salió de un
-  `tool_result` (evidencia real).
-- `--descargo` hace que `--precision` deje de decir «sin vara» (y nunca finge
-  1.00: §2.1c) — pasa a un número medido de verdad.
-- fallo "engaña" del revisor 3 (6-sep): `--descargo` no validaba nada, así que
-  cualquier sid/caza inventados se apuntaban igual y `--precision` podía dar
-  hasta un cociente negativo (más descargos que cazas). Ahora `--descargo`
-  exige los tres argumentos, rehúsa sid/caza vacíos, y comprueba que la caza
-  esté realmente registrada para esa sid antes de escribir nada; `--precision`
-  además capa los descargos a las cazas reales para que el cociente nunca se
-  salga de [0,1] pase lo que pase en el fichero.
-"""
+"""`vigia.py` (ESPECIFICACION.md §6): caza números inventados en la respuesta,
+nunca los que vinieron de un `tool_result`. `--descargo` valida sid/caza antes
+de escribir, y `--precision` nunca finge 1.00 ni se sale de [0,1] (§2.1c)."""
 import sys
 import os
 import json
@@ -77,7 +67,7 @@ class VigiaDescargoCambiaLaPrecision(unittest.TestCase):
         self.assertIn('sin vara', r2.stdout)
         self.assertNotIn('1.00', r2.stdout)
 
-        # descargamos esa caza (era legítima)
+        # se descarga esa caza (es legítima)
         r3 = ay.ejecutar(ay.script('vigia.py'), ['--descargo', sid, '999999', 'cálculo mío mostrado'], env)
         self.assertEqual(r3.returncode, 0, r3.stderr)
         self.assertIn('descargo apuntado', r3.stdout)
@@ -152,9 +142,9 @@ class VigiaPrecisionNuncaNegativa(unittest.TestCase):
         r1 = ay.ejecutar(ay.script('vigia.py'), [], env, entrada=entrada)
         self.assertEqual(r1.returncode, 0, r1.stderr)
 
-        # una única caza dura registrada, pero la descargamos DOS veces (descargo
-        # válido y repetido: nada impide llamar --descargo otra vez sobre la misma
-        # caza real) — sin el tope, desc=2 > tot=1 y la precisión se iría a negativo
+        # única caza registrada, descargada DOS veces (repetir --descargo sobre
+        # la misma caza es válido) — sin tope, desc=2 > tot=1 y la precisión
+        # se iría a negativo
         for _ in range(2):
             r = ay.ejecutar(ay.script('vigia.py'), ['--descargo', sid, '333444', 'cálculo mío mostrado'], env)
             self.assertEqual(r.returncode, 0, r.stdout)

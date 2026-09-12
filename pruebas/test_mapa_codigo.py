@@ -1,12 +1,6 @@
-"""`mapa_codigo.py`. Igual que `cuerpo.py` y
-`lector_pdf.py`: se importa directamente (sin subproceso) para las funciones
-puras — no toca `rutas.resolver()` ni stdin al importarse.
-
-Carpeta sintética con 2 módulos (uno con una clase de 2 métodos —uno decorado—
-y una función suelta; el otro trivial), un fichero roto (error de sintaxis a
-propósito) y dos ficheros DENTRO de directorios excluidos (`__pycache__`, `.git`)
-que no deben aparecer en el mapa.
-"""
+"""`mapa_codigo.py` se importa directamente (sin subproceso), igual que `cuerpo.py` y
+`lector_pdf.py`. Usa una carpeta sintética con 2 módulos, un fichero roto (sintaxis
+inválida a propósito) y ficheros dentro de `__pycache__`/`.git`, que no deben salir en el mapa."""
 import sys
 import os
 import json
@@ -110,13 +104,8 @@ class ConstruirMapa(unittest.TestCase):
         self.assertEqual(arrancar['linea_ini'], MODULO_A.splitlines().index('    def arrancar(self, fuerte=False):') + 1)
 
     def test_lineas_fin_exactas_clase_metodo_y_funcion(self):
-        """Fallo "roza": `linea_fin` no tenía falsador — medido por
-        mutación (sustituir TODOS los `node.end_lineno` por `node.lineno` en
-        `mapa_codigo.py`, de modo que cada símbolo pasa a tener rango de una
-        sola línea): las 19 pruebas anteriores seguían en verde porque solo se
-        comprobaba `linea_ini`. Aquí se fija el rango EXACTO de la clase, sus
-        dos métodos (uno de ellos decorado, cuyo `lineno` apunta al `def`, no
-        al decorador) y la función suelta."""
+        """Fija el rango EXACTO (línea_ini, línea_fin) de la clase, sus dos métodos —uno
+        decorado, cuyo `lineno` apunta al `def`, no al decorador— y la función suelta."""
         a = self.analisis['modulo_a.py']
         c = a['clases'][0]
         self.assertEqual((c['linea_ini'], c['linea_fin']), (6, 15))
@@ -219,11 +208,9 @@ class EscribirMapaEnDisco(unittest.TestCase):
 
 
 class FicheroConBomUtf8(unittest.TestCase):
-    """T2 revisor (7-sep): un `.py` VÁLIDO que empieza con BOM UTF-8 (EF BB BF —
-    lo escriben Visual Studio, PowerShell ISE y el Bloc de notas en Windows) se
-    listaba como roto («SyntaxError: invalid non-printable character U+FEFF») y
-    todos sus símbolos desaparecían del mapa, pese a que Python lo importa y
-    ejecuta sin problema. `analizar_fichero()` debe abrir con `utf-8-sig`."""
+    """Un `.py` válido que empieza con BOM UTF-8 (lo escriben Visual Studio, PowerShell
+    ISE y el Bloc de notas en Windows) no debe listarse como roto: `analizar_fichero()`
+    debe abrir con `utf-8-sig`."""
 
     def test_bom_no_es_error_de_sintaxis_y_su_funcion_aparece(self):
         tmp = tempfile.mkdtemp(prefix='abyss_mapa_bom_')

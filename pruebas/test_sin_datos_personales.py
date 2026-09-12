@@ -1,50 +1,8 @@
-"""Regla dura 4 del encargo 6-sep: nada de datos personales en el repo (ni el
-nombre de pila del autor, ni el nombre de otro proyecto privado suyo, ni rutas
-`C:/Users/<alguien>`, ni tokens, ni ids de chat) — el usuario se llama «el
-usuario». Dos fallos ya medidos por el revisor entraban aquí:
-`abyss/notify_telegram.ps1.plantilla` (una frase de ejemplo que citaba el nombre
-de ese otro proyecto suyo, en un fichero que SÍ se distribuye) y
-`ESPECIFICACION.md` (varias apariciones del nombre de
-pila del autor).
-
-SEGUNDA VUELTA (6-sep, revisor Opus, "roza"): el único fichero del repo con datos
-personales de verdad era ESTE, porque su propio docstring citaba los nombres (para
-contar la historia del fallo, sin necesitarlo) y `EXCLUIR_DIRS` saltaba `pruebas/`
-ENTERA en vez de solo este fichero — cualquier dato personal que se colara en un
-test futuro (una ruta real en un fixture, un id de chat) no se habría cazado. Ahora
-el docstring ya no nombra a nadie, y se escanea TODO el repo, `pruebas/` incluida,
-salvo ESTE fichero (que sí necesita las palabras, literalmente, en su propia
-regex, para poder buscarlas) y `__pycache__`.
-
-TERCERA VUELTA (revisor Opus, "roza"): `abyss/config.json` es el ÚNICO fichero que
-el propio paquete instalado escribe dentro de la carpeta de código (ESPECIFICACION.md
-§1/§4) — lleva la ruta absoluta del intérprete detectado, así que en cuanto alguien
-ejecuta `instalar.py` una sola vez, esa ruta (con el nombre de pila de quien sea)
-aparece ahí y esta prueba lo acusaba de dato personal publicado, cuando en realidad
-es un artefacto de ejecución que `.gitignore:17` excluye explícitamente de lo que se
-publica. `_ficheros_del_repo()` recorría por extensión sin mirar el `.gitignore`, así
-que trataba un fichero ignorado como si estuviera en el repo. Ahora se lee el propio
-`.gitignore` y se salta cualquier ruta que case con él (además de, como mínimo,
-`abyss/config.json` por nombre, de propina, por si el `.gitignore` cambiase de forma
-que dejase de cubrirlo) — el criterio de «qué se publica» vive en el `.gitignore`,
-no duplicado a mano aquí.
-
-CUARTA VUELTA (revisor Opus, "roza"): `ConfigJsonGeneradoNoEsPublicado` y
-`UnFicheroNoIgnoradoSigueVigilado` ESCRIBÍAN sobre el repo real (`abyss/config.json`
-y `docs/_decoy_prueba_datos_personales.md`) para poder probar los dos casos límite
-— justo el tipo de mutación que las reglas de la suite piden evitar («todo en
-directorios temporales»). Medido por simulación de muerte dura (`os._exit(3)` justo
-tras escribir el señuelo, equivalente a un corte de luz o un `taskkill /F`): el
-señuelo sobrevivía en `docs/` (una ruta que `.gitignore` NO cubre, así que SÍ se
-publicaría) y la siguiente corrida quedaba en rojo por su propia comprobación
-`assertFalse(RUTA.exists(), ...)`; y correr la suite entera cambiaba el `mtime` de
-`abyss/config.json` en el repo REAL. Ahora las dos pruebas trabajan sobre una COPIA
-temporal del repo (`shutil.copytree` a un directorio bajo `tempfile`, borrado con
-`addCleanup` — sobrevive incluso a un fallo a mitad de la prueba, aunque no a una
-muerte dura del proceso, que ningún `finally`/`addCleanup` de Python puede
-interceptar): nunca tocan un byte del repo real, así que una corrida interrumpida
-no puede dejar nada personal publicable ni cambiar ningún fichero de verdad."""
+"""Ningún fichero publicado del repo nombra a una persona ni lleva rutas de usuario
+o secretos: el usuario es «el usuario». Lo que `.gitignore` excluye no cuenta como
+publicado; el nombre del autor solo puede aparecer donde firma (`DONDE_SE_FIRMA`)."""
 import fnmatch
+import json
 import os
 import re
 import shutil
@@ -54,20 +12,28 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 ESTE_FICHERO_REL = Path(__file__).resolve().relative_to(RAIZ)
-PROHIBIDAS = re.compile(r'\b(jordi|caela|vencejo)\b', re.IGNORECASE)
-EXTENSIONES = {'.py', '.md', '.json', '.ps1', '.plantilla', '.txt', '.cfg', '.ini', '.js', '.html'}
+PROHIBIDAS = re.compile(
+    r'\b(jordi|caela|vencejo)\b'
+    r'|[A-Za-z]:[\\/]+Users[\\/]+(?!<|\.\.\.)[A-Za-z0-9_.-]{3,}'   # C:/Users/<alguien> real; marcadores (<x>, x, ...) no
+    r'|MLY\|'                                             # token de Mapillary
+    r'|\b(?:sk-|hf_|ghp_|gho_)[A-Za-z0-9]{20,}'           # claves de API con prefijo conocido
+    r'|\b\d{8,10}:[A-Za-z0-9_-]{35}\b',                   # token de bot de Telegram
+    re.IGNORECASE)
+EXTENSIONES = {'.py', '.md', '.json', '.jsonl', '.ps1', '.plantilla', '.txt', '.cfg', '.ini',
+               '.js', '.html', '.yaml', '.yml', '.toml'}
 EXCLUIR_DIRS = {'__pycache__', '.git'}
-# Artefactos de ejecución gitignorados que NUNCA cuentan como «publicados» aunque
-# `.gitignore` cambiara de forma o no se pudiera leer (ESPECIFICACION.md §1/§4):
-# la única excepción documentada es este fichero, que escribe el propio instalador.
-SIEMPRE_IGNORADOS = {'abyss/config.json'}
-# Y los tres sitios donde el autor SE DECLARA, que es lo contrario de un dato personal
-# colado: un paquete sin autor con nombre real es un hallazgo de su propio auditor
-# (`auditar.py`, comprobación 1: «ningún manifiesto declara un autor con nombre real»),
-# y la licencia Apache-2.0 pide un titular de copyright o no protege a nadie. La regla
-# general no se toca: el nombre va AQUÍ y en ningún otro fichero del repositorio, y esta
-# lista es corta a propósito para que ampliarla sea una decisión, no un descuido.
+SIEMPRE_IGNORADOS = {'abyss/config.json'}   # lo escribe el instalador; .gitignore ya lo excluye
+# Los tres sitios donde el autor SE DECLARA: se escanean igual, pero sin su nombre tal
+# como lo firma `plugin.json` (`author.name`). Cualquier otro dato personal ahí cuenta.
 DONDE_SE_FIRMA = {'LICENSE', '.claude-plugin/plugin.json', '.claude-plugin/marketplace.json'}
+
+
+def _firma(raiz):
+    try:
+        m = json.loads((raiz / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
+        return (m.get('author') or {}).get('name') or ''
+    except Exception:
+        return ''
 
 
 def _patrones_gitignore(raiz):
@@ -77,88 +43,89 @@ def _patrones_gitignore(raiz):
     patrones = []
     for linea in ruta.read_text(encoding='utf-8').splitlines():
         linea = linea.strip()
-        if not linea or linea.startswith('#') or linea.startswith('!'):
-            continue  # sin negaciones en este .gitignore; no hacen falta aquí
-        patrones.append(linea)
+        if not linea or linea.startswith('#'):
+            continue
+        negado = linea.startswith('!')
+        patrones.append((negado, linea[1:] if negado else linea))
     return patrones
 
 
+def _casa(rel, partes, pat):
+    p = pat
+    es_dir = p.endswith('/')
+    if es_dir:
+        p = p[:-1]
+    if p.startswith('**/'):
+        p = p[3:]
+        anclado = False
+    elif p.startswith('/'):
+        p = p[1:]
+        anclado = True
+    else:
+        anclado = '/' in p
+    if anclado:
+        return fnmatch.fnmatch(rel, p) or (es_dir and (rel == p or rel.startswith(p + '/')))
+    if es_dir:
+        return p in partes[:-1]
+    return fnmatch.fnmatch(partes[-1], p)
+
+
 def _ignorado(ruta, patrones, raiz):
-    """Replica el subconjunto de semántica de `.gitignore` que usan sus patrones
-    (anclado a la raíz si lleva `/` que no sea solo el final, `**/` = cualquier
-    profundidad, sin `/` = nombre en cualquier sitio, `/` final = directorio)."""
+    """Semántica de `.gitignore` reducida a lo que usa el del repo: anclado si lleva
+    `/` en medio, `**/` = cualquier profundidad, `/` final = directorio, y `!`
+    reincluye (gana el último patrón que casa)."""
     rel = ruta.relative_to(raiz).as_posix()
-    if rel in SIEMPRE_IGNORADOS or rel in DONDE_SE_FIRMA:
+    if rel in SIEMPRE_IGNORADOS:
         return True
     partes = rel.split('/')
-    for pat in patrones:
-        p = pat
-        es_dir = p.endswith('/')
-        if es_dir:
-            p = p[:-1]
-        if p.startswith('**/'):
-            p = p[3:]
-            anclado = False
-        elif p.startswith('/'):
-            p = p[1:]
-            anclado = True
-        else:
-            anclado = '/' in p
-        if anclado:
-            if fnmatch.fnmatch(rel, p) or (es_dir and (rel == p or rel.startswith(p + '/'))):
-                return True
-        elif es_dir:
-            if p in partes[:-1]:
-                return True
-        elif fnmatch.fnmatch(partes[-1], p):
-            return True
-    return False
+    ignorado = False
+    for negado, pat in patrones:
+        if _casa(rel, partes, pat):
+            ignorado = not negado
+    return ignorado
 
 
 def _ficheros_del_repo(raiz):
-    """`raiz` es la raíz a escanear — el repo real (`RAIZ`, por defecto en
-    `_todos_los_hallazgos()`) o una COPIA temporal (las dos pruebas que necesitan
-    escribir un fichero para el caso límite). `ESTE_FICHERO_REL` se compara por
-    ruta RELATIVA, no absoluta: así la copia de este mismo fichero de pruebas
-    (que SÍ lleva las palabras prohibidas, literalmente, en su propia regex y en
-    este docstring) también se salta correctamente dentro de una copia."""
+    """Ficheros de texto publicables bajo `raiz` (el repo real o una copia temporal).
+    Este fichero se salta por ruta relativa: lleva las palabras en su propia regex."""
     patrones = _patrones_gitignore(raiz)
     for dirpath, dirnames, filenames in os.walk(raiz):
         dirnames[:] = [d for d in dirnames if d not in EXCLUIR_DIRS]
         for nombre in filenames:
             ruta = Path(dirpath) / nombre
             if ruta.relative_to(raiz) == ESTE_FICHERO_REL:
-                continue  # este SÍ necesita las palabras, literalmente, en su propia regex
-            if ruta.suffix in EXTENSIONES or ruta.name.endswith('.plantilla'):
-                if _ignorado(ruta, patrones, raiz):
-                    continue  # artefacto de ejecución que el propio repo declara no publicable
-                yield ruta
+                continue
+            if ruta.suffix in EXTENSIONES or ruta.suffix == '' or ruta.name.endswith('.plantilla'):
+                if not _ignorado(ruta, patrones, raiz):
+                    yield ruta
 
 
-def _hallazgos_de(ruta, raiz):
+def _hallazgos_de(ruta, raiz, firma):
     try:
         texto = ruta.read_text(encoding='utf-8', errors='ignore')
     except Exception:
         return []
+    rel = ruta.relative_to(raiz).as_posix()
+    if rel in DONDE_SE_FIRMA and firma:
+        texto = texto.replace(firma, '')
     out = []
     for m in PROHIBIDAS.finditer(texto):
         linea = texto.count('\n', 0, m.start()) + 1
-        out.append(f'{ruta.relative_to(raiz)}:{linea}: «{m.group(0)}»')
+        out.append(f'{rel}:{linea}: «{m.group(0)}»')
     return out
 
 
 def _todos_los_hallazgos(raiz=RAIZ):
+    firma = _firma(raiz)
     hallazgos = []
     for ruta in _ficheros_del_repo(raiz):
-        hallazgos.extend(_hallazgos_de(ruta, raiz))
+        hallazgos.extend(_hallazgos_de(ruta, raiz, firma))
     return hallazgos
 
 
 def _copia_temporal_del_repo(caso):
-    """COPIA completa del repo bajo un directorio temporal del sistema — para las
-    pruebas que necesitan escribir un fichero de más para ejercitar un caso
-    límite, sin tocar el repo real ni un instante (§ cuarta vuelta, arriba).
-    `caso` es solo un prefijo legible en el nombre del directorio temporal."""
+    """Copia del repo bajo un directorio temporal, para las pruebas que necesitan
+    escribir un fichero de más sin tocar el repo real."""
     tmp = Path(tempfile.mkdtemp(prefix=f'abyss_repo_copia_{caso}_'))
     copia = tmp / 'repo'
     shutil.copytree(RAIZ, copia, ignore=shutil.ignore_patterns(*EXCLUIR_DIRS))
@@ -171,51 +138,51 @@ class RepoSinNombresPropiosPersonales(unittest.TestCase):
         self.assertEqual(hallazgos, [], 'datos personales encontrados en el repo:\n' + '\n'.join(hallazgos))
 
 
-class ConfigJsonGeneradoNoEsPublicado(unittest.TestCase):
-    """Falsador del fallo "roza" (revisor 3): `abyss/config.json` es un artefacto
-    del instalador, gitignorado (§1/§4) — no debe tumbar esta prueba aunque lleve
-    de verdad un nombre de pila dentro (la ruta absoluta del intérprete).
-
-    Cuarta vuelta: sobre una COPIA temporal del repo (`_copia_temporal_del_repo`),
-    nunca sobre el `abyss/config.json` real — así la prueba nunca cambia un
-    fichero del repo de verdad, y sobrevive intacta a un fallo a mitad de la
-    prueba (no hace falta ningún `finally` que restaure nada real)."""
-
-    def test_config_json_con_nombre_de_pila_no_cuenta_como_publicado(self):
-        tmp, copia = _copia_temporal_del_repo('config')
+class SobreUnaCopiaTemporal(unittest.TestCase):
+    def _copia(self, caso):
+        tmp, copia = _copia_temporal_del_repo(caso)
         self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        return copia
+
+    def test_config_json_del_instalador_no_cuenta_como_publicado(self):
+        copia = self._copia('config')
         (copia / 'abyss' / 'config.json').write_text(
-            '{"python": "C:\\\\Users\\\\jordi\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\python.exe", '
-            '"actualizado": "2026-09-07"}',
+            '{"python": "C:\\\\Users\\\\jordi\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\python.exe"}',
             encoding='utf-8')
-        hallazgos = _todos_los_hallazgos(copia)
-        de_config = [h for h in hallazgos if h.startswith('abyss') and 'config.json' in h]
-        self.assertEqual(de_config, [], 'abyss/config.json es un artefacto del instalador '
-                          '(gitignorado, ESPECIFICACION.md §1/§4): no cuenta como publicado')
+        de_config = [h for h in _todos_los_hallazgos(copia) if 'config.json' in h]
+        self.assertEqual(de_config, [])
 
-
-class UnFicheroNoIgnoradoSigueVigilado(unittest.TestCase):
-    """Falsador en la otra dirección: un nombre prohibido en un fichero que
-    `.gitignore` NO cubre (aquí, `docs/`) tiene que seguir cazándose — si no,
-    la exclusión de arriba sería demasiado ancha y dejaría de medir nada.
-
-    Cuarta vuelta: el señuelo se escribe dentro de una COPIA temporal del repo,
-    nunca en `docs/` de verdad — medido por simulación de muerte dura
-    (`os._exit` justo tras escribir el señuelo): con el fallo anterior, el
-    señuelo sobrevivía en el repo real bajo una ruta que `.gitignore` NO cubre
-    (SÍ se publicaría) y dejaba la siguiente corrida en rojo por su propia
-    comprobación de partida; sobre una copia temporal, la muerte dura como
-    mucho deja basura en `tempfile.gettempdir()`, nunca en el repo."""
-
-    def test_un_fichero_normal_con_nombre_prohibido_se_sigue_cazando(self):
-        tmp, copia = _copia_temporal_del_repo('decoy')
-        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+    def test_un_fichero_no_ignorado_se_sigue_cazando(self):
+        copia = self._copia('decoy')
         decoy = copia / 'docs' / '_decoy_prueba_datos_personales.md'
         decoy.write_text('nota de prueba que menciona a jordi de pasada', encoding='utf-8')
+        self.assertTrue(any(decoy.name in h for h in _todos_los_hallazgos(copia)))
+
+    def test_los_ficheros_firmados_se_escanean_salvo_la_firma(self):
+        copia = self._copia('firma')
+        ruta = copia / '.claude-plugin' / 'plugin.json'
+        m = json.loads(ruta.read_text(encoding='utf-8'))
+        m['description'] = 'nota que menciona a jordi'
+        ruta.write_text(json.dumps(m), encoding='utf-8')
         hallazgos = _todos_los_hallazgos(copia)
-        self.assertTrue(
-            any(decoy.name in h for h in hallazgos),
-            'un fichero NO ignorado con un nombre prohibido debe seguir cazándose')
+        self.assertTrue(any('plugin.json' in h for h in hallazgos), hallazgos)
+
+    def test_una_negacion_del_gitignore_reincluye(self):
+        copia = self._copia('negacion')
+        mp = copia / 'abyss' / 'vendor' / 'mp'
+        mp.mkdir(parents=True, exist_ok=True)
+        (mp / 'LICENSE-prueba.txt').write_text('licencia que menciona a jordi', encoding='utf-8')
+        (mp / 'otro.txt').write_text('binario ignorado que menciona a jordi', encoding='utf-8')
+        hallazgos = _todos_los_hallazgos(copia)
+        self.assertTrue(any('LICENSE-prueba.txt' in h for h in hallazgos), hallazgos)
+        self.assertFalse(any('otro.txt' in h for h in hallazgos), hallazgos)
+
+    def test_una_ruta_de_usuario_real_o_un_token_se_cazan(self):
+        copia = self._copia('token')
+        f = copia / 'docs' / '_decoy_token.md'
+        f.write_text('ruta C:/Users/alguien/x y clave MLY|123|abc y sk-' + 'a' * 24, encoding='utf-8')
+        hallazgos = [h for h in _todos_los_hallazgos(copia) if '_decoy_token.md' in h]
+        self.assertEqual(len(hallazgos), 3, hallazgos)
 
 
 if __name__ == '__main__':

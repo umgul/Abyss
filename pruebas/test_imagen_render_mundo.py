@@ -1,24 +1,6 @@
-"""TAREA D · integración: los verbos `render` y `mundo`
-de `imagen.py`, que delegan en `render3d.renderizar()` y en `mundo._cli()` — mismo patrón que
-ya usan `pintar`→`pintor._cli()` y `video`→`video_pintura._cli()`.
-
-`imagen.py` no llama a `rutas.resolver()` a nivel de módulo (solo dentro de `_cli()`, y aquí
-NUNCA se ejecuta al importar): seguro importarlo en el propio proceso de la prueba, igual que
-`test_render3d.py` ya hace con `render3d` y `test_mundo.py` con `mundo` (ver sus docstrings).
-
-`render3d` y `pintor` NO se ejecutan de verdad aquí (nada de navegador sin cabeza real ni de
-Pillow/numpy real): se sustituyen en `sys.modules` por módulos de mentira ANTES de que
-`imagen._cli()` haga su `import render3d` / `import pintor` — como Python cachea los módulos
-ya importados por nombre, ese `import` de dentro recoge la mentira sin tocar disco ni depender
-de qué haya instalado la máquina que corre la suite. Así se puede comprobar el ENCADENADO
-(qué argumentos exactos llegan a cada función, en qué orden, qué se escribe en el log) sin
-volver a probar `render3d.renderizar()` ni `pintor.pintar()` por dentro — eso ya lo cubren
-`test_render3d.py` y `test_pintor_estilos.py`/`test_imagen_pintar.py`.
-
-`mundo._cli` se sustituye igual, para comprobar que el verbo `mundo` reenvía `argv`/`mem` tal
-cual (sin repetir aquí el parseo de banderas de `mundo.py`, que ya prueba `test_mundo.py`) y
-devuelve su código de salida sin tocarlo.
-"""
+"""`imagen.py`: verbos `render`/`mundo`. Seguro importar en proceso (no llama
+a `rutas.resolver()` al importar). `render3d`/`pintor`/`mundo._cli` se
+sustituyen en `sys.modules` para probar el encadenado sin ejecutarlos de verdad."""
 import contextlib
 import io
 import json

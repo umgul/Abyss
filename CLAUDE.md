@@ -20,21 +20,22 @@ con él. Hay `--idioma en` si prefiere inglés.
 
 ## La instalación
 
+Desde aquí, sin ventana, se instala por nombre (los ids son los que imprime
+`--listar`):
+
 ```bash
-python instalar.py
+python instalar.py --instalar kinetico,kinetica,vigia,auditar
+python instalar.py --instalar kinetico --skills-dir <ruta>   # si sus skills no viven en ~/.claude/skills
 ```
 
-Instala los módulos marcados por defecto. Para elegir a mano:
+`python instalar.py` a secas abre una ventana Tk con casillas, y sin escritorio
+cae a `--listar`, que no instala nada: no lo uses desde una sesión sin pantalla.
+
+Y para deshacer, sin restos:
 
 ```bash
-python instalar.py --solo kinetico,kinetica,vigia,auditar
-python instalar.py --skills-dir <ruta>     # si sus skills no viven en ~/.claude/skills
-```
-
-Y para deshacer, entero y sin restos:
-
-```bash
-python instalar.py --desinstalar
+python instalar.py --desinstalar kinetico,kinetica,vigia,auditar
+python instalar.py --desinstalar kinetico --borrar-datos     # también lo que escribió en memory/
 ```
 
 ## Lo que hay que bajar aparte, y por qué no viene dentro
@@ -84,8 +85,9 @@ solas sin copiar nada:
 /plugin install abyss
 ```
 
-Ese camino instala las skills. Los ganchos y la instrumentación (memoria,
-propiocepción, vigía) siguen necesitando `instalar.py`.
+Ese camino instala solo las skills: el plugin no declara ningún gancho. Los
+ganchos y la instrumentación (memoria, propiocepción, vigía, huella) solo los
+pone `instalar.py`, módulo a módulo y diciendo qué toca cada uno.
 
 ## Comprobar que quedó bien
 

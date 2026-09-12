@@ -1,16 +1,6 @@
-"""`open()` sin gestor de contexto en varios guiones (fallo 6-sep, "roza"): MEDIDO
-que la suite escupía 8 `ResourceWarning` de ficheros sin cerrar en cada corrida
-(`settings.json`, `settings.json.tmp-abyss`, `abyss_manifiesto.json.tmp-abyss`,
-`config.json.tmp-abyss`, y el mismo patrón en `varas.py`, `continuidad.py`,
-`exterocepcion.py`, `noticias.py`, `modelo.py`). Ahora todo pasa por `with open(...)`.
-
-Cada caso se lanza como lo haría un gancho real (por subprocess, igual que el resto
-de la suite) con `PYTHONWARNINGS=always::ResourceWarning` para que el HIJO imprima
-por su stderr cualquier fichero que quede sin cerrar (CPython emite el aviso en
-cuanto el recuento de referencias libera el objeto — normalmente antes de que el
-proceso termine, no hace falta esperar a un ciclo de gc). Con el fallo, `stderr`
-llevaba la palabra «ResourceWarning»; con el arreglo, no debe aparecer nunca.
-"""
+"""Ningún guion debe dejar ficheros sin cerrar: el proceso hijo no debe escribir
+`ResourceWarning` en `stderr`. Se lanza por subprocess con
+`PYTHONWARNINGS=always::ResourceWarning` para que CPython avise en cuanto libera el fichero, sin esperar a un ciclo de gc."""
 import sys
 import os
 import json

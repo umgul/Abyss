@@ -1,9 +1,6 @@
-"""`continuidad.py --despertar` (gancho UserPromptSubmit): en cada prompt debe
-añadir `[tiempo]` siempre. `[mundo]` (exterocepción) puede faltar sin red
-(ESPECIFICACION.md §6) — aquí se preseeda `lugar.json`/`meteo.json` para que la
-prueba no dependa de si HAY red en la máquina que la corre: así es determinista Y
-además comprueba que, cuando SÍ hay lugar/meteo, `[mundo]` sale con esos datos.
-"""
+"""`continuidad.py --despertar`: cada prompt añade `[tiempo]`; `[mundo]` puede
+faltar sin red (ESPECIFICACION.md §6). Aquí se preseeda `lugar.json`/`meteo.json`
+para que la prueba sea determinista sin depender de la red de la máquina."""
 import sys
 import os
 import json
@@ -23,7 +20,7 @@ class DespertarAgregaTiempoYMundo(unittest.TestCase):
 
         mem = proj / 'memory'
         mem.mkdir(parents=True, exist_ok=True)
-        # preseeda lugar/meteo: [mundo] no depende de la red real ni de si la hay aquí
+        # preseeda lugar/meteo para que [mundo] no dependa de la red real
         (mem / 'lugar.json').write_text(json.dumps({'ip': {
             'nombre': 'Villafingida', 'region': 'Prueba', 'pais': 'ES',
             'lat': 41.0, 'lon': 2.0, 'fuente': 'IP', 'ts': time.time()}}), encoding='utf-8')
@@ -42,15 +39,14 @@ class DespertarAgregaTiempoYMundo(unittest.TestCase):
         payload = json.loads(r.stdout)
         contexto = payload['hookSpecificOutput']['additionalContext']
         self.assertIn('[tiempo]', contexto)
-        # con lugar/meteo preseedados y cacheados, [mundo] debe salir con esos datos
+        # lugar/meteo preseedados y cacheados: [mundo] debe traer esos datos
         self.assertIn('[mundo]', contexto)
         self.assertIn('Villafingida', contexto)
 
     def test_despertar_sin_pista_de_proyecto_calla(self):
-        """Sin `transcript_path` ni `cwd` en el stdin del gancho, `rutas.es_mio()` no
-        puede decidir a quién pertenece el hilo y se calla (fail-closed) aunque
-        `ABYSS_PROYECTO` sí resuelva `mem` — «sin proyecto no hay datos» es
-        distinto de «no sé si este hilo es mío»."""
+        """Sin `transcript_path` ni `cwd`, `rutas.es_mio()` no sabe a quién pertenece
+        el hilo y calla (fail-closed) aunque `ABYSS_PROYECTO` resuelva `mem`: «sin
+        proyecto no hay datos» es distinto de «no sé si este hilo es mío»."""
         proj = ay.nuevo_proyecto()
         entrada = json.dumps({'session_id': 'sid-sin-pista', 'prompt': 'hola'})
         env = ay.entorno(proj)

@@ -1,19 +1,6 @@
-"""`vigia.py`: dos tipos de caza más, `dominio`
-y `comando`, con la MISMA ley de procedencia que ya aplica a `numero`/`ruta`/`cita`
-(ver `pruebas/test_vigia.py`) — lo que no sale de un `tool_result` ni de un mensaje
-del usuario en la sesión se caza igual, ahora también para hosts/URLs y para líneas
-de instalación o ejecución remota.
-
-- `dominio`: se comparan HOSTS NORMALIZADOS (minúsculas, sin `www.`, sin puerto ni
-  ruta) — un mismo host repetido con o sin esquema/mayúsculas/puerto cuenta como el
-  mismo dominio.
-- `comando`: una línea con forma de instalación/ejecución remota (`curl`/`wget`/
-  `iwr`/`irm` con tubería a `bash`/`sh`/`iex`, `pip install`, `npm i`, `winget`,
-  `choco`, `Invoke-Expression`, `powershell -enc`) cuya fuente no está en el turno.
-- `--descargo` y `--precision` valen igual para los dos tipos nuevos (misma
-  mecánica ya probada en `test_vigia.py::VigiaDescargoCambiaLaPrecision`, aquí
-  repetida sobre una caza de tipo `dominio`).
-"""
+"""`vigia.py`: pruebas de los tipos de caza `dominio` y `comando`, con la misma ley
+de procedencia que `numero`/`ruta`/`cita` (`test_vigia.py`) — lo que no sale de un
+`tool_result` ni de un mensaje del usuario se caza igual."""
 import sys
 import os
 import json

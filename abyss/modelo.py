@@ -4,9 +4,8 @@ LÍMITE HONESTO (docs de Anthropic): NO hay forma de que un gancho devuelva la s
 a Fable por sí solo, y ningún gancho observa un cambio de modelo desde dentro de la
 sesión: los eventos reales de Claude Code son PreToolUse, PostToolUse, Stop,
 SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact y Notification
-— no existen `PostModelSwitch` ni `PreModelSwitch` (comprobado 6-sep contra la
-documentación de ganchos disponible; antes este módulo y `hooks/hooks.json`
-declaraban un gancho en un evento que no existe, así que nunca se disparaba). El
+— no existen `PostModelSwitch` ni `PreModelSwitch` (documentación de ganchos de
+Claude Code). El
 único retorno al modelo preferido lo teclea el usuario con `/model`; este módulo
 vive ahora solo como LIBRERÍA de `continuidad.py --despertar`, que ya llama a
 `texto(tp)` en cada prompt (ahí es donde de verdad se detecta el downgrade, no en

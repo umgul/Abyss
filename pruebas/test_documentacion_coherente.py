@@ -1,16 +1,7 @@
-"""Tres fallos "engaña" del 6-sep sobre README.md/README.en.md:
-
-(1) Prometían un gancho `PostModelSwitch`/`modelo.py --postswitch` que no existe en
-    Claude Code (los eventos reales son PreToolUse, PostToolUse, Stop, SubagentStop,
-    SessionStart, SessionEnd, UserPromptSubmit, PreCompact, Notification).
-(2) La sección de privacidad decía "continuidad.py ... no hace ninguna llamada de
-    red", falso: en `--arranque`/`--despertar` invoca a `exterocepcion.py`/
-    `noticias.py`, que SÍ contactan con ipinfo.io/open-meteo.com/nominatim/
-    news.google.com — justo la sección donde el lector decide si el gancho que
-    corre en cada mensaje manda o no su IP fuera.
-(3) `instalar.py` ya no declara el módulo `modelo` con gancho propio (MODULOS['modelo']
-    ['hooks'] == []): README y código deben decir lo mismo.
-"""
+"""README.md, README.en.md, ESPECIFICACION.md y el manifiesto del plugin dicen lo
+mismo que el código: sin ganchos inexistentes, sin promesas de privacidad falsas,
+sin firmas de comandos viejas."""
+import json
 import re
 import unittest
 from pathlib import Path
@@ -66,9 +57,8 @@ class InstalarYReadmeCoinciden(unittest.TestCase):
 
 
 class EspecificacionImagenCoincideConElCodigo(unittest.TestCase):
-    """ESPECIFICACION.md §3 (fallo 6-sep, "roza"): decía "Ambos [crear y pintar]
-    apuntan en mem/imagen.log" (MEDIDO: solo `crear` escribe ahí) y "solo pinceles
-    ≥ 3 px" (MEDIDO: `pintor.py --html-r-min` vale 2 por defecto)."""
+    """ESPECIFICACION.md §3: solo `crear` apunta en `mem/imagen.log` y el umbral de
+    pincel del HTML es el valor por defecto real de `pintor.py --html-r-min`."""
 
     def test_no_dice_ambos_apuntan_en_imagen_log(self):
         texto = (RAIZ / 'ESPECIFICACION.md').read_text(encoding='utf-8')
@@ -84,67 +74,30 @@ class EspecificacionImagenCoincideConElCodigo(unittest.TestCase):
         self.assertIn('--html-r-min', pintor)
 
 
-class ReadmeAvisaDelPythonPelado(unittest.TestCase):
-    """Fallo 6-sep, "engaña": los 5 ganchos de hooks/hooks.json invocan `python` a
-    secas (sin detección de intérprete, a diferencia de instalar.py) — en macOS
-    moderno no existe `python` (solo python3), y en Windows sin Python de
-    python.org puede ser el alias de la Microsoft Store. El README prometía que
-    "los ganchos del plugin funcionan solos, en cualquier proyecto, nada más
-    instalarlo" sin ese matiz."""
+class ElPluginNoTraeGanchos(unittest.TestCase):
+    """La vía `/plugin install` instala solo skills: Claude Code cargaría solo un
+    `hooks/hooks.json`, así que no debe existir, y los README lo dicen."""
 
-    def test_hooks_json_sigue_usando_python_pelado(self):
-        # si esto deja de ser cierto (se pasa a un lanzador que detecta el
-        # intérprete), el aviso del README quedaría obsoleto y habría que quitarlo.
-        # Segunda tanda (7-sep): +3 huella (SessionStart/PostToolUse/Stop) + 2 cuerpo
-        # (SessionStart/UserPromptSubmit) sobre los 4 de antes (continuidad x3, vigia).
-        texto = (RAIZ / 'hooks' / 'hooks.json').read_text(encoding='utf-8')
-        comandos = re.findall(r'"command":\s*"([^"]+)"', texto)
-        self.assertEqual(len(comandos), 9)
-        self.assertTrue(all(c.startswith('python ') for c in comandos), comandos)
+    def test_no_hay_hooks_json_ni_clave_hooks(self):
+        self.assertFalse((RAIZ / 'hooks').exists(), 'hooks/ se cargaría solo al instalar el plugin')
+        manifiesto = json.loads((RAIZ / '.claude-plugin' / 'plugin.json').read_text(encoding='utf-8'))
+        self.assertNotIn('hooks', manifiesto)
+        self.assertNotIn('hooks', manifiesto.get('keywords', []))
 
-    def test_los_dos_readme_avisan_del_limite(self):
-        for nombre in ('README.md', 'README.en.md'):
-            texto = (RAIZ / nombre).read_text(encoding='utf-8')
-            self.assertIn('python.org', texto, f'{nombre} debe avisar del límite de `python` pelado en los ganchos del plugin')
+    def test_los_dos_readme_dicen_que_el_plugin_solo_trae_skills(self):
+        es = _colapsar((RAIZ / 'README.md').read_text(encoding='utf-8'))
+        en = _colapsar((RAIZ / 'README.en.md').read_text(encoding='utf-8'))
+        self.assertIn('El plugin no declara ningún gancho', es)
+        self.assertIn('The plugin declares no hooks', en)
 
 
 def _colapsar(texto):
     return re.sub(r'\s+', ' ', texto)
 
 
-class ReadmesCuentanLosGanchosBien(unittest.TestCase):
-    """Fallo 6-sep, "roza": README.md/README.en.md decían "cinco ganchos"/"five
-    hooks" en el párrafo del límite de `python` pelado, resto de la retirada del
-    gancho PostModelSwitch — cuando `hooks/hooks.json` ya solo declara cuatro. El
-    número se deriva del propio `hooks.json` (no se repite a mano en el test) para
-    que un cambio futuro en el número de ganchos no vuelva a desincronizar los
-    README sin que la suite lo note."""
-
-    NUMEROS_ES = {1: 'un', 2: 'dos', 3: 'tres', 4: 'cuatro', 5: 'cinco', 6: 'seis',
-                  7: 'siete', 8: 'ocho', 9: 'nueve', 10: 'diez'}
-    NUMEROS_EN = {1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six',
-                  7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten'}
-
-    def test_el_numero_escrito_coincide_con_hooks_json(self):
-        texto_hooks = (RAIZ / 'hooks' / 'hooks.json').read_text(encoding='utf-8')
-        n = len(re.findall(r'"command":\s*"([^"]+)"', texto_hooks))
-        self.assertGreater(n, 0, 'hooks/hooks.json debería declarar al menos un gancho')
-
-        es = _colapsar((RAIZ / 'README.md').read_text(encoding='utf-8'))
-        en = _colapsar((RAIZ / 'README.en.md').read_text(encoding='utf-8'))
-        self.assertIn(f'{self.NUMEROS_ES[n]} ganchos de [`hooks/hooks.json`]', es,
-                      f'README.md debe decir "{self.NUMEROS_ES[n]} ganchos", como hooks.json declara ({n})')
-        self.assertIn(f'{self.NUMEROS_EN[n]} hooks in [`hooks/hooks.json`]', en,
-                      f'README.en.md debe decir "{self.NUMEROS_EN[n]} hooks", como hooks.json declara ({n})')
-
-
 class DesinstaladorNoPrometeByteAByte(unittest.TestCase):
-    """Fallo 6-sep, "engaña": ESPECIFICACION.md §6 prometía que el desinstalador
-    devuelve `settings.json` "byte a byte" salvo lo nuestro — falso, MEDIDO en
-    `test_instalador.py` (ciclo completo con un JSON de formato ajeno: "iguales
-    byte a byte: False" / "mismo JSON cargado: True"): `_escribir_json` siempre
-    reescribe con su propio `indent=2`. Los tres textos deben decir lo mismo:
-    mismo CONTENIDO, no mismo texto; el formato original queda en la copia `.bak`."""
+    """El desinstalador devuelve el mismo CONTENIDO de `settings.json`, no el mismo
+    texto (`_escribir_json` reescribe con `indent=2`); los tres textos lo dicen así."""
 
     def test_especificacion_no_promete_byte_a_byte_sin_matizar(self):
         texto = (RAIZ / 'ESPECIFICACION.md').read_text(encoding='utf-8')
@@ -160,12 +113,8 @@ class DesinstaladorNoPrometeByteAByte(unittest.TestCase):
 
 
 class EspecificacionImagenFirmaYCascadaReales(unittest.TestCase):
-    """Fallo 6-sep, "engaña": ESPECIFICACION.md §3 seguía documentando la firma
-    vieja de `crear` (posicionales `[ancho] [alto] [semilla]`, que `imagen.py`
-    ignora en silencio desde que se pasó a banderas) y la cascada vieja de dos
-    vías (Pollinations sin clave → HuggingFace) cuando el código tiene seis vías
-    con `local` primero. MEDIDO contra un servidor A1111 falso en
-    `test_imagen_crear_vias.py` y `test_imagen_posicional_desconocido.py`."""
+    """ESPECIFICACION.md §3 describe la firma real de `crear` (banderas, no
+    posicionales) y las seis vías con `local` primero."""
 
     def test_no_describe_los_positionales_viejos(self):
         texto = (RAIZ / 'ESPECIFICACION.md').read_text(encoding='utf-8')
@@ -181,24 +130,8 @@ class EspecificacionImagenFirmaYCascadaReales(unittest.TestCase):
 
 
 class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
-    """Fallo 6-sep, "roza": ESPECIFICACION.md §5 prometía que `docs/` lleva "las
-    fichas originales tal cual" (MEDIDO: `docs/` solo contiene `leyes.md` y
-    `ganchos_settings_ejemplo.json` — las fichas personales del autor no se
-    publican, a propósito) y "las siete leyes del SGICP propio" (MEDIDO:
-    `docs/leyes.md` tiene SEIS leyes numeradas, más una sección de resumen final
-    que no es una séptima ley).
-
-    El 7-sep se añadió `docs/AUDITORIA_DE_ABYSS.md` (el primer informe de
-    `auditar.py`, corrido sobre el propio paquete) a la lista blanca: sigue sin
-    haber fichas de diseño personales, pero la lista de lo permitido en `docs/`
-    tenía que crecer con ese fichero o quedaba una lista blanca desactualizada
-    tumbando la suite entera.
-
-    También el 7-sep se añadieron los espejos en inglés que este paquete
-    se pide a sí mismo («se añaden `docs/leyes.en.md` y ...
-    `docs/AUDITORIA_DE_ABYSS.en.md`»): misma razón, la lista blanca vuelve a
-    crecer con esos dos ficheros o la suite entera queda en rojo por un
-    requisito de la propia especificación."""
+    """`docs/` lleva exactamente su lista blanca (sin fichas de diseño personales) y
+    `leyes.md` tiene seis leyes, como dice ESPECIFICACION.md §5."""
 
     def test_no_promete_fichas_originales_ni_siete_leyes(self):
         texto = (RAIZ / 'ESPECIFICACION.md').read_text(encoding='utf-8')
@@ -224,17 +157,12 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
 
 
 class NingunGanchoDeclaraStatusMessage(unittest.TestCase):
-    """Fallo 6-sep, "roza": `statusMessage` en los ganchos de `hooks/hooks.json`
-    (y en el ejemplo de `docs/ganchos_settings_ejemplo.json`, y en lo que escribe
-    `instalar.py`) no se pudo verificar contra la documentación oficial de ganchos
-    (skill `hook-development`: el esquema de un gancho `command` es {type, command,
-    timeout}) ni contra ningún `settings.json` real de esta máquina. Se quitó de
-    los tres sitios en vez de publicar una promesa sin comprobar."""
+    """El esquema documentado de un gancho `command` es {type, command, timeout}:
+    ni el ejemplo ni `instalar.py` escriben un `statusMessage` sin respaldo."""
 
-    def test_hooks_json_y_el_ejemplo_no_llevan_statusmessage(self):
-        for nombre in ('hooks/hooks.json', 'docs/ganchos_settings_ejemplo.json'):
-            texto = (RAIZ / nombre).read_text(encoding='utf-8')
-            self.assertNotIn('statusMessage', texto, f'{nombre} no debe declarar statusMessage')
+    def test_el_ejemplo_no_lleva_statusmessage(self):
+        texto = (RAIZ / 'docs' / 'ganchos_settings_ejemplo.json').read_text(encoding='utf-8')
+        self.assertNotIn('statusMessage', texto)
 
     def test_instalar_py_no_escribe_statusmessage(self):
         texto = (RAIZ / 'instalar.py').read_text(encoding='utf-8')

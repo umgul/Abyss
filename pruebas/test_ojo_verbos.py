@@ -1,22 +1,7 @@
 # -*- coding: utf-8 -*-
-"""`ojo.py`: ocho verbos, un solo punto de entrada.
-`mirar` es "lo de hoy" (sin cambios); los otros siete DELEGAN enteros en
-`lectura_visual._cli()`, `volumen._cli()` o `gestos._cli()` — nunca repiten su lógica
-de visión.
-
-Esta prueba nunca ejerce una cámara, un escáner ni un servidor HTTP real: monkeypatch
-sobre las PIEZAS delegadas (no sobre `ojo.py`), para comprobar SOLO el cableado — qué
-verbo llama a qué módulo con qué argv exacto — sin arrastrar sus propias dependencias
-(numpy/cv2 de `volumen.py`, `mediapipe` de `gestos.py`) ni su comportamiento real, que
-ya prueban `test_lectura_visual.py`/`test_volumen.py`/`test_gestos.py` cada uno el
-suyo. Para `mirar` (que no delega en nada), se inyecta un `cv2` FALSO en
-`sys.modules` — nunca el real ni ninguna cámara — así el resultado no depende de si
-esta máquina tiene OpenCV instalado ni de qué cámaras tenga conectadas.
-
-`ojo.py` no llama a `rutas.resolver()` fuera de `main()` (guardado tras
-`if __name__ == '__main__':`, igual que `lectura_visual.py`/`volumen.py`/
-`gestos.py`): se puede importar DIRECTAMENTE en el proceso de la prueba y llamar a
-`ojo._cli(argv, proj, mem)` con un `proj`/`mem` de mentira, sin tocar stdin real."""
+"""`ojo.py`: ocho verbos, un solo punto de entrada. `mirar` no delega; los
+otros siete delegan entero en `lectura_visual`/`volumen`/`gestos._cli()`.
+Monkeypatch sobre las piezas delegadas (no `ojo.py`); para `mirar`, un `cv2` falso."""
 import io
 import os
 import sys
@@ -38,10 +23,9 @@ import gestos  # noqa: E402
 
 
 def _cv2_falso():
-    """Un `cv2` de mentira: `VideoCapture(...)` nunca se abre, nunca toca hardware
-    real. Se inyecta en `sys.modules['cv2']` justo antes de la llamada y se
-    restaura siempre después (`addCleanup`), para no dejarlo puesto para el resto
-    de la suite si esta prueba corre junto a otras en el mismo proceso."""
+    """Un `cv2` de mentira: `VideoCapture(...)` nunca se abre, nunca toca
+    hardware real. Se restaura siempre después (`addCleanup`), para no
+    dejarlo puesto para el resto de la suite si corre junto a otras."""
     class _CapFalsa:
         def __init__(self, *a, **k):
             pass
@@ -177,10 +161,9 @@ class VerboGestosDelega(unittest.TestCase):
 
 
 class VerboMirarNoDelegaEnNada(unittest.TestCase):
-    """`mirar` es la única pieza que NO delega (ver docstring de `ojo.py`): se
-    comprueba con un `cv2` FALSO inyectado en `sys.modules` — nunca la cámara
-    real — que ninguno de los tres módulos delegados se llama, y que el código
-    de salida/mensaje son los mismos que "lo de hoy" daba con una cámara que
+    """`mirar` es la única pieza que no delega: se comprueba con un `cv2`
+    falso en `sys.modules` (nunca la cámara real) que ningún módulo delegado
+    se llama, con el mismo código de salida/mensaje que da una cámara que
     nunca llega a abrirse."""
 
     def setUp(self):

@@ -1,14 +1,6 @@
-"""`esceptico` no es un guion Python — es una
-skill de Claude Code (`skills/esceptico/SKILL.md`) que `instalar.py` copia a la
-carpeta de skills del usuario (`--skills-dir`, por defecto `~/.claude/skills`).
-"la prueba comprueba que el instalador la copia, que el frontmatter parsea y que
-el desinstalador la retira solo si lleva nuestra marca."
-
-Import directo por ruta de fichero, igual que `test_instalador.py` (sin red ni
-`rutas.resolver()` a nivel de módulo). `RAIZ_SKILLS` de `instalar.py` apunta al
-`skills/` REAL del repo (no hay por qué fingirlo: es contenido versionado, no un
-artefacto de ejecución) — solo el DESTINO de la copia va a una carpeta temporal,
-nunca al `~/.claude/skills/` real de quien corra la prueba (regla dura 1/2)."""
+"""`esceptico` es una skill de Claude Code (`skills/esceptico/SKILL.md`), no un guion
+Python: comprueba que `instalar.py` la copia, que su frontmatter parsea y que el
+desinstalador solo la retira si lleva nuestra marca. El destino de la copia va siempre a una carpeta temporal, nunca a `~/.claude/skills/` real."""
 import os
 import re
 import importlib.util
@@ -21,10 +13,8 @@ import ayudas as ay
 
 
 def _colapsar(texto):
-    """Espacios/saltos de línea a un solo espacio — el frontmatter YAML pliega
-    (`description: >`) una frase larga en varias líneas del FICHERO; buscar la
-    frase disparadora tal cual (sin colapsar) fallaría por un salto de línea que
-    no significa nada para quien lee la skill renderizada."""
+    """Colapsa espacios/saltos de línea a uno solo: el frontmatter YAML pliega
+    (`description: >`) frases largas en varias líneas del fichero."""
     return re.sub(r'\s+', ' ', texto)
 
 
@@ -113,10 +103,8 @@ class DesinstaladorSoloRetiraLaSkillMarcada(unittest.TestCase):
         self.assertFalse(destino.exists(), 'la skill que SÍ instalamos nosotros debe desaparecer')
 
     def test_desinstalar_no_toca_una_skill_ajena_con_el_mismo_nombre(self):
-        """Falsador directo de que `desinstalar()` solo retira la skill copiada si
-        lleva nuestra marca: una carpeta `esceptico/SKILL.md` que
-        el usuario ya tuviera puesta por su cuenta (sin nuestra marca) no debe
-        borrarse solo porque `--desinstalar esceptico` se ejecute."""
+        """Una skill con el mismo nombre puesta por el usuario (sin nuestra marca) no
+        debe borrarse al desinstalar."""
         destino = self.skills_dir / 'esceptico'
         destino.mkdir(parents=True)
         (destino / 'SKILL.md').write_text(

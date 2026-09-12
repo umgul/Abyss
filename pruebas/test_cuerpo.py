@@ -1,15 +1,6 @@
-"""`cuerpo.py`: el hardware de la máquina, con
-normal propia por cuantiles. Las funciones puras (`medir`, `historial`, `guardar`,
-`cuantiles`, `evaluar`, `texto_arranque`, `texto_despertar`) se prueban importando
-el módulo DIRECTAMENTE (no por subproceso, a diferencia del resto de `abyss/`):
-`cuerpo.py` está diseñado a propósito para no tocar `rutas.resolver()` ni stdin al
-importarse (todo eso vive dentro de `if __name__ == '__main__':`), así que
-importarlo no tiene efecto secundario ninguno y cada instrumento
-(`leer_cpu`, `leer_ram_libre`, `leer_disco_libre`, `leer_gpu`, `leer_bateria`) se
-puede monkeypatchear por separado con `unittest.mock.patch.object`. El gancho
-real (`--arranque`/`--despertar` como los invocaría Claude Code) sí se prueba por
-subproceso, igual que el resto de la batería.
-"""
+"""`cuerpo.py`: hardware de la máquina, con normal propia por cuantiles. No toca
+`rutas.resolver()` ni stdin al importarse, así que las funciones puras se prueban con
+import directo y cada instrumento se monkeypatchea aparte; el gancho real se prueba por subproceso, igual que el resto de la batería."""
 import sys
 import os
 import json
@@ -57,10 +48,8 @@ class VaraPropiaPorCuantiles(unittest.TestCase):
 
 
 class FormatoDecimalCastellano(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: la línea del cuerpo imprimía los
-    decimales con PUNTO, no con coma, contra el ejemplo literal de la propia
-    especificación («ram libre 9,8 GB»). Medido con el gancho SessionStart
-    real: «ram libre 22.0 GB» (con punto)."""
+    """La línea del cuerpo debe imprimir los decimales con coma, no con punto, según
+    el ejemplo literal de la especificación («ram libre 9,8 GB»)."""
 
     def test_valor_fmt_usa_coma_no_punto(self):
         # 10035 MB / 1024 = 9,8 GB — el mismo ejemplo literal
@@ -242,10 +231,9 @@ class GanchosYCliPorSubproceso(unittest.TestCase):
 
 
 class HistorialConVaraNoMiente(unittest.TestCase):
-    """T2 revisor (7-sep): `--historial` reutilizaba `texto_arranque(m, [])` con el
-    historial VACÍO para CADA fila, así que `con_vara_global` era siempre falso y
-    la línea afirmaba «sin vara todavía (n=0)» aunque el proyecto sí tuviera vara
-    (8+ medidas previas) — una medida falsa, contra la ley del propio paquete."""
+    """`--historial` no debe decir "sin vara todavía" para una fila cuando el proyecto
+    ya tiene 8+ medidas anteriores: cada fila se compara contra todo lo anterior a
+    ella, no contra un historial vacío."""
 
     def test_con_ocho_o_mas_medidas_no_dice_sin_vara(self):
         proj = ay.nuevo_proyecto()

@@ -1,13 +1,6 @@
-"""`continuidad.py --arranque` (fallo 6-sep, "roza"): con la red muerta, el
-`additionalContext` no mencionaba el lugar en absoluto — silencio, no "sin dato".
-`--arranque` refrescaba la IP (`exterocepcion.lugar_ip(refrescar=True, ...)`) pero
-nunca llamaba a `exterocepcion.texto()` (a diferencia de `--despertar`, que sí lo
-hace) para componer la línea `[mundo] ...`; si `lugar_ip()` fallaba en silencio y
-`noticias.texto()` tampoco devolvía nada, el texto de arranque no llevaba ni rastro
-de que se hubiera intentado mirar el mundo.
-
-`ABYSS_SIN_RED=1` corta la red al instante (ver `ayudas.py`/regla dura 2 del
-encargo: "sin red en la suite")."""
+"""`continuidad.py --arranque` con la red muerta: `additionalContext` debe
+mencionar `[mundo]` con "sin dato", nunca callarlo por completo.
+`ABYSS_SIN_RED=1` corta la red al instante (ver `ayudas.py`)."""
 import sys
 import os
 import json
@@ -32,7 +25,6 @@ class ArranqueDiceMundoAunqueLaRedEsteMuerta(unittest.TestCase):
 
         payload = json.loads(r.stdout)
         contexto = payload['hookSpecificOutput']['additionalContext']
-        # con el fallo: nada de "[mundo]" aparecía aquí, ni siquiera un "sin dato"
         self.assertIn('[mundo]', contexto)
         self.assertIn('sin dato', contexto)
 

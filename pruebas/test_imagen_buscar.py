@@ -1,13 +1,6 @@
-"""`imagen.py buscar`: Openverse y Wikimedia Commons, sin
-clave, solo busca y trae con atribución (no monta nada). Probado contra las respuestas JSON
-guardadas en `pruebas/datos/openverse_ejemplo.json` y `pruebas/datos/commons_ejemplo.json`
-(copias fieles de la forma real de cada API, con URLs de imagen sustituidas por rutas de un
-servidor local): un servidor HTTP falso en 127.0.0.1 las sirve, sin tocar la red de verdad,
-igual que `test_imagen_crear_vias.py` hace para la vía `local` de `crear`.
-
-`ABYSS_OPENVERSE_URL`/`ABYSS_COMMONS_URL` (ver docstring de `imagen.py`) apuntan la búsqueda
-a ese servidor falso en vez de a los hosts reales.
-"""
+"""`imagen.py buscar`: Openverse/Wikimedia Commons sin clave. Las fixtures de
+`pruebas/datos/` se sirven por un servidor HTTP falso en 127.0.0.1;
+`ABYSS_OPENVERSE_URL`/`ABYSS_COMMONS_URL` apuntan ahí en vez de a los hosts reales."""
 import base64
 import io
 import json
@@ -47,10 +40,9 @@ def _png_falso():
 
 
 class _ServidorBancosFalso:
-    """Sirve las dos fixtures (con el placeholder `127.0.0.1:0` sustituido por su propio
-    puerto, para que las URLs de imagen que trae cada resultado apunten de vuelta a este
-    mismo servidor) y, para cualquier otra ruta, una imagen sintética — así `--descargar`
-    también se prueba sin red."""
+    """Sirve las dos fixtures (sustituyendo el placeholder `127.0.0.1:0` por su
+    propio puerto, para que las URLs de imagen apunten de vuelta aquí) y, para
+    cualquier otra ruta, una imagen sintética — así `--descargar` se prueba sin red."""
 
     def __enter__(self):
         openverse = (DATOS / 'openverse_ejemplo.json').read_text(encoding='utf-8')

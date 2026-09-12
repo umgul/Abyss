@@ -1,17 +1,6 @@
-"""`lector_pdf.py`. Como `cuerpo.py`, se importa
-DIRECTAMENTE (sin subproceso) para las funciones puras: no toca `rutas.resolver()`
-ni stdin al importarse.
-
-El PDF sintético de 6 páginas se construye con `fitz` (PyMuPDF) si está instalado
-— si no, TODA la clase que lo usa se salta con `unittest.skipUnless` y el motivo
-exacto («sin fitz (PyMuPDF): pip install pymupdf»), como pide el encargo. Dos
-páginas (1 y 4) llevan un título a tamaño 24 sobre cuerpo a tamaño 11 → 2
-secciones; solo la página 5 contiene la palabra «esdrujulisimo». Texto en ASCII
-puro a propósito: la fuente base `helv` de PyMuPDF (`insert_text` sin fuente
-Unicode incrustada) no representa bien los acentos (medido: los sustituye por
-`�`) — no es un límite de `lector_pdf.py`, es de cómo se fabrica el PDF de
-prueba, así que se evita en vez de ensuciar la prueba.
-"""
+"""`lector_pdf.py`: como `cuerpo.py`, se importa directamente (no toca `rutas.resolver()`
+ni stdin). El PDF sintético de 6 páginas usa `fitz` (PyMuPDF) si está instalado: títulos
+de tamaño 24 sobre cuerpo 11 en páginas 1 y 4 (2 secciones); solo la página 5 dice «esdrujulisimo» (ASCII: la fuente `helv` no representa bien los acentos)."""
 import sys
 import os
 import json
@@ -137,10 +126,9 @@ class LectorPdfConPdfSintetico(unittest.TestCase):
 
     @unittest.skipUnless(_TIENE_PYPDF, 'sin pypdf: pip install pypdf')
     def test_motor_pypdf_forzado_detecta_las_mismas_dos_secciones(self):
-        """`ABYSS_PDF_FORZAR_MOTOR=pypdf` fuerza la heurística de TEXTO aunque
-        `fitz` esté instalado: «Capitulo Uno»/«Capitulo Dos» también empiezan por
-        una palabra de `RE_CAPITULO`, así que la detecta igual sin mirar tamaños
-        de letra."""
+        """`ABYSS_PDF_FORZAR_MOTOR=pypdf` fuerza la heurística de TEXTO aunque `fitz` esté
+        instalado: «Capitulo Uno»/«Capitulo Dos» empiezan por una palabra de `RE_CAPITULO`,
+        así que la detecta igual sin mirar tamaños de letra."""
         with mock.patch.dict(os.environ, {'ABYSS_PDF_FORZAR_MOTOR': 'pypdf'}):
             paginas, secciones, motor, motivo = lp.extraer(self.ruta_pdf)
         self.assertIsNone(motivo)
@@ -214,12 +202,9 @@ class SinMotorDeExtraccion(unittest.TestCase):
 
 
 class IndexarConFicheroQueNoEsPdf(unittest.TestCase):
-    """Fallo "engaña" medido 7-sep: `extraer()` solo atrapaba
-    `ImportError`, así que un fichero de texto plano renombrado a `.pdf` hacía
-    que `fitz` (instalado) reventara con `pymupdf.FileDataError` como
-    traceback completo por stderr (con la ruta absoluta del fichero dentro) en
-    vez del mensaje limpio que usa el resto del paquete — y la cascada a
-    `pypdf`, que si podría intentarlo, nunca llegaba a ejecutarse."""
+    """Un fichero de texto plano renombrado a `.pdf` no debe reventar `extraer()` con un
+    traceback crudo: debe caer en el mensaje limpio del paquete (y dejar que la cascada a
+    `pypdf` se ejecute)."""
 
     def _fichero_falso(self, proj):
         ruta = proj / 'no_es_un_pdf.pdf'
@@ -232,14 +217,12 @@ class IndexarConFicheroQueNoEsPdf(unittest.TestCase):
         ruta_falsa = self._fichero_falso(proj)
         r = ay.ejecutar(ay.script('lector_pdf.py'), ['--indexar', str(ruta_falsa)], env)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
-        # lo que NO debe pasar: un traceback de Python crudo (con el fallo
-        # original, esto es justo lo que salía).
+        # lo que NO debe pasar: un traceback de Python crudo.
         self.assertNotIn('Traceback (most recent call last)', r.stderr, r.stderr)
         self.assertNotIn('Traceback (most recent call last)', r.stdout, r.stdout)
         self.assertTrue(r.stdout.strip(), 'debe imprimir un mensaje limpio en vez de nada')
-        # fallo "roza" medido 7-sep: `pypdf` avisa por SU PROPIO logger ("invalid
-        # pdf header", "EOF marker not found") aunque el mensaje limpio de arriba
-        # ya lo explica por stdout — nada debe salir por stderr en este caso.
+        # `pypdf` avisa por su propio logger ("invalid pdf header", "EOF marker not
+        # found"): nada de eso debe salir por stderr, el mensaje limpio ya va por stdout.
         self.assertEqual(r.stderr.strip(), '', r.stderr)
 
     def test_extraer_a_pelo_no_propaga_la_excepcion(self):
@@ -254,13 +237,9 @@ class IndexarConFicheroQueNoEsPdf(unittest.TestCase):
 
 @unittest.skipUnless(_TIENE_FITZ, 'sin fitz (PyMuPDF): pip install pymupdf')
 class HeuristicaDeSeccionCasoMinimo(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: con una página de EXACTAMENTE dos líneas
-    (título + una sola línea de cuerpo — la forma MÍNIMA usada como
-    falsador), `tamanos[n // 2]` daba la mediana SUPERIOR para `n` par; con
-    n=2 eso es el propio tamaño del título (mediana == p90), así que
-    `tamano > mediana` no era nunca cierto y NINGUNA sección salía detectada.
-    El falsador anterior usaba cuerpo abundante (3+ líneas por página), que
-    escondía justo este caso."""
+    """Con una página de exactamente dos líneas (título + una sola línea de cuerpo),
+    `tamanos[n // 2]` da la mediana superior para n par: con n=2 es el propio tamaño del
+    título, así que `tamano > mediana` nunca es cierto y no se detecta ninguna sección."""
 
     def _pdf_de_una_pagina(self, ruta, lineas):
         doc = fitz.open()
@@ -277,7 +256,6 @@ class HeuristicaDeSeccionCasoMinimo(unittest.TestCase):
         ruta = os.path.join(tmp, 'minimo.pdf')
         self._pdf_de_una_pagina(ruta, [('Titulo Solo', 24), ('Una linea de cuerpo nada mas.', 11)])
         _paginas, secciones = lp.extraer_fitz(ruta)
-        # con el fallo, esto daba [] (0 secciones)
         self.assertEqual(len(secciones), 1, secciones)
         self.assertEqual(secciones[0]['titulo'], 'Titulo Solo')
 
@@ -293,13 +271,9 @@ class HeuristicaDeSeccionCasoMinimo(unittest.TestCase):
 
 
 class BuscarOrdenaPorPuntuacionDescendente(unittest.TestCase):
-    """Fallo "roza": el orden de `--buscar` no tenía falsador — medido
-    por mutación (invertir `puntuaciones.sort(...)` para devolver PRIMERO la
-    página MENOS relevante), las 23 pruebas anteriores seguían en verde porque
-    su única consulta aparecía en una sola página (con un resultado, cualquier
-    orden pasa). Aquí la consulta aparece en DOS páginas con frecuencia muy
-    distinta y se exige orden descendente ESTRICTO, con la más repetida
-    primero — con la mutación de arriba, esto falla."""
+    """El orden de `--buscar` debe ser descendente ESTRICTO por puntuación: aquí la
+    consulta aparece en dos páginas con frecuencia muy distinta, con la más repetida
+    primero."""
 
     def test_pagina_con_mas_repeticiones_sale_primero_y_en_orden_descendente(self):
         indice = {

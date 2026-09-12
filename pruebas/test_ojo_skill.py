@@ -1,17 +1,7 @@
 # -*- coding: utf-8 -*-
-"""`skills/ojo/SKILL.md`: la descripción del
-frontmatter es lo primero que lee el enrutador de skills, antes que nada del
-cuerpo — así que el verbo que dispara cada frase importa tanto como la frase.
-
-Fallo "rompe" medido 7-sep: la descripción listaba «lee lo que hay en esta
-foto» / «read what's in this photo» como disparadores de `mirar` (el verbo que
-ABRE LA WEBCAM), justo lo contrario de la ley que la propia skill declara dos
-párrafos más abajo («una cámara que se enciende sola no es un ojo, es
-vigilancia»). Quien pidiera leer una foto que YA TIENE se llevaba la cámara
-encendida en vez de OCR (`texto`). Este falsador comprueba que cada frase
-disparadora cuelga del verbo correcto, en los dos idiomas, sin fiarse de que
-"la frase existe en algún sitio del fichero" — que es justo lo que un test
-más laxo no habría cazado."""
+"""`skills/ojo/SKILL.md`: el enrutador de skills lee el frontmatter antes que
+el cuerpo — cada frase disparadora debe colgar del verbo correcto. "Lee lo
+que hay en esta foto" (OCR) dispara `texto`, nunca `mirar`, en los dos idiomas."""
 import os
 import re
 import sys
@@ -24,20 +14,16 @@ RUTA_SKILL = ay.RAIZ / 'skills' / 'ojo' / 'SKILL.md'
 
 
 def _colapsar(texto):
-    """Espacios/saltos de línea a uno solo — el frontmatter YAML pliega
-    (`description: >`) una frase larga en varias líneas del FICHERO; buscar
-    "de un tirón" evita que un salto de línea (que no significa nada para
-    quien lee la skill renderizada) rompa la búsqueda."""
+    """Espacios/saltos de línea a uno solo: el frontmatter YAML pliega
+    (`description: >`) una frase larga en varias líneas del fichero, y un
+    salto de línea no debe romper la búsqueda de la frase completa."""
     return re.sub(r'\s+', ' ', texto)
 
 
 def _grupos_por_verbo(descripcion):
     """Trocea la descripción en los tramos de texto que preceden a cada marca
-    `` (`verbo`) ``, EN EL ORDEN en que aparecen. Como las marcas son
-    secuenciales y no se solapan, cada grupo capturado es exactamente el
-    tramo de disparadores que la propia skill le atribuye a ese verbo — con
-    los ocho verbos repetidos dos veces (castellano y luego inglés), salen 16
-    grupos."""
+    `` (`verbo`) ``, en el orden en que aparecen: cada grupo es el tramo de
+    disparadores de ese verbo. Ocho verbos x dos idiomas = 16 grupos."""
     return re.findall(r'([^(]*?)\(`(\w+)`\)', descripcion)
 
 

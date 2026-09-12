@@ -1,12 +1,6 @@
-"""`parentesis.py` (ESPECIFICACION.md §8).
-
-Casos: `--abrir`/`--cerrar` marcan un tramo por sesión y no duplican uno ya
-abierto; `--omitir-sesion` escribe (una vez) en sesiones/.omitir; `--recortar`
-conserva hasta la respuesta al mensaje dado y deja `.antes`, y se niega sobre un
-hilo con latido reciente; `--recortar-tramo` quita solo las líneas del tramo de
-tiempo dado; y, de punta a punta, un tramo marcado hace que `continuidad.py
---cierre` no copie esas líneas a sesiones/ ni las bolsas lleven sus palabras.
-"""
+"""`parentesis.py` (ESPECIFICACION.md §8): `--abrir`/`--cerrar` marcan un
+tramo por sesión; `--omitir-sesion`/`--recortar`/`--recortar-tramo` editan el
+transcript. Un tramo marcado no llega a sesiones/ ni a las bolsas (`continuidad.py --cierre`)."""
 import sys
 import os
 import json
@@ -231,11 +225,9 @@ class IntegracionConContinuidad(unittest.TestCase):
 
 
 class IntegracionConVigia(unittest.TestCase):
-    """Fallo "engaña" medido 7-sep: `vigia.leer_turno()` no miraba el tramo en
-    absoluto, así que una respuesta dicha DENTRO de un paréntesis abierto sí se
-    verificaba, y sus fragmentos podían quedar guardados (literales, hasta 40
-    caracteres) en `confabulaciones.jsonl` — justo lo que el tramo promete que
-    no viaja. Ver `parentesis.en_parentesis()` y `vigia.leer_turno()`."""
+    """Una respuesta dicha dentro de un tramo abierto no debe verificarse ni
+    guardarse en `confabulaciones.jsonl` (ver `parentesis.en_parentesis()` y
+    `vigia.leer_turno()`)."""
 
     def test_respuesta_dentro_del_tramo_no_se_verifica_ni_se_guarda(self):
         proj = ay.nuevo_proyecto()
@@ -290,14 +282,9 @@ class IntegracionConVigia(unittest.TestCase):
 
 
 class TramoAbiertoSinCerrarNoSeEscapa(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: la rama más crítica de `en_parentesis()` —un
-    tramo `--abrir` sin `--cerrar` (`fin: None`), que el propio docstring
-    describe como «nada de lo posterior al --abrir se escapa igual»— no tenía
-    ningún falsador. Mutando `if fin is None: return True` a `return False`
-    (un tramo sin cerrar deja de proteger absolutamente nada) la SUITE ENTERA
-    seguía en verde. Aquí se ejercita de punta a punta: `--abrir` real, sin
-    `--cerrar`, y `continuidad.py --cierre` sobre un transcript cuyo último
-    mensaje cae DESPUÉS del `--abrir`."""
+    """La rama de `en_parentesis()` para un tramo sin cerrar (`fin: None`):
+    nada de lo posterior al `--abrir` se escapa nunca. Ejercitado de punta a
+    punta con `--abrir` real (sin `--cerrar`) y `continuidad.py --cierre`."""
 
     def test_lo_dicho_tras_abrir_sin_cerrar_no_llega_a_sesiones(self):
         proj = ay.nuevo_proyecto()
@@ -334,11 +321,9 @@ class TramoAbiertoSinCerrarNoSeEscapa(unittest.TestCase):
 
 
 class FinCorruptoSigueOcultando(unittest.TestCase):
-    """Fallo "roza" medido 7-sep: la otra rama fail-closed de `en_parentesis()`
-    —un `fin` que no se puede parsear como fecha sigue ocultando en vez de
-    dejar pasar ("mejor de más que de menos, ahí ya sabemos que el tramo
-    existe")— tampoco tenía falsador. Mutando `except Exception: return True`
-    a `return False` en esa rama, la suite entera también seguía en verde."""
+    """La rama fail-closed de `en_parentesis()`: un `fin` que no se puede
+    parsear como fecha sigue ocultando, nunca deja pasar ("mejor de más que
+    de menos: ahí ya se sabe que el tramo existe")."""
 
     def test_fin_no_parseable_sigue_ocultando(self):
         proj = ay.nuevo_proyecto()

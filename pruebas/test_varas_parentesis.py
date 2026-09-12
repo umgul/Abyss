@@ -1,15 +1,6 @@
-"""`varas.py --index` (ronda 2 de arreglos, 7-sep): fallo "roza" medido sobre la
-versión viva — `varas.py` recorría los transcripts VIVOS de `proj` buscando
-lecturas de fichas (`"name":"Read"`/`cat `) sin consultar `parentesis.en_parentesis()`
-en absoluto, así que una lectura de ficha hecha DENTRO de un tramo marcado seguía
-contando como uso y le subía el ◆ a esa ficha en `MEMORY.md` — justo el fichero que
-el asistente lee al empezar cada hilo, y justo lo que lo que gobierna `parentesis.py`
-promete gobernar («lo que el propio asistente vuelve a leer en hilos futuros»).
-
-Fixture: un proyecto con 8 sesiones ARCHIVADAS (para pasar el arranque en frío,
-`propiocepcion.UMBRAL_FRIO`), 4 fichas enlazadas desde `MEMORY.md`, y un transcript
-VIVO cuya única lectura de una de ellas cae dentro (o fuera, de control) de un tramo.
-"""
+"""`varas.py --index`: una lectura de ficha (`"name":"Read"`) hecha dentro de
+un tramo de `parentesis.py` no debe subirle el ◆ (peso de uso) a esa ficha en
+`MEMORY.md` — justo lo que el asistente relee al empezar cada hilo."""
 import sys
 import os
 import json
@@ -22,10 +13,9 @@ FICHAS = ('ficha-secreta.md', 'ficha-b.md', 'ficha-c.md', 'ficha-d.md')
 
 
 def _linea_read(ruta_ficha, ts):
-    """Una línea de transcript que `varas.py` reconoce como lectura de ficha: debe
-    contener LITERALMENTE `"name":"Read"` (JSON compacto, sin espacio tras los
-    dos puntos — así serializa el harness real) y la palabra `memory` (viene sola
-    de la propia ruta de la ficha, que vive bajo `mem`)."""
+    """Una línea de transcript que `varas.py` reconoce como lectura de ficha:
+    debe contener literalmente `"name":"Read"` (JSON compacto, sin espacio
+    tras los dos puntos, como serializa el harness real) y `memory` en la ruta."""
     d = {'type': 'assistant', 'timestamp': ts,
          'message': {'content': [{'type': 'tool_use', 'name': 'Read', 'input': {'file_path': ruta_ficha}}]}}
     return json.dumps(d, separators=(',', ':'), ensure_ascii=False)

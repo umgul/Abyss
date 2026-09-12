@@ -1,28 +1,7 @@
 """Ayudas comunes para las pruebas de Abyss (ESPECIFICACION.md §6).
 
-No es un fichero de pruebas (no empieza por `test_`): `unittest discover` no lo
-recoge como caso, pero cada `test_*.py` lo importa para no repetir lo mismo:
-
-- `nuevo_proyecto()`: un directorio temporal que hace de `proj` — los transcripts
-  `.jsonl` van DIRECTAMENTE dentro (como hace Claude Code de verdad), y `memory/`
-  es una subcarpeta suya. Así `dirname(transcript_path) == proj` sin trucos, y
-  `rutas.es_mio()` acierta solo.
-- `entorno(proj)`: copia de `os.environ` con `ABYSS_PROYECTO=proj` (orden 4 de
-  `rutas.resolver()`), para los guiones que no reciben `transcript_path` por stdin.
-- `ejecutar(...)`: lanza `python <guion> <args>` como lo haría un gancho de Claude
-  Code, con `entrada` como stdin — SIEMPRE se pasa algo (por defecto `''`) para
-  que el proceso no se quede esperando un stdin real que nunca llega.
-- constructores de líneas de transcript sintéticas (`usuario`, `asistente_texto`,
-  `asistente_tool_use`, `usuario_tool_result`) y `sesion_simple()` para una sesión
-  mínima medible por `propiocepcion.medir()`.
-
-Los guiones de `abyss/` resuelven su carpeta de datos con `rutas.resolver()`
-(nunca `dirname(__file__)`, ESPECIFICACION.md §1); por eso aquí NUNCA se importan
-esos guiones directamente en el proceso de las pruebas (varios hacen
-`rutas.leer_stdin()`/`rutas.resolver()` nada más importarse y podrían abortar el
-proceso entero de `unittest`), siempre por subprocess, igual que los invocaría un
-gancho real.
-"""
+Los guiones de `abyss/` resuelven datos con `rutas.resolver()`, por eso aquí se
+invocan siempre por subprocess, nunca importados directamente en el proceso."""
 import sys
 import os
 import json
@@ -41,9 +20,8 @@ def script(nombre):
 
 
 def nuevo_proyecto():
-    """Directorio temporal que hace de `proj`: los transcripts `.jsonl` sintéticos
-    van directamente dentro (igual que Claude Code los deja bajo
-    `~/.claude/projects/<proyecto>/`), y `memory/` es una subcarpeta suya."""
+    """Directorio temporal que hace de `proj`: los `.jsonl` van directamente dentro
+    (como en `~/.claude/projects/<proyecto>/`), y `memory/` es una subcarpeta suya."""
     return Path(tempfile.mkdtemp(prefix='abyss_proj_'))
 
 
@@ -58,17 +36,9 @@ def entorno(proj, **extra):
 
 
 def ejecutar(ruta_script, args, env, entrada='', cwd=None, timeout=30):
-    """Lanza `python <ruta_script> <args...>`. `entrada` es el stdin (JSON en texto
-    del gancho, o '' si el guion no lo necesita) — se pasa siempre algo para que
-    `rutas.leer_stdin()` no se quede bloqueado esperando un terminal real.
-
-    `errors='replace'` en la decodificación: cada guion reconfigura SU stdout a
-    utf-8, pero no su stderr — un traceback sin capturar (justo lo que una prueba
-    de fallo quiere poder inspeccionar) puede salir en el `cp1252` de la consola
-    de Windows si lleva algún carácter no-ASCII en el código fuente (p. ej. `§`).
-    Sin `errors='replace'` eso revienta el propio `subprocess.run` con un
-    `UnicodeDecodeError` ANTES de devolver el `CompletedProcess`, y la prueba que
-    quería comprobar el mensaje de error se queda sin poder mirarlo."""
+    """Lanza `python <ruta_script> <args...>` con `entrada` como stdin (siempre algo,
+    por defecto '', para que `rutas.leer_stdin()` no bloquee). `errors='replace'`
+    evita un `UnicodeDecodeError` si el stderr trae un carácter no-ASCII (`§`) sobre la cp1252 de Windows."""
     return subprocess.run(
         [sys.executable, str(ruta_script)] + [str(a) for a in args],
         input=entrada, capture_output=True, text=True, encoding='utf-8', errors='replace',

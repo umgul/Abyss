@@ -1,27 +1,6 @@
-"""`gestos.py`: la regla del 1,7 para dedos extendidos, el
-pellizco/escala normalizados por percentiles 10/90 de la sesión, el servidor HTTP local, y
-el VOCABULARIO PROPIO (corrección del autor, 7-sep-2026): los dedos aíslan capas del
-despiece, el pellizco es el deslizador de explosión, la pose de la palma orbita la cámara,
-mano abierta y quieta captura PNG, dos manos escalan — nada del vocabulario del post citado
-(un dedo una flor, dos un aguacate, tres una calavera).
-
-`gestos.py` no llama a `rutas.resolver()` (vive/sirve mientras corre, como `taller.py`: sin
-mem, sin proyecto de Claude Code) — se puede importar DIRECTAMENTE en el proceso de la
-prueba. El caso "sin mediapipe" se prueba por subprocess, igual que `test_taller.py`
-prueba "sin diffusers" — pero SIN depender del inventario real de la máquina que ejecute
-la batería (MEDIDO el 7-sep-2026, tanda 5: `mediapipe` 1.0.1 puede estar instalado ahí y
-la prueba que asumía su ausencia fallaba, y peor, dejaba `gestos.py` llegar a abrir la
-cámara y levantar el servidor antes de reventar). Un `sitecustomize.py` propio antepuesto
-a `PYTHONPATH` bloquea `import mediapipe` en el PROCESO HIJO sin tocar el Python real
-(mismo método que `_entorno_con_modulos_bloqueados()` en
-`test_imagen_dependencias_opcionales.py`), y otro fabrica un `mediapipe` que importa pero
-sin `.solutions` (así mide el `mediapipe` 1.0.1 real en esta máquina) para probar que ESE
-camino también corta antes de tocar hardware. El caso "con mediapipe" (para las funciones
-que sí lo usan) inyecta un módulo `mediapipe` FALSO en `sys.modules` (con 21 puntos
-sintéticos por mano, una o dos) y recarga `gestos` para que su `import mediapipe as mp` lo
-recoja — se limpia siempre en `tearDown` para no dejar el módulo falso puesto para las
-demás pruebas de la suite completa.
-"""
+"""`gestos.py`: la regla del 1,7 para dedos extendidos, el pellizco/escala normalizados por
+percentiles 10/90 de la sesión, el servidor HTTP local, y su propio vocabulario (dedos =
+capas, pellizco = explosión, palma = órbita, mano quieta = PNG, dos manos = escala); no llama a `rutas.resolver()`, se importa directamente."""
 import importlib
 import json
 import os
@@ -146,10 +125,9 @@ class PellizcoPorPercentiles(unittest.TestCase):
 
 
 class VocabularioPropio(unittest.TestCase):
-    """El vocabulario se puede sustituir por fichero — `cargar_vocabulario()`
-    mezcla un JSON propio SOLO en las claves que declare, sobre `VOCABULARIO_POR_DEFECTO`,
-    y nunca copia el vocabulario del post (nada de "flor"/"aguacate"/"calavera" en ningún
-    sitio de este módulo)."""
+    """El vocabulario se puede sustituir por fichero: `cargar_vocabulario()` mezcla un
+    JSON propio solo en las claves que declare, sobre `VOCABULARIO_POR_DEFECTO` — nunca
+    copia el vocabulario del post (nada de "flor"/"aguacate"/"calavera")."""
 
     def test_sin_fichero_da_los_valores_por_defecto(self):
         v = gestos.cargar_vocabulario(None)
@@ -309,9 +287,8 @@ class ServidorSoloEnLoopback(unittest.TestCase):
 
 def _entorno_sin_mediapipe(env_base):
     """`sitecustomize.py` propio antepuesto a `PYTHONPATH` que bloquea `import mediapipe`
-    SIEMPRE en el proceso hijo, sin importar si esta máquina lo tiene instalado o no
-    (mismo método que `_entorno_con_modulos_bloqueados()` en
-    `test_imagen_dependencias_opcionales.py` — el Python real no se toca)."""
+    siempre en el proceso hijo, sin importar si esta máquina lo tiene instalado (el
+    Python real no se toca)."""
     bloqueo_dir = Path(tempfile.mkdtemp(prefix='abyss_sin_mediapipe_'))
     (bloqueo_dir / 'sitecustomize.py').write_text(textwrap.dedent('''
         import sys
@@ -332,11 +309,9 @@ def _entorno_sin_mediapipe(env_base):
 
 
 def _entorno_con_mediapipe_roto(env_base):
-    """`sitecustomize.py` propio que deja en `sys.modules` un `mediapipe` que IMPORTA sin
-    error pero sin atributo `solutions` — así mide esta tanda (7-sep-2026) el `mediapipe`
-    1.0.1 real instalado en la máquina (`AttributeError: module 'mediapipe' has no
-    attribute 'solutions'` dentro de `crear_detector()`). El Python real no se toca: solo
-    el proceso hijo ve este módulo falso."""
+    """`sitecustomize.py` propio que deja en `sys.modules` un `mediapipe` que importa sin
+    error pero sin atributo `solutions` (como un `mediapipe` real roto, que reventaría con
+    `AttributeError` dentro de `crear_detector()`). El Python real no se toca."""
     bloqueo_dir = Path(tempfile.mkdtemp(prefix='abyss_mediapipe_roto_'))
     (bloqueo_dir / 'sitecustomize.py').write_text(textwrap.dedent('''
         import sys
@@ -360,8 +335,8 @@ class GestosSinMediapipeCLI(unittest.TestCase):
         self.assertIn('pip install', r.stdout)
         self.assertNotIn('Traceback', r.stdout)
         self.assertNotIn('Traceback', r.stderr)
-        # falsador: sin mediapipe, la CLI corta ANTES de tocar cámara o servidor (regla
-        # dura de esta tanda: nada de encender webcam/levantar HTTP sin la dependencia).
+        # sin mediapipe, la CLI debe cortar antes de tocar cámara o servidor: nada de
+        # encender webcam ni levantar HTTP sin la dependencia.
         self.assertNotIn('escuchando en http', r.stdout)
         self.assertNotIn('calibrando', r.stdout)
 
@@ -371,12 +346,9 @@ class GestosSinMediapipeCLI(unittest.TestCase):
 
 
 class GestosMediapipeRotoCLI(unittest.TestCase):
-    """Falsador del hallazgo de la tanda 5 (7-sep-2026): `mediapipe` 1.0.1 en la máquina
-    real IMPORTA pero no trae `.solutions`. Antes del arreglo, `main()` solo comprobaba
-    `mp is None` (verdadero solo si el import falla) y seguía adelante hasta abrir la
-    cámara y levantar el servidor con un mediapipe inservible, reventando recién entonces
-    en `crear_detector()` — justo lo que la regla dura de esta tanda prohíbe. Aquí se
-    inyecta ESE mediapipe roto por subprocess y se comprueba que la CLI corta antes."""
+    """`mediapipe` puede importar sin error pero sin `.solutions` (un mediapipe real roto):
+    `main()` debe cortar ANTES de abrir cámara o levantar el servidor, no solo comprobar
+    `mp is None` (que solo es cierto si el import falla)."""
 
     def test_sale_con_2_sin_abrir_camara_ni_servidor(self):
         env = _entorno_con_mediapipe_roto(dict(os.environ))
@@ -459,12 +431,9 @@ def _quitar_mediapipe_falso():
 
 
 class ModuloFalsoIntegracion(unittest.TestCase):
-    """Segunda prueba declarada, literal: "un módulo falso inyectado en
-    sys.modules con 21 puntos sintéticos" ejercitando la regla del 1,7 y el pellizco por
-    percentiles 10/90 a través del camino REAL (`crear_detector().process(...)` ->
-    `manos_de_resultado()` -> `dedos_extendidos()`/`apertura_pellizco_bruta()`), no solo
-    las funciones puras sueltas (esas están en `ReglaDelUnoSiete`/`PellizcoPorPercentiles`,
-    sin necesitar ningún mediapipe, falso o real)."""
+    """Un módulo falso inyectado en `sys.modules` con 21 puntos sintéticos ejercita la
+    regla del 1,7 y el pellizco por percentiles 10/90 por el camino real
+    (`crear_detector().process(...)` -> `manos_de_resultado()` -> `dedos_extendidos()`)."""
 
     def tearDown(self):
         # Nunca dejar el `mediapipe` falso puesto para el resto de la suite: se quita y se
@@ -549,10 +518,9 @@ class ModuloFalsoIntegracion(unittest.TestCase):
 
 
 class GestoAMediasNoCambiaLaEscena(unittest.TestCase):
-    """Cuarta prueba declarada: "un gesto a medias NO cambia la escena".
-    `procesar_fotograma([], ...)` (sin ninguna mano completa) da `None`, y el bucle de
-    `main()` deja entonces el `estado` servido TAL CUAL — se comprueba aquí simulando ese
-    contrato: aplicar un `None` nunca debe machacar el último estado bueno."""
+    """`procesar_fotograma([], ...)` (sin ninguna mano completa) da `None`; el bucle de
+    `main()` deja el `estado` servido tal cual. Aplicar un `None` nunca debe machacar el
+    último estado bueno."""
 
     def test_sin_manos_completas_da_none_y_el_llamador_no_toca_el_estado(self):
         norm_p, norm_e = gestos.NormalizadorPercentil(), gestos.NormalizadorPercentil()

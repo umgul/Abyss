@@ -89,16 +89,14 @@ class ImagenPintarCLI(unittest.TestCase):
         self.assertFalse(list(proj.glob('*_pintada.png')))
 
     def test_proyecto_no_acaba_como_fichero_de_salida(self):
-        """Falsador (ESPECIFICACION.md §... medido 6-sep, item 2 de la tarea B): tras
-        resolver `proj`/`mem` con `--proyecto <cwd>`, `imagen.py` solo quitaba de
-        `resto` la bandera `--proyecto`, no su valor — así que el parser de `pintar`
-        confundía ese valor suelto con la ruta de salida (`args[1]` sin `--`).
-        Corregido: se quitan la bandera Y su valor juntos."""
+        """El valor de `--proyecto` no debe colarse como ruta de salida de `pintar`."""
         proj = ay.nuevo_proyecto()
+        home_falso = ay.nuevo_proyecto()
         foto = _foto_sintetica(proj / 'foto_sintetica.png')
         marcador = 'marcador-de-proyecto-de-prueba'
         env = ay.entorno(proj)
         env.pop('ABYSS_PROYECTO', None)  # fuerza la resolución por --proyecto (orden 3 de rutas.resolver)
+        env['HOME'] = env['USERPROFILE'] = str(home_falso)  # el proyecto marcador nace bajo un HOME desechable
 
         r = ay.ejecutar(ay.script('imagen.py'),
                          ['pintar', str(foto), '--ancho', '40', '--proyecto', marcador],

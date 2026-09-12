@@ -1,13 +1,6 @@
-"""Falsador del arreglo de `pintor.py` (arreglo «--html ignora el
-papel y el alfa del estilo»): antes de este arreglo, la plantilla `_HTML` de `--html` pintaba
-SIEMPRE `borra()` sobre `#080607` (el fondo fijo de "oleo") y con alfa 1, sin mirar el `"papel"`
-ni el `"alfa"` que el propio `.json.gz` ya guarda y que `video_pintura.py` sí respeta —
-medido con `pintor.py sintetica.png --estilo tinta --html`: papel del cuadro `#ffffff`, página con
-`#080607`. Lo mismo vale para carbon, acuarela, pastel e impresionista (papeles claros).
-
-Importa `pintor` directamente en el proceso de la prueba, como `test_pintor_estilos.py` y
-`test_pintor_acabado_suave.py` (no toca `rutas.resolver()` ni conoce `mem`).
-"""
+"""`--html` de `pintor.py` debe pintar sobre el papel y el alfa propios del estilo (los
+que ya guarda el `.json.gz`), no siempre sobre el fondo fijo de oleo (#080607, alfa 1).
+Importa `pintor` directamente en el proceso: no toca `rutas.resolver()` ni conoce `mem`."""
 import sys
 import os
 import re
@@ -26,7 +19,7 @@ try:
 except ImportError:
     Image = pintor = None
 
-# estilos cuyo papel NO es el fondo oscuro de oleo (#08 06 07) — los afectados por el fallo
+# estilos cuyo papel no es el fondo oscuro de oleo (#080607)
 ESTILOS_PAPEL_CLARO = ("impresionista", "acuarela", "pastel", "carbon", "tinta")
 
 
@@ -72,7 +65,6 @@ class HtmlUsaElPapelYElAlfaDelEstilo(unittest.TestCase):
             self.assertNotEqual(papel_esperado, '#080607',
                                  f'{estilo}: la tabla del estilo debe tener un papel distinto del de oleo '
                                  f'para que esta prueba falsara el fallo original')
-            # el fondo oscuro fijo de oleo no debe colarse en la página de un estilo de papel claro
             self.assertNotIn('#080607', texto,
                               f'{estilo}: la página no debe seguir usando el fondo fijo de oleo')
 
@@ -89,8 +81,7 @@ class HtmlUsaElPapelYElAlfaDelEstilo(unittest.TestCase):
                        'con alfa < 1 la plantilla debe componer la capa con globalAlpha, no dibujar directo')
 
     def test_html_de_oleo_no_cambia_de_papel_ni_de_alfa(self):
-        # oleo es el único estilo cuyo papel YA coincidía con el fondo fijo anterior: el arreglo
-        # no debe alterar su resultado.
+        # oleo es el único estilo cuyo papel coincide con el fondo fijo (#080607)
         r = self._pintar('oleo')
         papel_html, alfa_html, _texto = _leer_papel_alfa_html(r['html'])
         self.assertEqual(papel_html, '#080607')

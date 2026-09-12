@@ -26,11 +26,8 @@ class VarasIndexRecortaSinBorrar(unittest.TestCase):
 
         NUM_FILLER = 320
         TARGET_INDEX = 150  # 0-based dentro de `lineas`; línea 1-based = TARGET_INDEX + 1
-        # Cabecera GENÉRICA a propósito (no la literal de ningún índice concreto):
-        # la leyenda debe insertarse tras la primera línea que empiece por '# ',
-        # sea cual sea su texto — si el fixture usara la cadena fija de un
-        # MEMORY.md real, la prueba mediría de mentira (mediría el fixture, no
-        # la regla general).
+        # cabecera genérica a propósito (no la de un MEMORY.md real): la leyenda se
+        # inserta tras la primera línea que empiece por '# ', sea cual sea su texto.
         lineas = ['# Mi memoria', '> Varas: placeholder']
         lineas += [f'línea de relleno número {i:03d} para engordar el fichero de pruebas '
                    'y superar el límite sin tocar nada más aquí.' for i in range(NUM_FILLER)]
@@ -45,8 +42,7 @@ class VarasIndexRecortaSinBorrar(unittest.TestCase):
         n_lineas_antes = len(contenido.split('\n'))
 
         env = ay.entorno(proj)
-        # --recortar explícito: el recorte ya NO ocurre en el pase automático
-        # (ESPECIFICACION.md §2.3 revisado) — sin la bandera solo avisaría.
+        # --recortar explícito: sin la bandera solo avisaría, no recorta (ESPECIFICACION.md §2.3)
         r = ay.ejecutar(ay.script('varas.py'), ['--index', '--recortar'], env)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn('recortadas', r.stdout)
