@@ -64,7 +64,11 @@ class InstaladorCopiaLaSkill(unittest.TestCase):
 
         destino = self.skills_dir / 'esceptico' / 'SKILL.md'
         self.assertTrue(destino.is_file(), 'debe haber copiado SKILL.md a <skills-dir>/esceptico/')
-        self.assertIn('abyss-managed: true', destino.read_text(encoding='utf-8'))
+        texto = destino.read_text(encoding='utf-8')
+        self.assertIn('abyss-managed: true', texto)
+        # copiada fuera del sistema de plugins, la skill no puede depender de CLAUDE_PLUGIN_ROOT
+        self.assertNotIn('${CLAUDE_PLUGIN_ROOT}', texto)
+        self.assertIn(self.inst.RAIZ.replace(os.sep, '/') + '/abyss/', texto)
 
         # no debe haber tocado settings.json: esceptico no lleva gancho ni clave
         self.assertFalse(self.settings_ruta.exists())

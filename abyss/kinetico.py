@@ -43,6 +43,7 @@ import math
 import os
 import shutil
 import sys
+import tempfile
 
 try:                       # la consola de Windows y la salida tienen que hablar
     from . import consola  # el mismo idioma: ver abyss/consola.py
@@ -523,7 +524,7 @@ def _cli(argv):
     def valor(bandera, defecto=None):
         return resto[resto.index(bandera) + 1] if bandera in resto and resto.index(bandera) + 1 < len(resto) else defecto
 
-    salida = valor("--salida") or os.path.join(os.getcwd(), "kinetico_montado")
+    salida = valor("--salida") or os.path.join(tempfile.gettempdir(), "abyss", "kinetico_montado")
     tope = int(valor("--tope", TOPE))
     hondura = int(valor("--hondura", 2))
     if modo == "arbol":

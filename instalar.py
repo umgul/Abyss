@@ -1706,6 +1706,18 @@ def _copiar_skill(carpeta_skill, skills_dir):
     if os.path.isdir(destino):
         shutil.rmtree(destino)
     shutil.copytree(origen, destino)
+    # Fuera del sistema de plugins nadie define CLAUDE_PLUGIN_ROOT: se escribe la ruta real.
+    raiz = RAIZ.replace(os.sep, '/')
+    for carpeta, _, ficheros in os.walk(destino):
+        for nombre in ficheros:
+            if not nombre.endswith('.md'):
+                continue
+            ruta = os.path.join(carpeta, nombre)
+            with open(ruta, encoding='utf-8') as fh:
+                texto = fh.read()
+            if '${CLAUDE_PLUGIN_ROOT}' in texto:
+                with open(ruta, 'w', encoding='utf-8', newline='') as fh:
+                    fh.write(texto.replace('${CLAUDE_PLUGIN_ROOT}', raiz))
     return destino
 
 
