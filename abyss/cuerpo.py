@@ -1,66 +1,25 @@
 # -*- coding: utf-8 -*-
-"""Cuerpo: el hardware de la máquina donde corro, con normal propia.
+"""Cuerpo: el hardware de la máquina donde se ejecuta, con normal propia.
 
-Seis canales, cada uno en SU PROPIA función de lectura (para poder simular cada
-instrumento por separado en las pruebas, con `unittest.mock.patch`, sin tocar los
-demás):
+Seis canales, cada uno en su propia función (`leer_cpu`, `leer_ram_libre`,
+`leer_disco_libre`, `leer_gpu`, `leer_bateria` — vram y temperatura de la misma llamada a
+`nvidia-smi`), por el instrumento nativo de Windows/Linux/macOS. Canal ausente o que
+falla: `None`, nunca 0 (un 0% real y "sin instrumento" no son la misma información).
 
-    leer_cpu()          % de uso de CPU ahora mismo.
-    leer_ram_libre()     RAM libre, en MB.
-    leer_disco_libre(mem) GB libres en el disco que contiene `mem` (`shutil.disk_usage`,
-                          biblioteca estándar: no hace falta comando externo).
-    leer_gpu()           (vram_libre_MiB, temperatura_gpu) de UNA sola llamada a
-                          `nvidia-smi --query-gpu=memory.used,memory.total,temperature.gpu
-                          --format=csv,noheader,nounits` — vram y temperatura salen del
-                          mismo comando, así que comparten función. Sin `nvidia-smi`
-                          instalado (o sin GPU NVIDIA): `(None, None)`.
-    leer_bateria()        (porcentaje, cargando) de la batería. Sin batería (equipo de
-                          sobremesa) o sin instrumento: `(None, None)`.
+Arranque en frío (ESPECIFICACION.md §2.2): cada medida se apunta en `mem/cuerpo.jsonl`
+(línea JSON, ts + los seis canales); con `UMBRAL_FRIO` (8) medidas previas con dato, ese
+canal se lee contra sus propios cuantiles p5/p50/p95 — con menos, «sin vara todavía»,
+siempre contra el historial ANTERIOR a la medida actual.
 
-Windows: RAM por `ctypes` (`GlobalMemoryStatusEx`); CPU por PowerShell
-(`Get-CimInstance Win32_Processor`, media de `LoadPercentage`) con `wmic` de
-respaldo si PowerShell falla; batería por PowerShell sobre `Win32_Battery`.
-Linux: `/proc/meminfo` (RAM), `os.getloadavg()`/`/proc/loadavg` (CPU),
-`/sys/class/power_supply/BAT*` (batería). macOS: `vm_stat` (RAM), `os.getloadavg()`
-(CPU), `pmset -g batt` (batería). CUALQUIER instrumento ausente o que falle
-devuelve `None` (nunca 0: un 0% de batería medido de verdad y una batería que no
-existe no son la misma información) — fail-closed, [[verificar-antes-de-construir]].
+Ganchos (los registra `instalar.py`, no este módulo): `--arranque` (SessionStart) imprime
+la medida; `--despertar` (UserPromptSubmit) solo si algún canal sale de su p5–p95 propio,
+y solo mide, nunca ordena nada. Ambos callan si `rutas.es_mio()` no reconoce el proyecto.
+CLI manual: `python cuerpo.py [--historial [n]] [--json]`.
 
-Normal propia (arranque en frío, ESPECIFICACION.md §2.2): cada medida se apunta en
-`mem/cuerpo.jsonl` (una línea JSON por medida: ts + los seis canales). Con al menos
-`UMBRAL_FRIO` (8) medidas PREVIAS con dato en un canal, ese canal se lee contra sus
-propios cuantiles (p5, p50, p95); con menos, la línea dice «sin vara todavía
-(n=…)» y no se inventa ningún corte. La vara de cada medida se calcula SIEMPRE
-contra el historial ANTERIOR a ella (nunca incluyéndose a sí misma).
-
-Ganchos (registrados por `instalar.py`, no por este módulo):
-    --arranque  (SessionStart): imprime `{"hookSpecificOutput": {...}}` con una
-                línea `[cuerpo] cpu … · ram libre … · disco libre … · vram libre …
-                · temp gpu … · batería …`.
-    --despertar (UserPromptSubmit): SOLO imprime algo si algún canal de la medida
-                de AHORA cae fuera de su p5–p95 propio; si todo está dentro de lo
-                suyo, silencio total (no hay JSON que imprimir). Nunca ordena nada
-                (no cierra procesos, no baja modelos, no sugiere nada): mide, y
-                quien lo lea decide.
-Los dos ganchos se callan (sin imprimir nada, código 0) si `rutas.es_mio()` no
-reconoce el `transcript_path`/`cwd` del JSON de stdin como de este proyecto.
-
-CLI manual: `python cuerpo.py` (una medida, se guarda, se imprime la línea),
-`--historial [n]` (últimas n medidas guardadas, 20 por defecto), `--json` (la
-salida como JSON en vez de texto; combinable con `--historial`).
-
-Nada de esto sale de la máquina: no hay ninguna llamada de red en todo el módulo.
-
-Diseño deliberado para las pruebas: a diferencia de otros guiones de `abyss/`
-(`continuidad.py`, `vigia.py`…) que resuelven `proj`/`mem` nada más importarse,
-ESTE módulo no toca `rutas.resolver()` ni stdin al importarse — todas las
-funciones de arriba son puras (reciben `mem`/`hist` como argumento) y se pueden
-llamar directamente desde una prueba con instrumentos monkeypatcheados, sin
-lanzar un subproceso. Solo el bloque `if __name__ == '__main__':` resuelve
-`proj`/`mem` y lee stdin, para el uso real como gancho o CLI.
-
-Carpeta de datos: NUNCA `dirname(__file__)`; la resuelve `rutas.resolver()` (§1 de
-ESPECIFICACION.md) — solo dentro de `__main__`, ver arriba.
+Sin red: ningún canal ni gancho sale de la máquina. No toca `rutas.resolver()` ni stdin
+al importarse (funciones puras, sin lanzar subproceso desde una prueba); solo `__main__`
+resuelve `proj`/`mem`, siempre por `rutas.resolver()` (§1 ESPECIFICACION.md), nunca
+`dirname(__file__)`.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -97,12 +56,10 @@ ORDEN_CANALES = tuple(CANAL_INFO)
 # ---------- lectura de instrumentos (una función por instrumento) ----------
 
 def leer_cpu():
-    """% de uso de CPU ahora mismo. Windows: PowerShell sobre Win32_Processor
-    (media de LoadPercentage entre núcleos/sockets), con `wmic cpu get
-    loadpercentage` de respaldo si PowerShell falla. Linux/macOS:
-    `os.getloadavg()[0]` (carga a 1 minuto) entre `os.cpu_count()`, como
-    aproximación declarada — no es un % de uso instantáneo tal cual, es carga
-    media reciente por núcleo. Sin instrumento: None, nunca 0."""
+    """% de uso de CPU ahora mismo. Windows: PowerShell sobre `Win32_Processor`, con
+    `wmic` de respaldo si PowerShell falla. Linux/macOS: `os.getloadavg()[0]` entre
+    `os.cpu_count()` — carga media reciente por núcleo, no un % instantáneo. Sin
+    instrumento: `None`, nunca 0."""
     if os.name == 'nt':
         try:
             r = subprocess.run(
@@ -132,9 +89,9 @@ def leer_cpu():
 
 
 class _MemoryStatusEx:
-    """Envoltorio perezoso de MEMORYSTATUSEX: importar `ctypes` cuesta poco pero
-    definir la estructura a nivel de módulo en un guion que también corre en
-    Linux/macOS no aporta nada; se define solo si `leer_ram_libre()` la necesita."""
+    """Envoltorio perezoso de MEMORYSTATUSEX: se define solo si `leer_ram_libre()` la
+    necesita, para no cargar la estructura en un guion que también corre en
+    Linux/macOS."""
     _cls = None
 
     @classmethod
@@ -155,11 +112,9 @@ class _MemoryStatusEx:
 
 
 def leer_ram_libre():
-    """RAM libre en MB. Windows: `ctypes.windll.kernel32.GlobalMemoryStatusEx`
-    (`ullAvailPhys`). Linux: `/proc/meminfo` (`MemAvailable`, o `MemFree` si el
-    kernel no trae `MemAvailable`). macOS: `vm_stat` (páginas libres + inactivas
-    por el tamaño de página que el propio `vm_stat` declara). Sin instrumento:
-    None."""
+    """RAM libre en MB. Windows: `GlobalMemoryStatusEx`. Linux: `/proc/meminfo`
+    (`MemAvailable`, o `MemFree` si el kernel no lo trae). macOS: `vm_stat` (páginas
+    libres + inactivas por su propio tamaño de página). Sin instrumento: `None`."""
     if os.name == 'nt':
         try:
             import ctypes
@@ -212,11 +167,9 @@ def leer_disco_libre(mem):
 
 
 def leer_gpu():
-    """(vram_libre_MiB, temperatura_gpu) de UNA llamada a `nvidia-smi
-    --query-gpu=memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits`
-    (primera GPU si hay varias). Sin `nvidia-smi` en el PATH (no está instalado o
-    no hay GPU NVIDIA): `(None, None)` — nunca 0, que sería indistinguible de una
-    GPU llena de verdad."""
+    """(vram_libre_MiB, temperatura_gpu) de una llamada a `nvidia-smi --query-gpu=...`
+    (primera GPU si hay varias). Sin `nvidia-smi` en el PATH: `(None, None)` — nunca 0,
+    que sería indistinguible de una GPU llena de verdad."""
     try:
         r = subprocess.run(
             ['nvidia-smi', '--query-gpu=memory.used,memory.total,temperature.gpu',
@@ -232,11 +185,9 @@ def leer_gpu():
 
 
 def leer_bateria():
-    """(porcentaje, cargando) de la batería. Windows: PowerShell sobre
-    `Win32_Battery` (`EstimatedChargeRemaining`, `BatteryStatus` — 6/7/8/9 son los
-    cuatro estados de "cargando" de WMI). Linux:
-    `/sys/class/power_supply/BAT*/{capacity,status}`. macOS: `pmset -g batt`. Sin
-    batería (equipo de sobremesa) o sin instrumento: `(None, None)`."""
+    """(porcentaje, cargando) de la batería. Windows: `Win32_Battery` (`BatteryStatus`
+    6/7/8/9 = cargando). Linux: `/sys/class/power_supply/BAT*/{capacity,status}`. macOS:
+    `pmset -g batt`. Sin batería o sin instrumento: `(None, None)`."""
     if os.name == 'nt':
         try:
             r = subprocess.run(
@@ -349,13 +300,10 @@ def cuantiles(canal, hist):
 
 
 def _valor_fmt(canal, v, con_unidad=True):
-    """Texto del valor de `canal`, con COMA decimal (castellano: lo pide el
-    ejemplo literal «ram libre 9,8 GB»; `infografia.py` ya trae `--es`/
-    `--no-es` para esto mismo en otra pieza de la misma tanda). Sin
-    agrupación de miles: ningún canal de `cuerpo.py` llega a esa magnitud, así
-    que un `.` -> `,` directo sobre el número ya formateado basta y no hace
-    falta tirar de `infografia.formatear_numero()` (que sí agrupa miles) para
-    no acoplar un módulo con el otro."""
+    """Texto del valor de `canal`, con coma decimal (castellano). Sin agrupación de
+    miles: ningún canal de `cuerpo.py` llega a esa magnitud, así que no hace falta
+    `infografia.formatear_numero()` (que sí agrupa) y así no se acopla un módulo con el
+    otro."""
     if v is None:
         return 'sin dato'
     _, div, unidad, dec = CANAL_INFO[canal]
@@ -366,19 +314,17 @@ def _valor_fmt(canal, v, con_unidad=True):
 
 
 def evaluar(medida, hist_previo):
-    """[(canal, valor, 'p5'|'p95', límite)] de los canales de `medida` que caen
-    FUERA de su p5–p95 medido sobre `hist_previo` (el historial ANTERIOR a esta
-    medida, nunca incluyéndola). Un canal sin dato, o sin vara todavía (menos de
-    `UMBRAL_FRIO` medidas previas con dato en ESE canal), no puede violar nada:
-    no entra en la lista. Lista vacía = silencio del gancho de prompt."""
+    """[(canal, valor, 'p5'|'p95', límite)] de los canales de `medida` fuera de su
+    p5–p95 sobre `hist_previo` (el historial ANTERIOR, nunca incluyéndola). Un canal
+    sin dato o sin vara todavía no entra en la lista. Lista vacía = silencio del
+    gancho de prompt."""
     salidas = []
     for canal in ORDEN_CANALES:
         v = medida.get(canal)
         if v is None or canal == 'bateria_pct':
-            # la batería fluctúa por diseño entre "cargando" y "descargando": un
-            # p5-p95 de su propio historial no dice nada útil de su estado normal
-            # (bajaría de p5 cada vez que se desconecta el cargador, algo normal,
-            # no una anomalía). Se muestra en el arranque, no se vigila aquí.
+            # la batería fluctúa por diseño entre "cargando" y "descargando": su propio
+            # p5-p95 no dice nada útil del estado normal (bajaría cada vez que se
+            # desconecta el cargador). Se muestra en el arranque, no se vigila aquí.
             continue
         c = cuantiles(canal, hist_previo)
         if not c:
@@ -509,9 +455,9 @@ if __name__ == '__main__':
             n = 20
         hist_completo = historial(mem)
         hist = hist_completo[-n:] if n > 0 else []
-        # la vara de cada medida se calcula SIEMPRE contra el historial ANTERIOR a
-        # ella (docstring de texto_arranque): pasar [] aquí hacía que TODAS las filas
-        # mintieran «sin vara todavía (n=0)» aunque el proyecto sí tuviera vara.
+        # la vara de cada medida se calcula SIEMPRE contra el historial ANTERIOR a ella:
+        # se pasa `hist_completo[:offset+i]`, no `[]`, para no perder la vara ya
+        # existente del proyecto en cada fila listada.
         offset = len(hist_completo) - len(hist)
         if '--json' in argv:
             print(json.dumps(hist, ensure_ascii=False, indent=1))

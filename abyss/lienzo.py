@@ -50,55 +50,44 @@ corta que el resto si no hay bastantes imágenes para llenarla del todo.
 recorrido (0 = desde el propio centro/borde opuesto, 1 = solo el borde extremo). Para cabeceras
 y portadas: pon el texto donde ya no queda foto, solo color.
 
-`restaurar`: reduce ruido PRIMERO (antes de tocar niveles: estirar el contraste de una foto sin
-quitarle antes el grano amplifica el grano tanto como el contraste — fallo MEDIDO 7-sep: con el
-orden viejo, el ruido de una foto real subía de 43.69 a 83.88, casi el doble, mientras el
-"restaurar" se anunciaba como si hubiera mejorado), con fuerza proporcional al ruido medido a la
-entrada (`cv2.fastNlMeansDenoisingColored` si hay OpenCV, con `h` derivado de esa medida — sin
-OpenCV, mediana 3×3 de Pillow, dos pasadas si el ruido de entrada es alto), niveles automáticos
-por percentil 1-99 de cada canal (estira el contraste sin saturar por un pico o un valle
-aislado), corrección de dominante de color (lleva la media de los tres canales a un gris medio
-común — corrige un viraje amarillento/azulado uniforme, NO un balance de blancos con luces
-mixtas, y NO recupera el tono original de la foto: solo la lleva a neutro), arañazos opcionales
-con `cv2.inpaint` sobre una máscara heurística (líneas finas cuyo valor se aparta mucho de una
-mediana local — sin OpenCV, `--sin-aranazos` avisa y se salta ese paso), y una pasada final de
-nitidez por máscara de desenfoque (`--nitidez`, 0 = ninguna). Imprime SIEMPRE antes/después:
-contraste (desviación típica de la luminancia) y ruido estimado con una vara que NO cambia de
-escala con el contraste (percentil 20 de la desviación típica LOCAL en bloques fijos de 8×8 px
-sobre luminancia 0-255 — el percentil bajo aísla los bloques sin apenas detalle, donde cualquier
-variación que quede es ruido, no textura de la escena; un bloque fijo, a diferencia de un umbral
-de gradiente, no se corre cuando el contraste cambia, así que antes/después son comparables). Si
-pese a todo el ruido medido no baja, lo dice ("ruido no reducido") en vez de imprimir la subida
-como si fuera un logro (JSON: `ruido_reducido`) — MEDIDO en desarrollo: `--nitidez` (por defecto
+`restaurar`: reduce ruido PRIMERO, antes de tocar niveles (estirar el contraste de una foto sin
+quitarle antes el grano amplifica el grano tanto como el contraste), con fuerza proporcional al
+ruido medido a la entrada (`cv2.fastNlMeansDenoisingColored` si hay OpenCV, con `h` derivado de
+esa medida — sin OpenCV, mediana 3×3 de Pillow, dos pasadas si el ruido de entrada es alto),
+niveles automáticos por percentil 1-99 de cada canal (estira el contraste sin saturar por un
+pico o un valle aislado), corrección de dominante de color (lleva la media de los tres canales a
+un gris medio común — corrige un viraje amarillento/azulado uniforme, NO un balance de blancos
+con luces mixtas, y NO recupera el tono original de la foto: solo la lleva a neutro), arañazos
+opcionales con `cv2.inpaint` sobre una máscara heurística (líneas finas cuyo valor se aparta
+mucho de una mediana local — sin OpenCV, `--sin-aranazos` avisa y se salta ese paso), y una
+pasada final de nitidez por máscara de desenfoque (`--nitidez`, 0 = ninguna). Imprime SIEMPRE
+antes/después: contraste (desviación típica de la luminancia) y ruido estimado con una vara que
+NO cambia de escala con el contraste (percentil 20 de la desviación típica LOCAL en bloques
+fijos de 8×8 px sobre luminancia 0-255 — el percentil bajo aísla los bloques sin apenas detalle,
+donde cualquier variación que quede es ruido, no textura de la escena; un bloque fijo, a
+diferencia de un umbral de gradiente, no se corre cuando el contraste cambia, así que
+antes/después son comparables). Si el ruido medido no baja, lo dice ("ruido no reducido") en vez
+de imprimir la subida como si fuera un logro (JSON: `ruido_reducido`): `--nitidez` (por defecto
 1.0) afila amplificando cualquier detalle fino que quede tras el denoise, ruido incluido, y en
 fotos con poco margen puede devolverlo por encima de la entrada; es un efecto DISTINTO del que
-arregla este mismo fallo (el orden ruido-antes-que-niveles), y el aviso ("ruido no reducido")
-existe justo para decirlo cuando pasa, no para ocultarlo. Límite declarado y no sorteado aquí:
-esto NO reconstruye caras ni detalle que la foto ya perdió — eso pide un modelo generativo, y esta
-pieza no tiene ninguno.
+arregla el orden ruido-antes-que-niveles, y el aviso existe justo para decirlo cuando pasa, no
+para ocultarlo. Límite declarado y no sorteado aquí: esto NO reconstruye caras ni detalle que la
+foto ya perdió — eso pide un modelo generativo, y esta pieza no tiene ninguno.
 
 `numeros` ("pintar por números"): cuantiza a `--colores` tonos (Pillow `quantize`, corte de
 mediana, sobre la foto ya suavizada con una mediana 3×3); ANTES de agrupar en zonas, un segundo
 filtro de MODA (radio proporcional al ancho, `ancho/150`: cada píxel pasa al tono más frecuente
 de su vecindad) limpia el ruido sal-y-pimienta y los píxeles sueltos que deja la cuantización —
-sin este paso, cada mota de ruido nace como su propia zona (fallo MEDIDO 7-sep: una foto real de
-768×768 daba 24157 zonas con `--colores 12 --ancho 1200`, y 16255 con `--colores 8 --ancho 1200
---min-zona 400` — un libro de pintar por números de verdad tiene decenas o cientos de zonas, no
-miles). Agrupa en zonas conexas de un mismo tono (con `cv2.connectedComponents` si hay OpenCV —
-rápido —; si no, unión-búsqueda propia en Python puro — MUCHO más lenta en fotos grandes,
-declarado, no medido a esa escala aquí); cada zona de menos de `--min-zona` píxeles se FUNDE con
-la zona vecina con la que comparte más frontera, repitiendo hasta que no quede ninguna (antes,
-`--min-zona` solo descartaba el número sin fundir la zona, así que el contorno seguía lleno de
-islas); el recuento de `zonas` que devuelve es el de DESPUÉS de fundir. `--min-zona`, si no se
-da, sale proporcional al área ya redimensionada (0,05 % del lienzo, con un suelo de 20 px) en vez
-de un número fijo — medido con la foto real de arriba (768×768, `--colores 12 --ancho 1200`, sin
-`--min-zona`): 208 zonas, por debajo de las mil, cifra de ESA foto, no una ley. Dibuja el
+sin este paso, cada mota de ruido nace como su propia zona, y un libro de pintar por números de
+verdad tiene decenas o cientos de zonas, no miles. Agrupa en zonas conexas de un mismo tono (con
+`cv2.connectedComponents` si hay OpenCV — rápido —; si no, unión-búsqueda propia en Python puro
+— MUCHO más lenta en fotos grandes); cada zona de menos de `--min-zona` píxeles se FUNDE con la
+zona vecina con la que comparte más frontera, repitiendo hasta que no quede ninguna; el recuento
+de `zonas` que devuelve es el de DESPUÉS de fundir. `--min-zona`, si no se da, sale proporcional
+al área ya redimensionada (0,05 % del lienzo, con un suelo de 20 px) en vez de un número fijo,
+para que el umbral escale con el tamaño de la foto en vez de ser una cifra arbitraria. Dibuja el
 contorno entre zonas y numera con la cifra de su color las zonas que quedan, y añade al pie del
-PNG-plantilla la paleta numerada. Escribe dos ficheros — el nombre depende de si se da
-`--salida` (fallo "roza" medido 7-sep: antes esto decía siempre
-`<base>_numeros_plantilla.png`/`<base>_numeros_color.png`, pero con `--salida <base>` explícito
-el `_numeros` NO se añade, así que salían `<base>_plantilla.png`/`<base>_color.png` y quien
-siguiera el docstring al pie de la letra buscaba un fichero que no existía): sin `--salida`,
+PNG-plantilla la paleta numerada. Escribe dos ficheros: sin `--salida`,
 `<foto>_numeros_plantilla.png` y `<foto>_numeros_color.png` (junto a la foto de entrada); con
 `--salida <base>`, `<base>_plantilla.png` y `<base>_color.png` (el `<base>` tal cual, sin
 `_numeros` de más). Límite: el número de entradas de la paleta es el de tonos que de verdad
@@ -114,19 +103,17 @@ y cuál se usó — sin OpenCV, "sin dato: pip install opencv-python", código 2
 taller`, mandando la imagen y la máscara a un servidor local que hable `POST /sdapi/v1/img2img`
 con máscara (estilo A1111 — por ejemplo, `taller.py` con esa ruta añadida, o un A1111/Forge real)
 — la URL sale de `taller_url` en `<memoria>/imagen_config.json` (NUNCA en el código; plantilla en
-`plantillas/imagen_config.json`); sin esa clave, "sin dato". Límite MEDIDO en la prueba de este
-mismo paquete: el relleno clásico (`telea`/`ns`) funciona bien sobre objetos FINOS (postes,
-cables, una mancha) o fondos casi uniformes; sobre objetos grandes o fondos con estructura (una
-estación meteorológica de 240×350 px sobre matorral, una cosechadora de 960×360 px en un
-montaje) deja un borrón visible — ahí hace falta `--metodo taller`. Antes de rellenar, mide el
+`plantillas/imagen_config.json`); sin esa clave, "sin dato". Límite declarado: el relleno clásico
+(`telea`/`ns`) funciona bien sobre objetos FINOS (postes, cables, una mancha) o fondos casi
+uniformes; sobre objetos grandes o fondos con estructura deja un borrón visible — ahí hace falta
+`--metodo taller`. Antes de rellenar, mide el
 área de la máscara frente al área de la imagen y la textura del anillo de 20 px de fondo
 alrededor de ella (contra la mediana de desviación local de toda la imagen): si el área supera el
 1 % de la imagen o el anillo tiene más textura que esa mediana, imprime un aviso ("borrón
 probable…") y lo deja en el JSON (`aviso`, `None` si no aplica) — con `--metodo taller` no avisa
 (ya es el método recomendado para esos casos).
 
-`cubista`/`surrealista` (encargo 9-sep: "dos estilos pictóricos NUEVOS"): la pregunta de fondo
-no era qué parámetros pintar, sino DÓNDE viven — `pintor.py` es un motor de PINCELADAS
+`cubista`/`surrealista`: la pregunta de fondo no era qué parámetros pintar, sino DÓNDE viven — `pintor.py` es un motor de PINCELADAS
 (Hertzmann 1998: por cada radio, difuminar, medir error por celdas, poner una pincelada
 perpendicular al gradiente); sus seis estilos son el MISMO bucle con otro dict de radios/
 umbral/alfa (ver el docstring de `pintor.py`). Cubismo y surrealismo no son eso: no son una
@@ -243,10 +230,9 @@ def _media_ventana(arr, radio):
 
 def _mapa_desviacion_local(lum, radio=4):
     """Desviación típica LOCAL de `lum` (2D, escala 0-255) en una ventana de lado
-    `2*radio+1` alrededor de cada píxel — con OpenCV, `boxFilter` (rápido); sin
-    él, la misma tabla de sumas de área que `_suma_ventana`. Sirve para comparar
-    la textura de una región de la imagen (p. ej. el anillo alrededor de una
-    máscara) contra la del resto, con la MISMA vara en toda la imagen."""
+    `2*radio+1` alrededor de cada píxel — con OpenCV, `boxFilter`; sin él, la
+    misma tabla de sumas de área que `_suma_ventana`. Sirve para comparar la
+    textura de una región contra la del resto, con la MISMA vara en toda la imagen."""
     lum = lum.astype(np.float32)
     if cv2 is not None:
         k = 2 * radio + 1
@@ -446,15 +432,11 @@ def _ruido_zonas_planas(lum, bloque=8):
     contraste: se parte `lum` (0-255) en bloques FIJOS de `bloque` px, se mide la
     desviación típica dentro de cada bloque, y se toma el percentil 20 de esas
     desviaciones — el percentil bajo aísla los bloques sin apenas detalle (donde
-    lo que quede de variación es ruido, no textura de la escena). Fallo MEDIDO
-    7-sep con la vara VIEJA (percentil de gradiente: "plano" = gradiente por
-    debajo de su propio percentil 30): al estirar niveles, el estiramiento
-    amplifica el gradiente ENTERO, así que el conjunto de píxeles llamados
-    "planos" cambia entre antes/después y la medida deja de ser comparable —
-    con una foto real, esa vara subía de 43.69 a 83.88 aunque el ruido de
-    verdad (medido aquí, en bloques fijos) sí bajaba. Con un bloque fijo, la
-    rejilla no se mueve aunque cambie el contraste: antes y después usan
-    exactamente los mismos bloques."""
+    lo que quede de variación es ruido, no textura de la escena). Con un bloque
+    fijo, la rejilla no se mueve aunque cambie el contraste: antes y después usan
+    exactamente los mismos bloques, así que la medida sigue siendo comparable (a
+    diferencia de un umbral basado en el gradiente, que se corre al estirar
+    niveles)."""
     alto, ancho = lum.shape
     ah, aw = (alto // bloque) * bloque, (ancho // bloque) * bloque
     if ah == 0 or aw == 0:
@@ -493,15 +475,11 @@ def _reducir_ruido(arr01, ruido_medido=None):
     en la misma escala que `_ruido_zonas_planas`) Y a la ganancia de contraste que
     `_niveles_automaticos` va a aplicar DESPUÉS (mismo percentil 1-99 por canal): una
     foto muy "lavada" (poco contraste de entrada) recibe un estirón grande, así que su
-    ruido necesita una pasada más fuerte para no acabar amplificado igual — con una
-    fuerza fija, una foto de poco contraste pero mucho ruido de entrada salía mal
-    parada (medido en desarrollo: con `h` proporcional solo al ruido, una foto
-    sintética de contraste muy comprimido seguía con MÁS ruido que a la entrada
-    después de estirar niveles, aunque el propio denoise sí hubiera bajado el ruido
-    medido justo tras esa pasada). Con OpenCV, `fastNlMeansDenoisingColored` (mejor
-    que el `bilateralFilter` viejo para ruido de grano, no solo de borde); sin OpenCV,
-    mediana 3×3 de Pillow, y una SEGUNDA pasada si el ruido de entrada es alto (una
-    sola mediana 3×3 no basta con ruido gaussiano fuerte)."""
+    ruido necesita una pasada más fuerte para no acabar amplificado igual. Con OpenCV,
+    `fastNlMeansDenoisingColored` (mejor que el `bilateralFilter` viejo para ruido de
+    grano, no solo de borde); sin OpenCV, mediana 3×3 de Pillow, y una SEGUNDA pasada
+    si el ruido de entrada es alto (una sola mediana 3×3 no basta con ruido gaussiano
+    fuerte)."""
     img_u8 = _de01(arr01)
     ruido = 15.0 if ruido_medido is None else float(ruido_medido)
     if cv2 is not None:
@@ -654,11 +632,10 @@ def _dibujar_contornos(draw, etiquetas, color=(160, 160, 160)):
 def _suavizar_indices_moda(indices, radio):
     """Filtro de MODA por ventana `2*radio+1`: cada píxel pasa al índice de color más
     frecuente en su vecindad. Aplicado ANTES de etiquetar zonas conexas, limpia el
-    ruido sal-y-pimienta y los píxeles sueltos que deja la cuantización — sin este
-    paso, cada mota de ruido nace como su propia zona de 1 píxel (fallo MEDIDO 7-sep:
-    miles de zonas microscópicas en una foto real). Para cada color se cuenta cuántas
+    ruido sal-y-pimienta y los píxeles sueltos de la cuantización — sin él, cada mota
+    de ruido nace como su propia zona de 1 píxel. Para cada color se cuenta cuántas
     veces aparece en la ventana de cada píxel (`_suma_ventana` sobre su máscara
-    binaria — con OpenCV, `boxFilter`, más rápido) y se toma el color con más votos."""
+    binaria — con OpenCV, `boxFilter`) y se toma el color con más votos."""
     if radio <= 0:
         return indices
     mejor_cuenta = np.full(indices.shape, -1.0, dtype=np.float32)
@@ -714,10 +691,9 @@ def _renumerar_consecutivo(etiquetas):
 
 def _fusionar_zonas_pequenas(etiquetas, num_zonas, min_zona):
     """Funde cada zona con área < `min_zona` en la zona vecina con la que comparte
-    más frontera, repitiendo hasta que no quede ninguna — antes, las zonas chicas se
-    dejaban SIN numerar pero seguían ahí, así que el contorno seguía lleno de islas
-    (fallo MEDIDO 7-sep). Una zona sin ningún vecino (toda la imagen es una única
-    zona diminuta) se deja tal cual: no hay con qué fundirla."""
+    más frontera, repitiendo hasta que no quede ninguna. Una zona sin ningún vecino
+    (toda la imagen es una única zona diminuta) se deja tal cual: no hay con qué
+    fundirla."""
     etiquetas = etiquetas.copy()
     for _ in range(int(num_zonas) + 1):
         tamanos = np.bincount(etiquetas.ravel())
@@ -845,12 +821,11 @@ def _mascara_anillo(m_bool, ancho_anillo=20):
 def _evaluar_aviso_borron(arr_rgb, m_bool):
     """Mide ANTES de rellenar, para avisar de un borrón probable en vez de dejar que
     aparezca sin más: (1) el área de la máscara frente al área total de la imagen —
-    MEDIDO: una estación meteorológica de 240×350 px sobre una foto de 2048×1536 (2,7 %
-    del lienzo) deja un borrón visible; (2) la textura del anillo de 20 px de fondo
-    alrededor de la máscara, contra la mediana de la desviación local de TODA la
-    imagen — un fondo con estructura (matorral, un edificio) no se rellena bien con
-    `cv2.inpaint`, uno casi uniforme sí. Umbrales: área > 1 % de la imagen, o
-    desviación del anillo por encima de esa mediana."""
+    un objeto grande relativo al lienzo deja un borrón visible; (2) la textura del
+    anillo de 20 px de fondo alrededor de la máscara, contra la mediana de la
+    desviación local de TODA la imagen — un fondo con estructura (matorral, un
+    edificio) no se rellena bien con `cv2.inpaint`, uno casi uniforme sí. Umbrales:
+    área > 1 % de la imagen, o desviación del anillo por encima de esa mediana."""
     alto, ancho = m_bool.shape
     area_fraccion = float(m_bool.sum()) / float(alto * ancho)
     lum = _luminancia(arr_rgb.astype(np.float32))
@@ -1188,9 +1163,9 @@ def cubista(ruta, facetas=220, desplazamiento=0.07, giro=7.0, contorno=True, dif
 
     # El jitter (giro + desplazamiento) de cada faceta se decide UNA sola vez aquí, con el
     # mismo generador ya usado arriba para las semillas: así el cuadro FINAL no cambia según
-    # se pidan pasos de vídeo o no — medido en desarrollo: si el jitter se calculase dentro
-    # de la función que dibuja cada fotograma, se consumirían números aleatorios distintos
-    # según cuántas veces se llame, y el último paso dejaría de coincidir con el PNG final.
+    # se pidan pasos de vídeo o no. Si el jitter se calculase dentro de la función que dibuja
+    # cada fotograma, se consumirían números aleatorios distintos según cuántas veces se
+    # llame, y el último paso dejaría de coincidir con el PNG final.
     jitters = []
     for area, _color, _pts in facetas_calc:
         radio = math.sqrt(area)

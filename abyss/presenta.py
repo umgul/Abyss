@@ -3,92 +3,41 @@
 
     python presenta.py [--salida abyss_1min.mp4] [--idioma es|en] [--segundos 60] [--ancho 1920]
 
-No es un vídeo montado a mano: cada bloque es una tarjeta de título + una demostración REAL,
-generada en el momento invocando la propia pieza (`varas.py --index`, `vigia.py --probar`,
-`auditar.py`, `cuerpo.py`/`exterocepcion.py`, `pintor.py`/`video_pintura.py`, `mundo.py`,
-`lectura_visual.py` (verbos `texto`/`fotocopia` de `ojo.py`), `render3d.py`). Nada de lo que se
-ve se inventa ni se recorta de una captura vieja: si una pieza cambia, este guion se vuelve a
-correr y el vídeo sale distinto — esa es la garantía.
+Cada bloque es una tarjeta de título + una demostración real, generada invocando la propia pieza
+(`varas.py`, `vigia.py`, `auditar.py`, `cuerpo.py`/`exterocepcion.py`, `pintor.py`/
+`video_pintura.py`, `mundo.py`, `lectura_visual.py`, `render3d.py`): nada se inventa ni se recorta
+de una captura vieja. Bloques, en orden: apertura · memoria · honestidad · auditoría · sentidos ·
+pintor · estilos · mundo · el ojo · 3D · holograma · cierre. Si una pieza no está disponible en
+esta máquina (sin OpenCV, sin motor OCR, sin navegador sin cabeza, sin red para «mundo», o
+cualquier fallo real al generarla) su bloque se SALTA —nunca revienta el vídeo entero— y al final
+se dice cuáles, por stdout y en el propio vídeo. Con todas las piezas ausentes, el vídeo sale
+igual: solo apertura y cierre.
 
-Bloques (en este orden):
-    apertura · memoria y continuidad (`varas --index`) · honestidad (`vigia --probar`) ·
-    auditoría (`auditar.py`) · sentidos (`cuerpo` + `exterocepcion`) · pintor (`video_pintura.py`) ·
-    estilos (`pintor.py`, cuatro estilos) · mundo (`mundo.py` + `pintor.py`) ·
-    el ojo (`lectura_visual.texto`/`fotocopiar`) · 3D (`render3d.py --png`) ·
-    holograma (`render3d.py --holograma`) · cierre.
+`--segundos` (60 por defecto) es el presupuesto total: cada bloque tiene una duración "natural" y,
+si no caben todas, se recortan los tramos MÁS LARGOS (techo común por bisección) sin bajar nunca
+de `PISO_BLOQUE` — con un `--segundos` muy pequeño el vídeo puede salir algo más largo que lo
+pedido; límite declarado, no un fallo silencioso. `--idioma es|en` fija el idioma del texto (por
+defecto, el de la máquina).
 
-Si una pieza no está disponible en ESTA máquina (sin OpenCV, sin motor OCR, sin navegador sin
-cabeza para el 3D, sin red para `mundo`, o cualquier fallo real al generarla) su bloque se
-SALTA — nunca revienta el vídeo entero — y al final, en una línea (en el propio vídeo y por
-stdout), se dice cuáles: "se hizo con lo que había". Con TODAS las piezas ausentes, el vídeo
-sale igual: solo apertura y cierre, diciéndolo.
+1920×1080 a 30 fps con `imageio_ffmpeg` (mismos parámetros `libx264` que `video_pintura.py`),
+tipografía y paleta de `infografia.py`, sin música. Autosuficiente: ninguna imagen de ejemplo
+viene de `pruebas/datos/` — foto, texto OCR, "hoja" de fotocopia y escena 3D se generan aquí mismo
+con Pillow. Los bloques «memoria»/«sentidos» usan un proyecto de ejemplo (directorio temporal,
+fichas `.md`, `MEMORY.md`, sesiones que cruzan `UMBRAL_FRIO`) para que `varas.py --index`
+recalcule pesos ◆ de verdad.
 
-Presupuesto de tiempo declarado (`--segundos`, 60 por defecto): cada bloque tiene una duración
-"natural" (una tabla fija, calibrada para que TODOS los bloques disponibles quepan en un minuto
-sin recortar). Si la suma de las duraciones naturales de los bloques disponibles no cabe en el
-tiempo pedido, se recortan los tramos MÁS LARGOS (un techo común por bisección: todo bloque que
-pase de ese techo se corta A ese techo; los bloques ya cortos no se tocan) — nunca se acelera
-todo por igual hasta que no se entienda, y se DICE qué bloques se recortaron y cuánto (por
-stdout). Ningún bloque baja de un suelo mínimo (`PISO_BLOQUE`): con un `--segundos` muy pequeño
-y muchos bloques disponibles, el vídeo puede salir algo más largo que lo pedido — límite
-declarado, no un fallo silencioso.
+Nada sale de la máquina salvo el bloque «mundo» (`mundo.buscar()`/`descargar()`) y, si hay red,
+`exterocepcion.py` de «sentidos». `ABYSS_SIN_RED=1` corta el intento de red de «mundo» antes de
+tocarla (`mundo.py` no mira esa variable por su cuenta; este guion la comprueba él mismo). El
+bloque «auditoría» corre `auditar.auditar()` sobre el propio repo en modo lectura: presenta.py
+nunca ejecuta código de terceros.
 
-Tipografía y paleta: las MISMAS que `infografia.py` (`PALETA`, `colores(oscuro=True)`) — un
-paquete, una sola paleta. Fuente `arial.ttf`/`arialbd.ttf` con reserva a la bitmap de Pillow
-(mismo criterio que `lectura_visual._fuente`; no se reimplementa esa función porque es privada
-de otro módulo, pero el criterio es idéntico a propósito). Sin música: quien lo publique le pone
-la suya. Texto en el idioma pedido (`--idioma es|en`; por defecto, el de la máquina).
-
-1920×1080 a 30 fps con `imageio_ffmpeg`, igual que `video_pintura.py` (mismos parámetros de
-`libx264`: `-crf 18 -preset medium -pix_fmt yuv420p -movflags +faststart`). El bloque «pintor»
-reutiliza `pintor.pintar()` + `video_pintura.video()` tal cual (pinta a una anchura pequeña por
-velocidad; `video_pintura.py` redibuja los trazos — vectoriales, no un píxel ampliado — a la
-anchura final) y el clip resultante se vuelve a leer con el MISMO `ffmpeg` (decodificado a
-`rawvideo`) para empalmarlo en el hilo del vídeo entero: no hay una segunda pasada de
-codificación con otra herramienta, es el mismo binario en los dos sentidos.
-
-Autosuficiente a propósito ("no sabemos a qué máquina se va a instalar"): ninguna imagen ni
-escena de ejemplo vive en `pruebas/datos/` (eso es del árbol de desarrollo, puede no viajar con
-el paquete instalado) — la foto de demostración, el texto para OCR, la "hoja" para fotocopia y
-la escena 3D se generan aquí mismo, con Pillow y un dict, en el momento.
-
-Proyecto de ejemplo (bloques «memoria» y «sentidos»): un directorio temporal que hace de `proj`
-(mismo patrón que `pruebas/ayudas.nuevo_proyecto()`, sin importarlo — este guion no depende de
-`pruebas/`), con unas pocas fichas `.md`, un `MEMORY.md` que las enlaza, transcritos sintéticos
-con lecturas (`Read`) reales de esas fichas, y `UMBRAL_FRIO` sesiones archivadas para que
-`varas.py --index` recalcule pesos ◆ DE VERDAD en vez de decir «sin vara todavía» — ambas
-salidas son honestas (con menos corpus, este guion enseñaría igualmente el aviso real).
-
-Nada de esto sale de la máquina salvo el bloque «mundo» (que sí llama a `mundo.buscar()`/
-`descargar()`, con la misma red que usaría cualquier persona a mano) y, si hay red,
-`exterocepcion.py` del bloque «sentidos» — el resto es local. `ABYSS_SIN_RED=1` (la misma
-bandera que ya usan `exterocepcion.py`/`noticias.py`) corta el intento de red del bloque
-«mundo» ANTES de tocarla — `mundo.py` no mira esa variable por su cuenta, así que este guion la
-comprueba él mismo — y deja intacto el «sin dato» normal de `exterocepcion.py` si tampoco hay
-red para ese bloque.
-
-Nunca ejecuta el código de ningún paquete de terceros: el bloque «auditoría» corre
-`auditar.auditar()` (que en sí mismo NUNCA ejecuta lo que audita, ver su propio docstring)
-sobre el propio repositorio de Abyss (la carpeta que contiene `abyss/`), en modo lectura.
-
-`varas.py` y `vigia.py` NUNCA se importan en este proceso (los dos ejecutan código de resolución
-de proyecto nada más importarse, `ESPECIFICACION.md` §1 / ver `pruebas/ayudas.py`): se invocan
-por `subprocess`, exactamente como los invocaría un gancho o una persona por terminal, con
-`ABYSS_PROYECTO` apuntando al proyecto de ejemplo y stdin vacío (para que `rutas.leer_stdin()`
-no se quede esperando). `cuerpo.py`/`exterocepcion.py` se invocan igual, por simetría y para no
-depender del estado que dejan en el propio proceso (`exterocepcion._CACHE`) si este guion se
-llama más de una vez. `auditar.py`, `pintor.py`, `video_pintura.py`, `render3d.py`,
-`lectura_visual.py` y `mundo.py` sí son seguros de importar (ninguno toca `rutas.resolver()` ni
-stdin al importarse, solo dentro de funciones que este guion no llama) y se usan como librería,
-más rápido que un subproceso por cada fotograma.
-
-`ABYSS_PRESENTA_FORZAR_AUSENTE` (solo para pruebas, mismo patrón que `ABYSS_RENDER3D_NAVEGADOR`
-de `render3d.py` o `ABYSS_SIN_RED` de `exterocepcion.py`): lista de ids de bloque separados por
-comas (`memoria,honestidad,auditoria,sentidos,pintor,estilos,mundo,ojo,threed,holograma`) que se
-tratan como ausentes SIN intentar generarlos — para los seis bloques que son el propio paquete
-(memoria/honestidad/auditoría/sentidos/pintor/estilos) no hay ninguna forma "natural" de que
-falten (no dependen de red, cámara ni navegador), así que la única manera de probar de verdad
-"con TODAS las piezas ausentes, el vídeo no revienta" sin fingir que falta Pillow/numpy es esta.
+`varas.py`/`vigia.py` nunca se importan (ejecutan resolución de proyecto al importarse,
+`ESPECIFICACION.md` §1): se invocan por `subprocess`, con `ABYSS_PROYECTO` apuntando al proyecto
+de ejemplo y stdin vacío; `cuerpo.py`/`exterocepcion.py` igual, por simetría. El resto de piezas
+se usa como librería. `ABYSS_PRESENTA_FORZAR_AUSENTE` (solo pruebas): ids de bloque separados por
+comas (`memoria,honestidad,auditoria,sentidos,pintor,estilos,mundo,ojo,threed,holograma`)
+tratados como ausentes sin generarlos.
 """
 import json
 import locale
@@ -457,8 +406,7 @@ def _frame_bloque(titulo, subtitulo, lineas_reales, ancho, alto, indice, mono=Tr
 def _cabecera_mosaico(titulo, ancho, alto, indice):
     """Para los bloques de mosaico (estilos/mundo/ojo): lienzo con una franja de cabecera YA
     reservada (acento + título) y el alto de esa franja, para que el contenido se pegue POR
-    DEBAJO — nunca al revés, que taparía justo lo que se quiere enseñar (medido: pegar la
-    cabecera al final tapaba las etiquetas del mosaico de arriba)."""
+    DEBAJO — nunca al revés, que taparía las etiquetas del mosaico."""
     img = _lienzo(ancho, alto)
     d = ImageDraw.Draw(img)
     acento = PALETA[indice % len(PALETA)]

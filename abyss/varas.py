@@ -1,6 +1,6 @@
-"""Varas para mi memoria: mide en vez de decretar.
+"""Varas para la memoria: mide en vez de decretar.
 Dos varas en el índice, separadas:
-  ★  estrella-diario  = decreto mío al escribir (importancia que le di ese día)
+  ★  estrella-diario  = decreto de quien escribe (importancia asignada ese día)
   ◆  peso-uso medido  = citas [[..]] desde otras fichas + sesiones que la leyeron
      (cortes por CUANTILES de la distribución actual, no umbrales fijos:
       normales que rotan; ◆◆◆ decil alto, ◆◆ siguiente 20 %, ◆ siguiente 30 %)
@@ -29,13 +29,10 @@ sesiones/) viven en `mem`, resuelto por `rutas.resolver()` — nunca
 Límite conocido: «leída» solo ve Read/cat explícitos; lo que el harness inyecta
 como recuerdo no deja huella → subestima.
 
-Paréntesis (ronda 2 de arreglos, 7-sep): una lectura de ficha hecha DENTRO de un
-tramo marcado por `parentesis.py` no cuenta como uso — no le sube el ◆ a esa
-ficha. Antes SÍ contaba (fallo "roza" medido 7-sep): este módulo recorría los
-transcripts vivos de `proj` sin mirar el tramo en absoluto, así que MEMORY.md
-—lo primero que el asistente lee al empezar cada hilo— seguía delatando qué
-ficha se consultó en ese rato, aunque el contenido nunca se copiara a ningún
-sitio."""
+Paréntesis: una lectura de ficha hecha DENTRO de un tramo marcado por `parentesis.py`
+no cuenta como uso — no le sube el ◆ a esa ficha, para que MEMORY.md (lo primero que
+se lee al empezar cada hilo) no delate qué ficha se consultó en ese rato, aunque el
+contenido nunca se copiara a ningún sitio."""
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
     from . import consola  # el mismo idioma: ver abyss/consola.py
@@ -52,22 +49,21 @@ except ImportError:
 
 CODE = rutas.CODE
 # leer_stdin_si_hace_falta: si ya hay --proyecto/ABYSS_PROYECTO (p. ej. porque
-# continuidad.py ya resolvió proj y lo dejó puesto antes de lanzarnos como
-# subprocess) no hace falta tocar stdin (fallo 6-sep: 3 s de peaje de más, y el
-# hilo lector que deja detrás un leer_stdin() sin usar puede trabar el siguiente
-# import que toque hilos).
+# continuidad.py ya resolvió proj y lo dejó puesto antes de lanzar este módulo como
+# subprocess) no hace falta tocar stdin: ahorra el peaje de `leer_stdin()` y evita el
+# hilo lector sin usar que puede trabar el siguiente import que toque hilos.
 _STDIN = rutas.leer_stdin_si_hace_falta(sys.argv[1:])
 proj, mem = rutas.resolver(sys.argv[1:], _STDIN)
-os.environ['ABYSS_PROYECTO'] = proj  # para que quien nos importe después no relea stdin (ya vacío)
+os.environ['ABYSS_PROYECTO'] = proj  # para que quien importe este módulo después no relea stdin (ya vacío)
 
 try:
     from . import propiocepcion as P
 except ImportError:
     import propiocepcion as P
 
-# Paréntesis (ronda 2 de arreglos, 7-sep): importado DESPUÉS de fijar
-# ABYSS_PROYECTO (igual que hace `continuidad.py` con este mismo módulo) para
-# que la propia resolución de `parentesis.py` no vuelva a tocar stdin.
+# Importado DESPUÉS de fijar ABYSS_PROYECTO (igual que hace `continuidad.py` con
+# este mismo módulo) para que la propia resolución de `parentesis.py` no vuelva a
+# tocar stdin.
 try:
     from . import parentesis as PZ
 except ImportError:
@@ -82,8 +78,8 @@ SEP = ' · '
 idx = ''
 if os.path.exists(IDX):
     # newline='': preserva los finales de línea TAL CUAL estaban (LF o CRLF), sin la
-    # traducción universal de Python — medido 6-sep: sin esto, un MEMORY.md con LF se
-    # reescribía entero en CRLF en cada cierre de sesión, solo por pasar por aquí.
+    # traducción universal de Python — sin esto, un MEMORY.md con LF se reescribiría
+    # entero en CRLF en cada cierre de sesión, solo por pasar por aquí.
     with open(IDX, encoding='utf-8', newline='') as _fh:
         idx = _fh.read()
 fichas = [f for f in os.listdir(mem) if f.endswith('.md') and f != 'MEMORY.md']
@@ -109,11 +105,9 @@ for f in fichas:
         if t in indeg and t != f:
             indeg[t] += 1
 def _ts_de_linea(line):
-    """`timestamp` de una línea de transcript ya candidata (barato: solo se llama
-    tras el filtro de substrings de abajo), o `None` si no se puede leer como
-    JSON — mismo criterio fail-open que `parentesis.en_parentesis()` ante datos
-    que no se pueden interpretar (una línea sin marca de tiempo no se oculta,
-    se cuenta igual que siempre)."""
+    """`timestamp` de una línea de transcript ya candidata, o `None` si no se puede leer
+    como JSON — mismo criterio fail-open que `parentesis.en_parentesis()`: una línea
+    sin marca de tiempo no se oculta, se cuenta igual que siempre."""
     try:
         return json.loads(line).get('timestamp')
     except Exception:
@@ -127,12 +121,8 @@ for sp in glob.glob(os.path.join(proj, '*.jsonl')):
         for line in fh:
             if 'memory' not in line or ('"name":"Read"' not in line and 'cat ' not in line):
                 continue
-            # Paréntesis (ronda 2, 7-sep): una lectura de ficha hecha DENTRO de un
-            # tramo marcado no debe subirle el ◆ a esa ficha en MEMORY.md — fallo
-            # "roza" medido 7-sep: `varas.py` recorría los transcripts vivos sin
-            # mirar el tramo en absoluto, así que el ÍNDICE que el asistente lee al
-            # empezar cada hilo seguía delatando qué ficha se consultó en ese rato,
-            # aunque el contenido nunca se copiara a ningún sitio.
+            # Paréntesis (ver docstring del módulo): una lectura DENTRO de un tramo
+            # marcado no debe subirle el ◆ a esa ficha en MEMORY.md.
             if PZ.en_parentesis(sid, _ts_de_linea(line)):
                 continue
             line = N('NFC', line)
@@ -184,12 +174,12 @@ def _recortar_lineas_largas(texto):
 
 if '--index' in sys.argv:
     if not os.path.exists(IDX) and not fichas:
-        # Proyecto virgen: ni índice ni ninguna ficha .md en mem/. Medido 6-sep: el
-        # gancho SessionEnd (continuidad.cerrar() → varas.py --index) dispara en
-        # TODOS los proyectos que se abran (settings.json es global), y sin este
-        # aviso creaba de la nada un MEMORY.md de 147 bytes con solo la leyenda —
-        # el fichero de memoria automática que Claude Code inyecta en contexto, con
-        # una leyenda que no explica nada de ESE proyecto. No se escribe nada.
+        # Proyecto virgen: ni índice ni ninguna ficha .md en mem/. El gancho SessionEnd
+        # (continuidad.cerrar() → varas.py --index) dispara en TODOS los proyectos que
+        # se abran (settings.json es global); sin este aviso, crearía de la nada un
+        # MEMORY.md con solo la leyenda — el fichero de memoria automática que Claude
+        # Code inyecta en contexto, con una leyenda que no explica nada de ESE
+        # proyecto. No se escribe nada.
         print('sin índice ni fichas todavía: no se crea MEMORY.md de la nada')
         sys.exit()
     if SIN_VARA:

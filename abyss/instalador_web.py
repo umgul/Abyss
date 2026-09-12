@@ -1,66 +1,31 @@
 # -*- coding: utf-8 -*-
-"""Sirve `plantillas/instalador.html` y le da los verbos que hoy tiene la ventana
-Tk de `instalar.py` (`_abrir_ventana`) — instalar, desinstalar, dependencias,
-claves, cerrar.
+"""Sirve `plantillas/instalador.html` y le da los verbos que ya tiene la ventana Tk de
+`instalar.py` (`_abrir_ventana`): instalar, desinstalar, dependencias, claves, cerrar.
+Existe porque Tk en Windows no pinta bordes redondeados, sombras, interletrado ni
+diálogos vestibles, y esa ventana es la primera pantalla que alguien ve al publicar
+este paquete.
 
-## Por qué existe
+CERO lógica de instalación duplicada: qué es un módulo, qué gancho lleva, cómo se
+instala o desinstala vive SOLO en `instalar.py` (raíz del repo). Este fichero lo carga
+por ruta absoluta (no por import normal: `instalar.py` vive fuera del paquete `abyss/`)
+y llama a sus funciones reales (`instalar()`, `desinstalar()`,
+`instalar_dependencias()`, `_tabla_dependencias()`, `_texto()`, `MODULOS`,
+`DEPENDENCIAS`, `estado_modulo()`) — nunca reimplementa esa lógica, para no acabar con
+dos implementaciones (web y Tk) que se desincronicen.
 
-Tk en Windows no pinta bordes redondeados, ni sombras, ni interletrado, ni más
-peso de fuente que normal/negrita, y sus diálogos (`messagebox`, `simpledialog`)
-son grises de sistema y no se pueden vestir — medido en la propia `instalar.py`
-(comentario junto a `_abrir_ventana`: los `messagebox` "son de Windows y no
-obedecen [`option_add`]: eso se queda gris"). Este paquete se va a publicar y
-esa ventana es la primera pantalla que alguien ve.
+Propio de aquí: servir `plantillas/instalador.html` (único fichero, sin más estáticos);
+las rutas JSON que envuelven esas funciones para `fetch()` (`/api/estado`,
+`/api/dependencias`, `/api/claves`, `/api/instalar`, `/api/desinstalar`,
+`/api/instalar_dependencias`, `/api/cerrar`); y la lectura de
+`plantillas/imagen_config.json`/`mem/imagen_config.json` para la ventana de claves —
+misma lectura que `instalar._ventana_claves()`, nunca se manda el VALOR de una clave,
+solo si está puesta o vacía.
 
-## La regla que manda: CERO lógica de instalación duplicada
-
-Este fichero NO decide qué es un módulo, qué gancho lleva, ni cómo se instala o
-se desinstala nada de eso vive SOLO en `instalar.py`, en la raíz del repo, y
-sigue así (otro hilo lo está editando en paralelo mientras se escribe esto: ver
-el aviso del encargo — este fichero no le toca una sola línea). Aquí solo se
-CARGA ese módulo por ruta absoluta y se llama a sus funciones reales:
-`instalar()`, `desinstalar()`, `instalar_dependencias()`, `_estado_dependencias()`,
-`_tabla_dependencias()`, `_texto()`, `MODULOS`, `DEPENDENCIAS`, `estado_modulo()`.
-Cargarlo por ruta (no por import normal) es el mismo patrón que ya usa
-`pruebas/test_documentacion_coherente.py` para leer `MODULOS` sin ejecutar su
-CLI: `instalar.py` vive en la raíz, fuera del paquete `abyss/`, así que un
-`import instalar` a secas no lo encontraría salvo que la raíz estuviera en
-`sys.path` — cargarlo por ruta evita ensuciar `sys.path` del proceso solo para
-esto.
-
-Dos implementaciones de "qué hace instalar un módulo" es exactamente el modo de
-fallo que el propio `instalar.py` señala en su docstring sobre la ventana Tk
-("no hay una segunda implementación"): una web y una Tk que se desincronizan el
-primer día que alguien cambie una sola.
-
-## Lo que SÍ es propio de aquí
-
-- Servir `plantillas/instalador.html` (un único fichero, HTML+CSS+JS en línea:
-  no hay más estáticos que servir).
-- Un puñado de rutas JSON que envuelven las llamadas de arriba y las traducen a
-  algo que `fetch()` pueda leer: `/api/estado`, `/api/dependencias`,
-  `/api/claves` (leer y guardar), `/api/instalar`, `/api/desinstalar`,
-  `/api/instalar_dependencias`, `/api/cerrar`.
-- Leer los once campos de `plantillas/imagen_config.json` (`_ayuda`) y el
-  `mem/imagen_config.json` del proyecto para la ventana de claves — es la MISMA
-  lectura que ya hace `instalar._ventana_claves()`/`instalar._claves()` (mismos
-  dos ficheros, mismo criterio de "puesta"/"vacía": nunca se manda el VALOR de
-  una clave al navegador, solo si está puesta o no), pero aquí sirve para
-  construir JSON en vez de widgets de Tk — no hay una función reutilizable para
-  eso en `instalar.py` (`_ventana_claves` está soldada a `tkinter`), así que
-  esta lectura sí es propia — sin tocar la lógica de instalar/desinstalar.
-
-## Seguridad: SOLO 127.0.0.1
-
-El servidor se ata a `127.0.0.1` y a nada más — nunca `0.0.0.0` — así que ningún
-equipo de la red local puede ni ver este puerto. Los verbos que cambian algo
-(instalar, desinstalar, instalar dependencias, guardar claves, cerrar) son
-SIEMPRE `POST`; un `GET` aquí solo lee (estado de módulos, tabla de
-dependencias, qué claves hay puestas) y nunca deja nada instalado. Las llamadas
-`fetch()` de la página mandan `Content-Type: application/json`, que el
-navegador NUNCA manda "simple" a otro origen sin permiso expreso (dispara un
-preflight `OPTIONS` que este servidor no responde): una pestaña de otro sitio
-abierta a la vez no puede disparar un POST aquí a ciegas.
+Seguridad: el servidor se ata SOLO a `127.0.0.1`, nunca a `0.0.0.0`. Los verbos que
+cambian algo son siempre `POST`; un `GET` solo lee y nunca deja nada instalado. Las
+llamadas mandan `Content-Type: application/json`, que dispara un preflight `OPTIONS`
+que este servidor no responde: una pestaña de otro sitio no puede disparar un POST aquí
+a ciegas.
 """
 import argparse
 import http.server
@@ -90,12 +55,10 @@ PUERTO_POR_DEFECTO = 8877
 
 
 def _cargar_instalador():
-    """Carga `instalar.py` (raíz del repo) por RUTA — ver el docstring de arriba.
-    Sin `except` propio a propósito: si `instalar.py` no se puede cargar (el
-    otro hilo lo dejó con un error de sintaxis a mitad de una edición, por
-    ejemplo), este servidor tampoco puede funcionar y debe fallar alto y claro
-    en vez de arrancar a medias sirviendo una página que no podrá instalar
-    nada."""
+    """Carga `instalar.py` (raíz del repo) por ruta — ver el docstring del módulo. Sin
+    `except` propio a propósito: si no se puede cargar, este servidor tampoco puede
+    funcionar y debe fallar alto y claro, no arrancar a medias sirviendo una página que
+    no podrá instalar nada."""
     ruta = os.path.join(RAIZ, 'instalar.py')
     spec = importlib.util.spec_from_file_location('abyss_instalador_nucleo', ruta)
     mod = importlib.util.module_from_spec(spec)
@@ -105,12 +68,10 @@ def _cargar_instalador():
 
 instalador = _cargar_instalador()
 
-# Contexto de ESTA invocación del servidor: se resuelve UNA vez al arrancar
-# (`main()`) y los manejadores de petición solo lo leen — nunca se recalcula
-# por petición, para que --settings/--proyecto/--python fijados al lanzar el
-# servidor sean estables durante toda la sesión de instalación (igual que la
-# ventana Tk los recibe una vez de `__main__` y los cierra en su propio
-# `_abrir_ventana`).
+# Contexto de ESTA invocación: se resuelve UNA vez al arrancar (`main()`) y los
+# manejadores de petición solo lo leen — nunca se recalcula por petición, para que
+# --settings/--proyecto/--python sean estables durante toda la sesión (igual que la
+# ventana Tk los recibe una vez de `__main__`).
 _CTX = {
     'idioma': 'es',
     'settings_ruta': None,
@@ -132,12 +93,10 @@ def _idioma_de(qs_o_cuerpo):
 
 
 def _textos_completos(idioma):
-    """Todas las cadenas de `TEXTOS` para `idioma`, con el mismo fail-closed que
-    `instalar._texto()`: lo que falte en el idioma pedido cae al castellano. Se
-    manda el diccionario ENTERO en vez de una cadena a la vez para que la
-    página pueda cambiar de idioma sin volver a pedir cada texto suelto —
-    sigue sin haber ni una traducción duplicada aquí: todas vienen de
-    `instalar.TEXTOS`."""
+    """Todas las cadenas de `TEXTOS` para `idioma` (fail-closed: lo que falte cae al
+    castellano, igual que `instalar._texto()`). Se manda el diccionario entero para que
+    la página cambie de idioma sin pedir cada texto suelto; ninguna traducción se
+    duplica aquí, todas vienen de `instalar.TEXTOS`."""
     fusion = dict(instalador.TEXTOS.get('es', {}))
     fusion.update(instalador.TEXTOS.get(idioma, {}))
     return fusion
@@ -172,11 +131,9 @@ def _estado(idioma):
 
 
 def _claves_estado(idioma):
-    """Misma lectura que `instalar._ventana_claves()`/`instalar._claves()`: la
-    plantilla del repo (con su bloque `_ayuda`) y el `mem/imagen_config.json`
-    del proyecto, si lo hay. NUNCA se manda el valor de una clave — solo si
-    está puesta (en `mem/` o ya en la propia plantilla, p. ej. `horde_key`, que
-    trae la anónima de fábrica) o vacía."""
+    """Misma lectura que `instalar._ventana_claves()`/`instalar._claves()`: la plantilla
+    del repo y el `mem/imagen_config.json` del proyecto, si lo hay. Nunca se manda el
+    valor de una clave, solo si está puesta o vacía."""
     try:
         with open(RUTA_PLANTILLA_CLAVES, encoding='utf-8') as fh:
             base = json.load(fh)
@@ -207,11 +164,9 @@ def _claves_estado(idioma):
 
 
 def _guardar_claves(valores):
-    """Igual que `guardar()` dentro de `instalar._ventana_claves()`: solo se
-    escribe lo que el usuario haya tecleado de verdad (un campo vacío es
-    "déjalo como estaba", nunca "bórralo"), fusionado sobre la plantilla y lo
-    que ya hubiera, y `_ayuda` se descarta antes de guardar (vive en la
-    plantilla, no en el fichero de cada quien)."""
+    """Igual que `guardar()` en `instalar._ventana_claves()`: solo escribe lo tecleado de
+    verdad (campo vacío = "déjalo como estaba", nunca "bórralo"), fusionado sobre la
+    plantilla y lo que ya hubiera; `_ayuda` se descarta antes de guardar."""
     mem = _CTX['mem']
     if not mem:
         return {'ok': False, 'motivo': 'sin_proyecto'}
@@ -290,13 +245,10 @@ class _Manejador(http.server.BaseHTTPRequestHandler):
         elif partes.path == '/api/estado':
             self._json(_estado(idioma))
         elif partes.path == '/api/dependencias':
-            # Mismo criterio que `hacer_dependencias()` en la ventana Tk: de los
-            # módulos MARCADOS, solo los que de verdad tienen dependencias
-            # registradas; si ninguno de los marcados las tiene, se comprueban
-            # TODOS los de `DEPENDENCIAS` (nunca una tabla vacía porque lo
-            # marcado no venía al caso). Se devuelve la lista YA RESUELTA
-            # (`modulos_resueltos`) para que el POST que instala use EXACTAMENTE
-            # lo que esta tabla mostró — nunca dos cálculos que puedan discrepar.
+            # Mismo criterio que `hacer_dependencias()` en la ventana Tk: de los módulos
+            # marcados, solo los que tienen dependencias registradas; si ninguno las
+            # tiene, se comprueban todos los de `DEPENDENCIAS`. Se devuelve la lista ya
+            # resuelta para que el POST que instala use exactamente la misma.
             marcados_raw = (qs.get('modulos', ['']) or [''])[0]
             marcados = [m for m in marcados_raw.split(',') if m]
             resueltos = [m for m in marcados if m in instalador.DEPENDENCIAS] or list(instalador.DEPENDENCIAS)
@@ -326,17 +278,12 @@ class _Manejador(http.server.BaseHTTPRequestHandler):
                                             python_exe=ctx['python_exe'], mem=ctx['mem'],
                                             telegram=telegram, skills_dir=ctx['skills_dir'],
                                             idioma=idioma)
-            # Lo que FALTA después de instalar, medido y no decretado. Los botones de
-            # dependencias y de claves están en la barra, pero alguien que acaba de clonar
-            # esto no sabe que tiene que pulsarlos: el instalador termina, dice que fue
-            # bien, y deja a medias lo que hace falta para que varios módulos funcionen.
-            # Se mide y se OFRECE; si no falta nada no se dice nada, que abrir dos ventanas
-            # para enseñar que está todo puesto es hacerle perder el tiempo a quien acaba
-            # de pulsar un botón.
+            # Lo que falta tras instalar (paquetes/claves) se comprueba y se ofrece aquí
+            # mismo, para que quien acaba de pulsar el botón no tenga que adivinar que
+            # falta abrir además dependencias/claves; si no falta nada, no se dice nada.
             faltan = instalador._paquetes_a_instalar(ids, ctx['python_exe'])
-            # `_claves_estado` no manda NUNCA el valor de una clave, solo si está
-            # puesta — que es justo lo que hace falta aquí y lo que hay que respetar:
-            # una clave no viaja por el socket ni para contarla.
+            # `_claves_estado` nunca manda el valor de una clave, solo si está puesta:
+            # eso es lo único que hace falta aquí.
             _cl = _claves_estado(idioma)
             vacias = [c['campo'] for c in (_cl.get('campos') or []) if not c.get('puesta')]
             self._json({'mensajes': mensajes,

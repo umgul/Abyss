@@ -10,54 +10,42 @@ Uso:
 `--acabado` (por defecto `mate`, para no cambiarle el resultado a nadie que ya use este guion):
 `mate` es el material plano de siempre (roughness 0.85/metalness 0.05, tres luces planas,
 rejilla debajo). `estudio` reproduce, en un guion GENÉRICO (no sabe qué es un tornillo), la
-receta que trae embebida `pintor_demo/tornillo/tornillo.html` (verificada leyendo ese fichero,
-no de memoria): tono ACES (`toneMappingExposure=1.05`), sombras suaves (`PCFSoftShadowMap`),
-un entorno de reflejo PROCEDURAL (un cubo con dos caras que llevan "ventanas" claras, dos
-`<canvas>` 2D generados en la propia página — cero texturas cargadas de fuera), material
-metálico (`metalness:1.0`), un suelo oscuro que recibe sombra, y SIN rejilla (se sigue
-creando pero arranca oculta — el control de la página la puede volver a encender).
-
-Las posiciones/tamaños de luces y suelo de esa receta están pensadas para SU tornillo, que
-mide RADIO≈24,1538 (mismo CENTRO/RADIO que calcula `_bbox_escena()` de este propio guion,
-aplicado a mano a los vértices que decodifiqué del `PIEZAS` embebido en ese HTML, con las
-mismas transformaciones que aplica su guion: `grupo.position.z=-16.350` y
-`tumbado.rotation.{y,z}`). Por eso aquí NO se copian esos números a pelo: se guarda cada
-posición como `(posición_vieja − CENTRO_viejo) / RADIO_viejo` y, al renderizar, se multiplica
-por el RADIO de la escena que se cargue — así una luz direccional (sin atenuación: lo único
-que le importa es su DIRECCIÓN, que un reescalado uniforme no toca) queda en el mismo ángulo
-sin importar el tamaño del modelo. El roughness 0,34/0,27 por pieza (plana/curva) del original
-no se replica pieza a pieza: ese dato (qué grupo es una cara plana) no existe en el esquema
-genérico de `render3d.py` — aquí todas las piezas del acabado `estudio` llevan un único
-roughness intermedio (0,30); el aspecto facetado o liso de cada grupo lo sigue dando, igual
-que en `mate`, el propio normal que trae el fichero de entrada, no el material.
+receta que trae embebida `pintor_demo/tornillo/tornillo.html`: tono ACES
+(`toneMappingExposure=1.05`), sombras suaves (`PCFSoftShadowMap`), un entorno de reflejo
+PROCEDURAL (un cubo con dos caras que llevan "ventanas" claras, generadas en la propia
+página — cero texturas cargadas de fuera), material metálico (`metalness:1.0`), un suelo
+oscuro que recibe sombra, y SIN rejilla (se sigue creando pero arranca oculta). Las
+posiciones/luces de esa receta se guardan como `(posición − CENTRO) / RADIO` de la escena
+original y, al renderizar, se multiplican por el RADIO de la escena que se cargue — así
+queda bien sin importar el tamaño del modelo (una luz direccional solo depende de su
+DIRECCIÓN, que un reescalado uniforme no toca). El roughness por pieza del original no se
+replica: `estudio` usa un único roughness intermedio (0,30) para todas las piezas; el
+aspecto facetado o liso de cada grupo lo sigue dando el propio normal del fichero de
+entrada, igual que en `mate`.
 
 `--html` es el modo normal (SIEMPRE se escribe la página, con o sin la bandera; ésta solo
-sirve para elegir la ruta — a diferencia de `pintor.py`, aquí la página no es un extra
-opcional: es el propio resultado). Sin ruta explícita:
-`<carpeta_de_la_entrada>/<base>_render3d.html`.
+elige la ruta — la página no es un extra opcional, es el propio resultado). Sin ruta
+explícita: `<carpeta_de_la_entrada>/<base>_render3d.html`.
 
-`--holograma`: la MISMA escena, la MISMA cámara, en cuatro cuadrantes cuadrados
-alrededor del centro de la pantalla (arriba/abajo/izquierda/derecha), cada uno con la
-imagen espejada horizontalmente y girada 0°/180°/90°/-90° respectivamente — lo que pide
-una pirámide de metacrilato apoyada en el centro de la pantalla (Pepper's ghost): cada cara
-de la pirámide refleja el cuadrante que tiene delante hacia el centro, y la reflexión
-espeja la imagen, de ahí el espejado. Es una CONVENCIÓN de composición 2D declarada aquí,
-no verificada contra una pirámide física de verdad (no hay una en la máquina de
-desarrollo): si la orientación no coincide con la tuya, cambia el signo de los ángulos, es
-el único ajuste que hace falta. El fondo se fuerza a negro puro (`#000000`, ignora
-`--fondo`) porque el efecto exige negro de verdad, no un gris oscuro. Sin dependencias
-nuevas: los cuatro cuadrantes son cuatro copias 2D (`CanvasRenderingContext2D.drawImage`)
-del MISMO fotograma que ya pinta el `<canvas>` WebGL de siempre (que se queda montado pero
-oculto, como fuente); no se crean más contextos WebGL ni se vuelve a recorrer la escena
-cuatro veces.
+`--holograma`: la MISMA escena y cámara, en cuatro cuadrantes alrededor del centro de la
+pantalla (arriba/abajo/izquierda/derecha), cada uno espejado horizontalmente y girado
+0°/180°/90°/-90° — lo que pide una pirámide de metacrilato apoyada en el centro (Pepper's
+ghost): cada cara refleja el cuadrante que tiene delante, y la reflexión espeja la imagen.
+Es una CONVENCIÓN de composición 2D, no verificada contra una pirámide física de verdad; si
+la orientación no coincide, cambia el signo de los ángulos. El fondo se fuerza a negro puro
+(ignora `--fondo`, el efecto exige negro de verdad). Los cuatro cuadrantes son cuatro copias
+2D (`drawImage`) del MISMO fotograma que ya pinta el `<canvas>` WebGL (que sigue montado
+pero oculto): no se crean más contextos WebGL ni se recorre la escena cuatro veces.
 
 `--png [salida.png]`: además de la página, la abre en un navegador sin cabeza (Chrome o
-Edge; se busca en las rutas habituales de Windows — `msedge.exe`/`chrome.exe` — y en el
-PATH en Linux/macOS: `google-chrome`/`chromium`) y guarda una captura. Sin navegador
-encontrado: «sin dato: no hay navegador sin cabeza», código 2 — la página HTML igualmente
-se ha escrito (no depende del navegador). WebGL renderiza con aceleración si el navegador
-la tiene; sin ella el navegador sin cabeza cae a SwiftShader (software) y tarda más — no
-hay «fallback a WebGL» porque WebGL YA es el camino normal en la propia página.
+Edge; rutas habituales de Windows — `msedge.exe`/`chrome.exe` — o el PATH en Linux/macOS:
+`google-chrome`/`chromium`) y guarda una captura. Sin navegador encontrado: «sin dato: no
+hay navegador sin cabeza», código 2 — la página HTML igualmente se ha escrito. El primer
+fotograma se pinta de forma SÍNCRONA, antes del bucle de `requestAnimationFrame`, y cada
+intento se acepta solo si el PNG pesa 10 KB o más (un fotograma en blanco comprime mucho más
+pequeño que uno con luces, rejilla y geometría); si no, reintenta hasta 3 veces con 1,5 s de
+espera. Si las tres fallan, se queda con el último PNG (con aviso) en vez de reventar
+teniendo ya algo que mostrar — solo lanza si NINGÚN intento deja fichero.
 
 Formatos de entrada:
   - `escena.json` (diagramas sin CAD, sin geometría real): `{"unidades": "m", "piezas":
@@ -85,33 +73,16 @@ la página desplaza cada grupo, como bloque rígido, en la dirección desde el c
 la escena hacia el centroide de ese grupo, escalado por el radio de la escena — así el
 efecto se ve igual de bien sin importar las unidades del modelo.
 
-Tres controles más en la página, todos en vivo (no son banderas de la CLI, que solo fija
-el estado INICIAL): casilla de rejilla, casilla de alambre, y tres pares casilla+deslizador
-de plano de corte (uno por eje). Y el botón «Capturar PNG», que descarga el fotograma
-actual del `<canvas>` (con `preserveDrawingBuffer` a propósito: sin él, `toDataURL()` puede
-devolver un lienzo vacío).
+Otros controles de la página, todos en vivo (no son banderas de la CLI, que solo fija el
+estado INICIAL): casilla de rejilla, casilla de alambre, tres pares casilla+deslizador de
+plano de corte (uno por eje), y el botón «Capturar PNG» (descarga el fotograma actual del
+`<canvas>`, con `preserveDrawingBuffer` a propósito: sin él, `toDataURL()` puede devolver un
+lienzo vacío).
 
-Tres es el número de reintentos de `--png`, no una promesa de que el primero vaya a fallar:
-el primer fotograma se pinta de forma SÍNCRONA, antes de arrancar el bucle de
-`requestAnimationFrame` (para que ya esté dibujado cuando el navegador sin cabeza dispara
-la captura al terminar de cargar), y el guion, tras cada intento, comprueba que el PNG
-resultante pesa por lo menos 10 KB (medido: un fotograma realmente en blanco de estas
-dimensiones comprime muchísimo más pequeño que uno con luces, rejilla y geometría) — si no,
-borra el intento y prueba otra vez, hasta 3 veces con 1,5 s
-de espera entre cada una, avisando en cada reintento. Si las tres fallan, se queda con el
-último PNG (puede llevar un aviso: «PNG de N bytes, por debajo de 10000») en vez de reventar
-teniendo ya algo que mostrar — solo lanza si NINGÚN intento deja fichero.
-
-Medido el 7-sep-2026 en la máquina de desarrollo (Windows, msedge.exe headless,
-SwiftShader por software con --disable-gpu): `--png` sobre `pruebas/datos/escena_prueba.json`
-(3 piezas, 1600×900) acertó al PRIMER intento las 3 veces que se repitió seguido, entre
-1,05 y 2,02 s (PNG de 70.801 bytes, por encima del umbral de 10 KB con margen de sobra).
-
-Dependencias: NINGUNA fuera de la biblioteca estándar (a propósito: la página que se genera
-no necesita más que `abyss/vendor/three.min.js` y `abyss/vendor/orbita_minima.js`, embebidos
-tal cual — ver sus docstrings/LICENSE-three.txt — así que tampoco este guion necesita nada
-más para construirla). `--png` lanza un proceso de navegador con `subprocess`, nunca instala
-nada.
+Dependencias: NINGUNA fuera de la biblioteca estándar (la página que se genera no necesita
+más que `abyss/vendor/three.min.js` y `abyss/vendor/orbita_minima.js`, embebidos tal cual —
+ver sus docstrings/LICENSE-three.txt). `--png` lanza un proceso de navegador con
+`subprocess`, nunca instala nada.
 
 Límites honestos: esto es un visor y editor de vistas, no un modelador (no repara mallas,
 no simplifica, no exporta). La vista explosionada exige piezas YA separadas en el fichero de
@@ -374,9 +345,8 @@ _NUMCOMP = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT2": 4, "MAT3": 9, 
 def _gltf_leer_accessor(gltf, buffers, idx):
     """Solo el caso común: accessor con `bufferView`, sin `sparse`, sin normalizar
     (POSITION/NORMAL en float32, índices en uint16/uint32 — lo que exportan Blender y
-    la mayoría de herramientas para mallas simples). Un accessor `sparse` o normalizado
-    se lee igual pero SIN aplicar esas dos correcciones (aviso, no excepción, para no
-    tirar todo el modelo por una sola primitiva rara)."""
+    la mayoría de herramientas). Un accessor `sparse` o normalizado se lee igual pero
+    SIN esas dos correcciones (aviso, no excepción, para no tirar todo el modelo)."""
     acc = gltf["accessors"][idx]
     n = _NUMCOMP[acc["type"]]
     fmt, sz = _COMPONENTE[acc["componentType"]]
@@ -593,18 +563,17 @@ def _leer_vendor(nombre):
 
 
 def _texto_three_embebido():
-    """El vendor tal cual (ver LICENSE-three.txt), con sus DOS únicas URLs (una en el aviso
-    de obsolescencia del build UMD, otra repetida dos veces en un aviso sobre gestión de
-    color) recortadas al vuelo a "threejs.org/..." / "discourse.threejs.org/..." (se les
-    quita solo el esquema `https://`, dentro de textos de `console.warn` que nadie llega a
-    fetch-ear) — así la página generada no lleva ninguna URL externa de verdad.
+    """El vendor tal cual (ver LICENSE-three.txt), con sus DOS URLs (aviso de
+    obsolescencia del build UMD; aviso de gestión de color) recortadas al vuelo a
+    "threejs.org/..." — se les quita solo el esquema `https://`, dentro de
+    `console.warn` que nadie llega a fetch-ear — así la página generada no lleva
+    ninguna URL externa de verdad.
 
-    OJO: la ÚNICA otra cadena `http` del fichero es `"http://www.w3.org/1999/xhtml"`, el
-    espacio de nombres XHTML que usa internamente `document.createElementNS(...)` para
-    crear el `<canvas>` — esa NO se toca (recortarle el esquema la convertiría en un
-    espacio de nombres distinto y `createElementNS` dejaría de darte un `HTMLCanvasElement`
-    de verdad: es un identificador, nunca se descarga). El fichero en `vendor/` no se toca;
-    esto solo afecta a la copia que se escribe en cada HTML."""
+    OJO: la única otra cadena `http` del fichero, `"http://www.w3.org/1999/xhtml"`,
+    es el espacio de nombres XHTML de `document.createElementNS(...)` — NO se toca:
+    recortarle el esquema la convertiría en un espacio de nombres distinto y dejaría
+    de dar un `HTMLCanvasElement` de verdad (es un identificador, nunca se descarga).
+    El fichero en `vendor/` no se toca; esto solo afecta a la copia del HTML."""
     texto = _leer_vendor("three.min.js")
     texto = texto.replace("https://threejs.org", "threejs.org")
     texto = texto.replace("https://discourse.threejs.org", "discourse.threejs.org")
@@ -1050,13 +1019,11 @@ def _construir_html(escena_embebida, titulo, explosion_inicial):
 # ───────────────────────────────── navegador sin cabeza ─────────────────────────────────
 
 def _buscar_navegador():
-    """Ruta a un ejecutable de Chrome/Edge sin cabeza, o `None` si no se encuentra ninguno.
-
-    `ABYSS_RENDER3D_NAVEGADOR` (si está puesta, aunque sea vacía) MANDA sobre la búsqueda
-    real: existe solo para las pruebas de este paquete (poder forzar tanto "aquí está" como
-    "aquí no hay nada" sin depender de qué navegadores tenga instalados la máquina que
-    ejecuta la suite) — en uso normal nunca se define, igual que `ABYSS_OPENVERSE_URL` en
-    `imagen.py`."""
+    """Ruta a un ejecutable de Chrome/Edge sin cabeza, o `None` si no se encuentra
+    ninguno. `ABYSS_RENDER3D_NAVEGADOR` (si está puesta, aunque sea vacía) MANDA
+    sobre la búsqueda real: existe para las pruebas (forzar "aquí está" o "aquí no
+    hay nada" sin depender de qué navegadores tenga la máquina); en uso normal
+    nunca se define."""
     forzado = os.environ.get("ABYSS_RENDER3D_NAVEGADOR")
     if forzado is not None:
         return forzado if (forzado and os.path.isfile(forzado)) else None
@@ -1101,13 +1068,11 @@ def _capturar_png(ruta_html, ruta_png, ancho, alto, avisar=print, navegador=None
     t0 = time.time()
 
     # ── primero, por el protocolo del navegador ─────────────────────────────
-    # La bandera `--screenshot` dejó de servir para esta página. Medido el 9-sep-2026 con
-    # Edge 152.0.4191.66: sobre la escena WebGL da 0 bytes en `--headless`, `--headless=old`
-    # y `--headless=new`, con y sin `--disable-gpu` y con SwiftShader — tres intentos, todos
-    # vacíos; y sobre una página trivial alterna 0 y 1.981 bytes entre intentos, que es una
-    # carrera, no una avería. Por el protocolo, la misma escena sale a la primera.
-    # La bandera se conserva DEBAJO como respaldo: en otra máquina o con otra versión puede
-    # seguir siendo el camino bueno, y quitarla sería cambiar una suposición por otra.
+    # La bandera `--screenshot` no es fiable sobre esta página (WebGL): puede dar 0
+    # bytes o entrar en una carrera con el renderizado, según versión/plataforma del
+    # navegador. Por el protocolo, la misma escena sale a la primera. La bandera se
+    # conserva DEBAJO como respaldo: en otra máquina o versión puede seguir siendo el
+    # camino bueno, y quitarla sería cambiar una suposición por otra.
     try:
         from navegador_cdp import captura as _captura_cdp
     except ImportError:
@@ -1160,22 +1125,19 @@ def renderizar(entrada, html=None, png=None, explosion=0.0, ancho=1600, alto=900
                camara=None, mirar=None, fondo=None, luz="neutra", holograma=False,
                acabado="mate", avisar=print, navegador=None):
     """Lee `entrada` (glb/gltf/obj/stl/escena.json), escribe SIEMPRE una página HTML
-    autocontenida (`html`: ruta exacta si es una cadena; si no — `None` o `True`, para la
-    bandera `--html` sin valor — `<carpeta_de_entrada>/<base>_render3d.html`) y, si `png`
-    no es `None`, además una captura vía navegador sin cabeza (mismo criterio de ruta con
-    `_render3d.png`; lanza `SinNavegador` si no se encuentra ninguno).
+    autocontenida (`html`: ruta exacta si es cadena; si no, `<carpeta_de_entrada>/
+    <base>_render3d.html`) y, si `png` no es `None`, además una captura vía
+    navegador sin cabeza (mismo criterio de ruta con `_render3d.png`; lanza
+    `SinNavegador` si no se encuentra ninguno).
 
-    `camara`/`mirar`: `"x,y,z"` o `[x,y,z]`; si no se dan, se usa la `camara` de
-    `escena.json` (si la trae) y si tampoco, un encuadre automático a 3/4 sobre el centro
-    de toda la escena. `fondo`: `"#rrggbb"` (por defecto `#15151a`; ignorado, forzado a
-    `#000000`, si `holograma=True` — ver docstring del módulo). `luz`: calida/fria/neutra.
-    `holograma`: cuatro cuadrantes espejados sobre negro (Pepper's ghost). `acabado`:
-    `mate` (por defecto) o `estudio` (metal con reflejos, entorno procedural, sombras suaves,
-    suelo oscuro, sin rejilla al arrancar — ver docstring del módulo).
+    `camara`/`mirar`: `"x,y,z"` o `[x,y,z]`; sin ellos, la `camara` de
+    `escena.json` si la trae, y si no, un encuadre automático a 3/4 sobre el
+    centro de la escena. `fondo`: `"#rrggbb"` (por defecto `#15151a`; forzado a
+    `#000000` si `holograma=True`). `luz`: calida/fria/neutra. `acabado`:
+    mate/estudio (ver docstring del módulo para `holograma`/`acabado`).
 
-    Devuelve un dict con `html`, `png` (o `None`), `piezas`, `grupos`, `centro`, `radio`, y
-    -si hubo `--png`- `segundos_png`/`intentos_png`/`bytes_png` (y `aviso` si el PNG final
-    quedó por debajo del umbral tras los 3 intentos)."""
+    Devuelve un dict con `html`, `png`, `piezas`, `grupos`, `centro`, `radio`, y
+    -si hubo `--png`- `segundos_png`/`intentos_png`/`bytes_png`/`aviso`."""
     ruta_entrada = os.path.abspath(entrada)
     piezas, camara_json, unidades = cargar_entrada(ruta_entrada, avisar=avisar)
 

@@ -2,33 +2,24 @@
 """Instalador / desinstalador de Abyss (ESPECIFICACION.md §4). Vive en la RAÍZ del
 repo, junto a `abyss/` (el paquete de código) y `plantillas/` (semillas de datos).
 
-Qué hace y qué no:
-  - Escribe ganchos en TU `settings.json` (por defecto `~/.claude/settings.json`,
-    cambia con `--settings <ruta>`) apuntando al código instalado aquí, con el
-    `python` que detecte o el que le digas (`--python <exe>`). NUNCA quita un gancho
-    ajeno: en cada evento se AÑADE una entrada nueva a la lista.
-  - Como ese `settings.json` es GLOBAL, los ganchos disparan en TODOS tus proyectos
-    de Claude Code, no solo en el que tenías abierto al instalar: no existe "el
-    proyecto instalado". Cada gancho resuelve su propio proyecto en cada invocación
-    (`rutas.resolver()`, por el `transcript_path`/`cwd` de ESE gancho) y guarda ahí
-    su propia memoria — la de un proyecto nunca se mezcla con la de otro.
-  - Antes de tocar `settings.json` deja una COPIA FECHADA al lado
-    (`settings.json.abyss-AAAAMMDD-HHMMSS.bak`).
-  - Apunta todo lo añadido (ganchos por firma, claves con su valor previo, permisos,
-    telegram) en `mem/abyss_manifiesto.json`, donde `mem` es la memoria del PROYECTO
-    desde el que se instala (§1: se resuelve con `rutas.resolver()`; si no hay
-    `--proyecto <cwd>` ni `ABYSS_PROYECTO`, se usa el cwd actual — el instalador se
-    teclea a mano, nunca hay stdin de un gancho).
-  - Desinstalar quita SOLO las entradas cuyo comando apunta a nuestro código (o, para
-    telegram, al `.ps1` que escribimos nosotros) y restaura las claves de preferencia
-    y de permisos a su valor previo (o las borra si no existían). Pregunta antes de
-    borrar sesiones/relojes/etc. generados — por defecto NO los toca.
-  - Nada de esto escribe en el repo del usuario. En la carpeta del CÓDIGO (`abyss/`)
-    solo se escribe `abyss/config.json` (§1/§4: la única excepción permitida), con
-    el `python` detectado/usado la última vez — nada más. Las plantillas de datos
-    (`plantillas/*.json`) se copian a `mem/` solo si el destino no existe todavía.
+Escribe ganchos en TU `settings.json` (por defecto `~/.claude/settings.json`,
+`--settings <ruta>` para otro) apuntando al código instalado aquí, con el `python`
+detectado o el que le digas (`--python <exe>`); NUNCA quita un gancho ajeno, solo
+AÑADE una entrada nueva en cada evento. Como `settings.json` es GLOBAL, los ganchos
+disparan en TODOS tus proyectos: cada uno resuelve su propio `proj`/`mem` en cada
+invocación (`rutas.resolver()`, §1, por el `transcript_path`/`cwd` de ESE gancho),
+sin mezclar memoria entre proyectos. Antes de tocar `settings.json` deja una copia
+fechada al lado (`settings.json.abyss-AAAAMMDD-HHMMSS.bak`); apunta todo lo añadido
+(ganchos, claves con su valor previo, permisos, telegram) en
+`mem/abyss_manifiesto.json` para que desinstalar pueda restaurarlo. Desinstalar
+quita SOLO las entradas cuyo comando apunta a nuestro código y restaura las claves
+de preferencia/permisos a su valor previo; pregunta antes de borrar datos generados
+(sesiones/relojes/etc.) — por defecto NO los toca. Nada de esto escribe en el repo
+del usuario; en `abyss/` solo se escribe `abyss/config.json` (§1/§4, la única
+excepción). Sin rutas de usuario en el código: dónde está `~/.claude`, qué proyecto
+y qué `python` se resuelven en tiempo de ejecución.
 
-Módulos (nombre · una línea · qué toca) — ver `MODULOS` más abajo; `--listar` los
+Módulos (nombre · una línea · qué toca): ver `MODULOS` más abajo; `--listar` los
 imprime todos con su estado real leído de `settings.json`.
 
 Uso por línea de comandos:
@@ -49,49 +40,40 @@ aviso) y botones — Instalar / Desinstalar / Dependencias / Cerrar — que llam
 las mismas `instalar()`/`desinstalar()`/`instalar_dependencias()` de aquí abajo:
 no hay una segunda implementación.
 
-Sin rutas de usuario en el código: todo lo que toca a un usuario concreto (dónde
-está `~/.claude`, qué proyecto, qué `python`) se resuelve en tiempo de ejecución.
+`--dependencias` mira, con un `import` REAL bajo el `python` que se vaya a usar
+(nunca una lista fija de "lo que suele hacer falta"), qué le falta a cada módulo con
+paquetes de pip opcionales (`DEPENDENCIAS`, más abajo) y lo dice en una tabla
+(falta/paquete/tamaño aprox.). `--instalar-dependencias [mod1,mod2]` (o la casilla
+«Dependencias» de la ventana) instala lo que de verdad falta con `sys.executable -m
+pip install <paquete>`, UN paquete a la vez, enseñando el comando ANTES de correrlo
+y el resultado DESPUÉS — nunca en silencio, nunca desde un gancho, nunca reintenta
+solo un fallo. Lo que pip no puede poner (el binario `tesseract` en Linux/macOS;
+`torch`+`diffusers` para `taller.py`, detectando GPU NVIDIA con `nvidia-smi`) se
+dice como comando exacto del gestor que corresponda, nunca se finge instalado.
+`--desinstalar-dependencias` NO existe a propósito: quitar paquetes de Python del
+entorno de alguien es más arriesgado que ponerlos.
 
-Quinta tanda (dependencias de terceros): `--dependencias` mira, con un
-`import` REAL bajo el `python` que se vaya a usar (nunca una lista fija de "lo que
-suele hacer falta"), qué le falta a cada módulo con paquetes de pip opcionales
-(`DEPENDENCIAS`, más abajo) y lo dice en una tabla (falta/paquete/tamaño aprox.).
-`--instalar-dependencias [mod1,mod2]` (o la casilla «Dependencias» de la ventana)
-instala lo que de verdad falta con `sys.executable -m pip install <paquete>`, UNA
-paquete a la vez, enseñando el comando ANTES de correrlo y el resultado DESPUÉS —
-nunca en silencio, nunca desde un gancho, nunca reintenta solo un fallo. Lo que
-pip no puede poner (el binario `tesseract` en Linux/macOS; `torch`+`diffusers` para
-`taller.py`, detectando GPU NVIDIA con `nvidia-smi`) se dice como comando exacto
-del gestor que corresponda, nunca se finge instalado. `--desinstalar-dependencias`
-NO existe a propósito: quitar paquetes de Python del entorno de alguien es más
-arriesgado que ponerlos.
+Todo lo que ve el usuario en la ventana, la CLI y los avisos pasa por `TEXTOS`
+(`_texto(idioma, clave, **fmt)`), con `--idioma es|en` o, por defecto, el idioma del
+sistema (inglés si no empieza por "es"). Los guiones (`abyss/*.py`) siguen
+documentados y con sus propios mensajes SIEMPRE en castellano — es el idioma del
+código — salvo lo que este instalador imprime.
 
-Quinta tanda (bilingüe): todo lo que ve el usuario en la ventana, la CLI y
-los avisos pasa por `TEXTOS` (`_texto(idioma, clave, **fmt)`), con `--idioma
-es|en` o, por defecto, el idioma del sistema (inglés si no empieza por "es"). Los
-guiones (`abyss/*.py`) siguen documentados y con sus propios mensajes SIEMPRE en
-castellano — es el idioma del código — salvo lo que este instalador imprime. Las
-líneas de `MODULOS` (`linea`) son documentación del código y se muestran igual en
-los dos idiomas; el detalle `toca`/`aviso` (con vocabulario castellano de control
-como «ganchos») solo se imprime en `--idioma es`, para no dejar vocabulario sin
-traducir en la vista inglesa — el README/SKILL en inglés cubre ese detalle.
-
-Sexta tanda (T6, MediaPipe Tasks Vision para el visor cinético): el JS+wasm+
-modelo de manos que necesita `abyss/plantillas/kinetica.html` (vía `gestos.py`)
-NO se instala con pip — es un paquete de NPM que corre DENTRO DEL NAVEGADOR,
-servido por jsdelivr, más el modelo de manos de Google
-(`storage.googleapis.com`). Pesa ~27 MB en total (medido 8-sep-2026: seis
+MediaPipe Tasks Vision para el visor cinético: el JS+wasm+modelo de manos que
+necesita `abyss/plantillas/kinetica.html` (vía `gestos.py`) NO se instala con pip —
+es un paquete de NPM que corre DENTRO DEL NAVEGADOR, servido por jsdelivr, más el
+modelo de manos de Google (`storage.googleapis.com`). Pesa ~27 MB en total (seis
 ficheros, ver `VENDOR_MP`) y por eso NUNCA va en el repositorio de git — a
 diferencia de `three.min.js`, que sí se commitea por pesar unos cientos de KB.
-`--manos` los baja a `abyss/vendor/mp/`, SOLO los que falten (si ya están
-todos, no toca la red); enseña ANTES de empezar de dónde y cuánto ocupa cada
-uno — nunca en silencio, nunca desde un gancho. Sin red: UN aviso limpio
-(nunca una traza de Python) y se para ahí mismo, sin repetir el mismo fallo con
-lo que quedara por bajar. `--dependencias` también dice si estos ficheros
-están o faltan, igual que con los paquetes de pip (pero no son lo mismo: no se
-instalan con `--instalar-dependencias`). La licencia (Apache License 2.0, del
-propio proyecto MediaPipe) se escribe aparte, en
-`abyss/vendor/mp/LICENSE-mediapipe.txt`, al terminar la descarga.
+`--manos` los baja a `abyss/vendor/mp/`, SOLO los que falten (si ya están todos, no
+toca la red); enseña ANTES de empezar de dónde y cuánto ocupa cada uno — nunca en
+silencio, nunca desde un gancho. Sin red: UN aviso limpio (nunca una traza de
+Python) y se para ahí mismo, sin repetir el mismo fallo con lo que quedara por
+bajar. `--dependencias` también dice si estos ficheros están o faltan, igual que
+con los paquetes de pip (pero no son lo mismo: no se instalan con
+`--instalar-dependencias`). La licencia (Apache License 2.0, del propio proyecto
+MediaPipe) se escribe aparte, en `abyss/vendor/mp/LICENSE-mediapipe.txt`, al
+terminar la descarga.
 """
 import os
 import sys
@@ -151,7 +133,7 @@ import rutas  # noqa: E402
 SETTINGS_POR_DEFECTO = os.path.join(os.path.expanduser('~'), '.claude', 'settings.json')
 MANIFIESTO_NOMBRE = 'abyss_manifiesto.json'
 
-# Segunda tanda: el módulo `esceptico` no es un guion Python — es una skill
+# El módulo `esceptico` no es un guion Python — es una skill
 # de Claude Code (`skills/esceptico/SKILL.md` en este repo) que se COPIA a la
 # carpeta de skills del usuario, igual que `~/.claude/settings.json` es la carpeta
 # de ganchos por defecto. `--skills-dir <ruta>` la cambia (pruebas, o una instalación
@@ -175,7 +157,7 @@ DATOS_GENERADOS = (
     'confabulaciones.jsonl', 'lugar.json', 'meteo.json', '.modelo_revisado',
     'modelo_log.jsonl', 'noticias.json', 'temas_auto.json', 'temas_veto.json',
     'temas_log.jsonl', 'ojo.log', 'propiocepcion.json', 'imagen.log', 'imagenes',
-    # Segunda tanda: telemetría/caché regenerable de las piezas nuevas. NO incluye
+    # Telemetría/caché regenerable de las piezas nuevas. NO incluye
     # `parentesis.json` (tramos que el usuario pidió a propósito, no telemetría
     # automática) ni `imagen_config.json` (claves puestas a mano) — mismo criterio
     # de arriba: solo lo que el propio programa genera por su cuenta.
@@ -198,8 +180,8 @@ def _script(nombre):
 #
 # Sin `statusMessage`: no aparece en el esquema de gancho documentado (skill oficial
 # `hook-development`: {type, command, timeout} para un gancho de tipo `command`) ni
-# en ningún `settings.json` real encontrado en esta máquina — se quitó el 6-sep tras
-# no poder verificarla contra ninguna fuente (ver ESPECIFICACION.md §4).
+# en ningún `settings.json` real — sin poder verificarla contra ninguna fuente, no se
+# declara (ver ESPECIFICACION.md §4).
 # ---------------------------------------------------------------------------------
 MODULOS = [
     dict(id='continuidad', script='continuidad.py', defecto=True,
@@ -231,11 +213,10 @@ MODULOS = [
          linea='Avisa si Fable bajó a Opus y qué revisar cuando se vuelve.',
          linea_en='Warns if Fable dropped to Opus, and what to check when it comes back.',
          # Sin gancho propio: no existe un evento «PostModelSwitch»/«PreModelSwitch» en
-         # Claude Code (comprobado 6-sep contra la documentación de ganchos: los eventos
-         # reales son PreToolUse, PostToolUse, Stop, SubagentStop, SessionStart,
-         # SessionEnd, UserPromptSubmit, PreCompact, Notification). Antes se declaraba
-         # aquí un gancho que nunca se disparaba. `modelo.py` es
-         # ahora solo una librería que usa `continuidad.py --despertar` en cada prompt.
+         # Claude Code (los eventos reales son PreToolUse, PostToolUse, Stop,
+         # SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact,
+         # Notification). `modelo.py` es una librería que usa `continuidad.py
+         # --despertar` en cada prompt.
          toca='sin gancho propio (lo usa continuidad --despertar); ficheros mem/modelo_preferido.json',
          hooks=[],
          plantilla='modelo_preferido.json',
@@ -623,12 +604,12 @@ DEPENDENCIAS = {
     ],
 }
 
-# Tamaños aproximados de la RUEDA (wheel) — medidos consultando la API JSON de
-# pypi.org el 7-sep-2026 (rueda cp312/cp313 win_amd64 cuando existe; `pypdf` es
-# universal, "py3-none-any"). Varían por plataforma/versión de Python y NO son lo
-# que ocupará en disco (una dependencia transitiva ya instalada no vuelve a
-# contar) — por eso la tabla los marca como "aprox." y nunca como una promesa; si
-# algún paquete faltara aquí, la tabla dice «sin dato» en vez de inventar uno.
+# Tamaños aproximados de la RUEDA (wheel) — de la API JSON de pypi.org (rueda
+# cp312/cp313 win_amd64 cuando existe; `pypdf` es universal, "py3-none-any").
+# Varían por plataforma/versión de Python y NO son lo que ocupará en disco (una
+# dependencia transitiva ya instalada no vuelve a contar) — por eso la tabla los
+# marca como "aprox." y nunca como una promesa; si algún paquete faltara aquí, la
+# tabla dice «sin dato» en vez de inventar uno.
 TAMANOS_APROX_MB = {
     'Pillow': 6.9,
     'numpy': 12.0,
@@ -641,15 +622,13 @@ TAMANOS_APROX_MB = {
 
 
 # ---------------------------------------------------------------------------------
-# T6 · MediaPipe Tasks Vision vendorizado para el visor cinético (kinetica.html +
+# MediaPipe Tasks Vision vendorizado para el visor cinético (kinetica.html +
 # gestos.py) — DISTINTO de la entrada 'gestos' de `DEPENDENCIAS` de arriba: aquella
 # es el paquete de PIP `mediapipe` (Python, para el resto de verbos de gestos.py);
 # esto es el paquete de NPM `@mediapipe/tasks-vision` (JavaScript + WebAssembly),
-# que corre DENTRO DEL NAVEGADOR y nunca se instala con pip. Los seis ficheros y
-# tamaños de abajo están MEDIDOS (descargados y comprobados el 8-sep-2026; ver el
-# informe de la tarea) — no se afina más de lo que ahí se midió. `destino` es
-# siempre con "/" (nunca `os.sep` a pelo): `_ruta_vendor_mp` lo pasa por
-# `os.path.join` para que valga en Windows y en POSIX por igual.
+# que corre DENTRO DEL NAVEGADOR y nunca se instala con pip. `destino` es siempre
+# con "/" (nunca `os.sep` a pelo): `_ruta_vendor_mp` lo pasa por `os.path.join`
+# para que valga en Windows y en POSIX por igual.
 # ---------------------------------------------------------------------------------
 COMANDO_DESCARGAR_MANOS = 'python instalar.py --manos'
 
@@ -819,7 +798,7 @@ def instalar_dependencias(modulos, *, python_exe=None, idioma='es'):
 
 
 # ---------------------------------------------------------------------------------
-# T6 · descarga de MediaPipe Tasks Vision (`--manos`) — ver `VENDOR_MP` arriba.
+# Descarga de MediaPipe Tasks Vision (`--manos`) — ver `VENDOR_MP` arriba.
 # Se llama SOLO desde `--manos` en `__main__` (nunca desde un gancho, nunca al
 # arrancar, nunca desde `instalar()`/`desinstalar()`): mismo principio que
 # `instalar_dependencias()`, que tampoco corre sola. Regla dura 5 del encargo
@@ -869,13 +848,12 @@ def _descargar_uno(url, destino_abs, *, timeout=30):
 
 
 # Metadatos + texto COMPLETO de la Apache License 2.0 (fuente:
-# https://www.apache.org/licenses/LICENSE-2.0.txt, comprobado 8-sep-2026, 11.358
-# bytes, sin modificar). Es la licencia que el propio paquete declara
-# ("license": "Apache-2.0" en el package.json de @mediapipe/tasks-vision@0.10.14,
-# comprobado ese mismo día) — mismo patrón que `abyss/vendor/LICENSE-three.txt`,
-# pero escrito por el instalador (estos ficheros nunca se commitean: no hay un
-# `LICENSE-mediapipe.txt` fijo en el repo, se genera cada vez que se corre
-# `--manos`, junto a lo que descarga).
+# https://www.apache.org/licenses/LICENSE-2.0.txt, 11.358 bytes, sin modificar). Es
+# la licencia que el propio paquete declara ("license": "Apache-2.0" en el
+# package.json de @mediapipe/tasks-vision@0.10.14) — mismo patrón que
+# `abyss/vendor/LICENSE-three.txt`, pero escrito por el instalador (estos ficheros
+# nunca se commitean: no hay un `LICENSE-mediapipe.txt` fijo en el repo, se genera
+# cada vez que se corre `--manos`, junto a lo que descarga).
 _LICENCIA_MEDIAPIPE_TEXTO = """MediaPipe Tasks Vision — vendorizado para abyss/gestos.py y
 abyss/plantillas/kinetica.html (T6)
 
@@ -1269,7 +1247,7 @@ def _texto_no_instalables(idioma):
 
 
 def _tabla_vendor_mp(idioma):
-    """T6: la fila de `--dependencias` para MediaPipe Tasks Vision (el vendor de
+    """La fila de `--dependencias` para MediaPipe Tasks Vision (el vendor de
     `abyss/vendor/mp/`, ver `VENDOR_MP`) — dice, fichero a fichero, si está o
     falta (mismo `os.path.isfile` real de `_estado_vendor_mp`, nunca una
     suposición). No son paquetes de pip: `--instalar-dependencias` no los toca;
@@ -1306,19 +1284,14 @@ def _tabla_dependencias(idioma, modulos=None, python_exe=None):
 # no vocabulario de interfaz — pero SÍ se traducen, con el mismo fail-closed,
 # junto a su dato: `mod['linea']`/`mod['linea_en']` en `MODULOS` (la descripción
 # de una frase de cada módulo; ver `_listar()`) y `e['para']`/`e['para_en']` en
-# `DEPENDENCIAS` (la columna «para qué»; ver `_para_localizado()`). Antes de que
-# existieran `linea_en`/`para_en` (medido 7-sep), `--idioma en --dependencias` y
-# `--idioma en --listar` imprimían esos dos bloques enteros en castellano sin
-# avisarlo — la mayoría de lo que el usuario veía en pantalla, incumpliendo
-# justo la promesa de este párrafo; ahora si a una entrada le faltara la
-# traducción, cae a su castellano en vez de dejar la fila muda, igual que
-# `_texto()`.
+# `DEPENDENCIAS` (la columna «para qué»; ver `_para_localizado()`). Si a una
+# entrada le faltara la traducción, cae a su castellano en vez de dejar la fila
+# muda, igual que `_texto()`.
 #
-# `mod['toca']`/`mod['aviso']` SÍ se quedan sin traducir a propósito: llevan
-# vocabulario de control castellano (nombres de gancho, rutas de `mem/`, verbos
-# de la CLI) que traducido a medias sería peor que no traducido — `_listar()`
-# los OMITE en inglés en vez de imprimirlos así, y `listar_detalle_nota` (abajo)
-# lo dice.
+# `mod['toca']`/`mod['aviso']` se traducen igual que `linea`, vía `toca_en`/
+# `aviso_en` con el mismo fail-closed: si a una entrada le faltara la traducción,
+# cae a su castellano de control (nombres de gancho, rutas de `mem/`, verbos de
+# la CLI) antes que dejar la fila muda.
 # ---------------------------------------------------------------------------------
 TEXTOS = {
     'es': {
@@ -1451,8 +1424,7 @@ TEXTOS = {
         'estado_instalado': 'installed',
         'estado_no_instalado': 'not installed',
         'estado_sin_gancho': 'no hook of its own',
-        'listar_detalle_nota': ('  (details omitted here: they carry untranslated Spanish control '
-                                 'vocabulary; run --idioma es --listar, or see README.en.md)'),
+        'listar_detalle_nota': '',  # the per-module details are translated too: no note needed
         'apagado_como': 'off by default; to turn it on:',
         'toca_label': 'touches:',
         'aviso_label': 'note:',
@@ -1619,16 +1591,15 @@ def _leer_json(ruta):
 
 
 def _escribir_json(ruta, datos):
-    """Escribe `datos` como JSON con indent=2. `newline='\\n'` a propósito
-    (fallo "roza" medido 7-sep): sin esto, `open(..., 'w')` en Windows traduce
-    cada `\\n` del texto a `\\r\\n` al escribir, así que un `settings.json` de
-    partida en LF (lo que escriben tanto los editores como el propio Claude
-    Code) volvía en CRLF tras instalar/desinstalar — mismo CONTENIDO (el JSON
-    parseado es idéntico) pero el fichero ENTERO aparecía como modificado en
-    cualquier diff o git, aunque nada del usuario hubiera cambiado. Con
-    `newline='\\n'` el caso común (LF de entrada) vuelve BYTE A BYTE, y el
-    aviso del README pasa a cubrir solo lo que de verdad no se puede
-    garantizar (otro indent, otro orden de claves)."""
+    """Escribe `datos` como JSON con indent=2. `newline='\\n'` a propósito: sin
+    esto, `open(..., 'w')` en Windows traduce cada `\\n` del texto a `\\r\\n` al
+    escribir, así que un `settings.json` de partida en LF (lo que escriben tanto
+    los editores como el propio Claude Code) volvía en CRLF tras instalar/
+    desinstalar — mismo CONTENIDO (el JSON parseado es idéntico) pero el fichero
+    ENTERO aparecía como modificado en cualquier diff o git, aunque nada del
+    usuario hubiera cambiado. Con `newline='\\n'` el caso común (LF de entrada)
+    vuelve BYTE A BYTE; lo que no se puede garantizar es otro indent u otro orden
+    de claves."""
     carpeta = os.path.dirname(os.path.abspath(ruta))
     if carpeta:
         os.makedirs(carpeta, exist_ok=True)
@@ -1641,13 +1612,10 @@ def _escribir_json(ruta, datos):
 
 def _copia_fechada(ruta):
     """Copia `ruta` a `ruta.abyss-AAAAMMDD-HHMMSS[-N].bak` si existe. Se hace SIEMPRE
-    antes de escribir settings.json, tanto al instalar como al desinstalar.
-
-    Medido 6-sep: instalar→desinstalar seguidos (mismo segundo) dejaba UNA sola
-    copia, porque el nombre ya estaba tomado y la segunda llamada se saltaba entera
-    — la copia previa al desinstalado (justo la red de seguridad que hace falta si
-    el desinstalado sale mal) desaparecía en silencio. Ahora, si el nombre ya existe,
-    se añade un sufijo incremental en vez de saltarse la copia."""
+    antes de escribir settings.json, tanto al instalar como al desinstalar. Si el
+    nombre ya existe (instalar→desinstalar seguidos, mismo segundo), añade un
+    sufijo incremental en vez de saltarse la copia — la copia previa es la red de
+    seguridad si el paso siguiente sale mal, y no debe desaparecer en silencio."""
     if not os.path.exists(ruta):
         return None
     base = f'{ruta}.abyss-{time.strftime("%Y%m%d-%H%M%S")}'
@@ -1759,13 +1727,12 @@ def _quotar(s):
 
 
 def _construir_command(ejecutable, args):
-    """Une `ejecutable` + `args` en UNA sola cadena para la clave `command`.
-
-    Medido 6-sep: el esquema REAL de un gancho de `settings.json` de Claude Code es
-    `{type, command, timeout}` con la línea de órdenes ENTERA dentro de `command` —
-    no existe un campo `args` aparte. La versión anterior de este instalador escribía
-    `{"command": "<python.exe>", "args": ["<script>", "--bandera"]}`, que Claude Code
-    no sabe interpretar: ejecutaría `python.exe` pelado, sin guion."""
+    """Une `ejecutable` + `args` en UNA sola cadena para la clave `command`: el
+    esquema REAL de un gancho de `settings.json` de Claude Code es
+    `{type, command, timeout}` con la línea de órdenes ENTERA dentro de `command`
+    — no existe un campo `args` aparte, y `{"command": "<python.exe>", "args":
+    [...]}` no lo sabe interpretar Claude Code (ejecutaría `python.exe` pelado,
+    sin guion)."""
     return ' '.join(_quotar(a) for a in ([ejecutable] + list(args)))
 
 
@@ -2113,11 +2080,10 @@ def estado_modulo(settings, mod, settings_ruta=None, skills_dir=None):
 
 def _campo_localizado(idioma, mod, campo):
     """`mod[campo]` en el idioma pedido, con el mismo criterio que `_linea_localizada`:
-    en inglés usa `<campo>_en` si el módulo la declara y, si no, cae al castellano antes
-    que dejar el hueco vacío. Antes esto no existía y `--listar --idioma en` ESCONDÍA
-    `toca` y `aviso` en vez de traducirlos: quien instalaba en inglés no llegaba a leer
-    qué toca cada módulo ni su aviso de coste, que es justo lo que hay que leer antes de
-    decidir. Dos pruebas del propio paquete lo cazan (test_instalador_idioma)."""
+    en inglés usa `<campo>_en` si el módulo la declara y, si no, cae al castellano
+    antes que dejar el hueco vacío — para que `--listar --idioma en` traduzca
+    `toca`/`aviso` en vez de esconderlos, que es justo lo que hay que leer antes de
+    decidir."""
     if idioma != 'es':
         otro = mod.get(campo + '_en')
         if otro:
@@ -2191,12 +2157,12 @@ def _claves(argv, idioma='es'):
 
 
 def _listar(settings_ruta, skills_dir=None, idioma='es'):
-    """`idioma='es'`: con `--idioma en`, la etiqueta de estado, las
-    cabeceras y `mod['linea']` (vía `_linea_localizada()`, cayendo al castellano
-    si al módulo le faltara `linea_en`) cambian de idioma — y `toca`/`aviso`
-    (que sí llevan vocabulario castellano de control, p. ej. «ganchos») se
-    OMITEN en inglés en vez de imprimirse a medio traducir; ver el comentario
-    junto a `TEXTOS`."""
+    """`idioma='es'`: con `--idioma en`, la etiqueta de estado, las cabeceras y
+    `mod['linea']` (vía `_linea_localizada()`, cayendo al castellano si falta
+    `linea_en`) cambian de idioma. `toca`/`aviso` (vocabulario castellano de
+    control, p. ej. «ganchos») se traducen igual, con el mismo fail-closed
+    (`_campo_localizado()`): es lo que hay que leer antes de decidir instalar un
+    módulo o no."""
     settings = _leer_json(settings_ruta)
     existe = os.path.exists(settings_ruta)
     print(_texto(idioma, 'settings_prefix') + str(settings_ruta)
@@ -2205,10 +2171,8 @@ def _listar(settings_ruta, skills_dir=None, idioma='es'):
         st = estado_modulo(settings, mod, settings_ruta, skills_dir)
         etiqueta = _texto(idioma, _ETIQUETA_ESTADO_CLAVE[st])
         print(f'  {mod["id"]:14} [{etiqueta:16}] {_linea_localizada(idioma, mod)}')
-        # El detalle sale en los DOS idiomas. Estaba tras un `if idioma == 'es'`, así que
-        # quien instalaba en inglés no llegaba a leer qué toca cada módulo ni su aviso de
-        # coste — justo lo que hay que leer antes de decidir. Las dos etiquetas inglesas
-        # ya existían sin usarse.
+        # El detalle ("toca"/"aviso") sale en los DOS idiomas: es justo lo que hay
+        # que leer antes de decidir instalar un módulo o no.
         print(f'  {"":14}   {_texto(idioma, "toca_label")} {_campo_localizado(idioma, mod, "toca")}')
         if mod.get('aviso'):
             print(f'  {"":14}   {_texto(idioma, "aviso_label")} {_campo_localizado(idioma, mod, "aviso")}')
@@ -2258,12 +2222,12 @@ def _lista_flag_opcional(argv, nombre):
 
 
 # ---------------------------------------------------------------------------------
-# Validación de argv (fallo 6-sep: `--help`, un typo como `--instaler`, o cualquier
-# invocación no interactiva con una bandera que __main__ no reconocía, caían de
-# largo hasta `_abrir_ventana()` + `mainloop()` — el proceso se quedaba colgado sin
-# salida (MEDIDO: `--help` no volvió en 120 s) y encima abría una ventana en el
-# escritorio del usuario. Se valida ANTES de decidir qué hacer, para salir con un
-# mensaje claro (código 2) en vez de caer a la ventana por descarte.
+# Validación de argv: `--help`, un typo como `--instaler`, o cualquier invocación
+# no interactiva con una bandera que __main__ no reconoce debe salir con un mensaje
+# claro (código 2) — nunca caer de largo hasta `_abrir_ventana()` + `mainloop()`,
+# que colgaría el proceso sin salida y abriría una ventana en el escritorio del
+# usuario. Por eso se valida ANTES de decidir qué hacer, en vez de caer a la
+# ventana por descarte.
 # ---------------------------------------------------------------------------------
 _FLAGS_CON_VALOR = ('--settings', '--python', '--proyecto', '--instalar', '--desinstalar',
                     '--telegram-token', '--telegram-chat', '--skills-dir', '--idioma')
@@ -2473,11 +2437,10 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
     root.configure(bg=C_FONDO)
 
     # ── que quepa, antes que nada ───────────────────────────────────────────
-    # MEDIDO el 9-sep-2026: con 22 módulos la ventana pedía 682x1594 px en una pantalla de
-    # 1920x1080 y estaba fijada con resizable(False, False). Los cuatro botones quedaban
-    # 514 px POR DEBAJO del borde inferior: la ventana no se podía usar y nadie lo había
-    # visto porque nada lo medía. La lista va ahora dentro de un lienzo con barra, la
-    # ventana crece a lo alto, y el alto de arranque se limita a lo que dé la pantalla.
+    # Con muchos módulos la ventana puede pedir más alto del que cabe en la pantalla:
+    # fijar `resizable(False, False)` deja los botones por debajo del borde inferior,
+    # inalcanzables. La lista va dentro de un lienzo con barra, la ventana crece a lo
+    # alto, y el alto de arranque se limita a lo que dé la pantalla.
     root.resizable(False, True)
 
     # los colores por defecto de TODO widget clásico que se cree a partir de aquí; los
@@ -2504,13 +2467,12 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
     tk.Label(root, text=_texto(idioma, 'ventana_proyecto_label', proj=proyecto_txt),
              anchor='w', bg=C_FONDO, fg=C_ACENTO).pack(fill='x', padx=10)
 
-    # El cuerpo va en su propio marco. Sin él, el lienzo y su barra se reparten TODO el
-    # espacio que queda y la fila de botones acaba flotando arriba a la derecha — que es
-    # exactamente lo que pasó al primer intento.
-    # En Tk, lo que va abajo se empaqueta ANTES que lo que se expande: si el cuerpo se
-    # lleva primero todo el hueco, la fila de botones se queda con 1 px y sus botones ni
-    # llegan a mapearse. Medido: `visible=0` en los cuatro. Así que el marco de los botones
-    # se crea aquí, vacío, y más abajo se le meten dentro cuando existen sus funciones.
+    # El cuerpo va en su propio marco: sin él, el lienzo y su barra se reparten TODO
+    # el espacio que queda y la fila de botones acaba flotando arriba a la derecha.
+    # En Tk, lo que va abajo se empaqueta ANTES que lo que se expande: si el cuerpo
+    # se lleva primero todo el hueco, la fila de botones se queda sin espacio y sus
+    # botones ni llegan a mapearse. Así que el marco de los botones se crea aquí,
+    # vacío, y más abajo se le meten dentro cuando existen sus funciones.
     tk.Frame(root, bg=C_BORDE, height=1).pack(side='bottom', fill='x')
     botones = tk.Frame(root, bg=C_FONDO)
     botones.pack(side='bottom', fill='x', padx=10, pady=10)
@@ -2612,8 +2574,8 @@ def _abrir_ventana(settings_ruta, python_exe, mem, proj, skills_dir=None, idioma
         messagebox.showinfo(_texto(idioma, 'titulo_abyss'), '\n'.join(msjs) or _texto(idioma, 'msg_nada_que_hacer'))
 
     def _boton(padre, texto, orden_):
-        """El color de un botón no llega por `option_add` en Windows: hay que dárselo.
-        Medido: con solo option_add salían grises de sistema sobre el fondo oscuro."""
+        """El color de un botón no llega por `option_add` en Windows: hay que
+        dárselo explícitamente, o salen los grises de sistema sobre el fondo oscuro."""
         return tk.Button(padre, text=texto, command=orden_,
                          bg=C_PANEL, fg=C_TINTA_VIVA,
                          activebackground=C_ACENTO, activeforeground=C_FONDO,

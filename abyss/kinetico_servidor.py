@@ -1,33 +1,25 @@
 # -*- coding: utf-8 -*-
 """Sirve una escena kinética y le da dos verbos: ENTRAR en una carpeta y ABRIR un fichero.
+Hace falta un servidor local (no vale abrir el .html a pelo): la página carga MediaPipe
+como módulo ES y el navegador bloquea los módulos servidos por file://.
 
-Hace falta un servidor local (no vale abrir el .html a pelo): la página carga MediaPipe como
-módulo ES y el navegador bloquea los módulos servidos por file://.
-
-## Los dos verbos, y por qué van por lista blanca
-
-Una página web que le pide a un programa local «abre esto» es exactamente la forma de un
-agujero, así que aquí no se pega ninguna ruta:
+Los dos verbos van por lista blanca: una página web que le pide a un programa local «abre
+esto» es exactamente la forma de un agujero, así que aquí no se pega ninguna ruta.
 
   - `POST /entrar`  {"destino": "<id>"} — vuelve a montar la escena dentro de esa carpeta.
   - `POST /abrir`   {"destino": "<id>"} — abre ese fichero con el programa que el sistema
     tenga asociado.
 
-En los dos casos el `destino` se busca **en el diccionario de la escena que está montada**.
-No es una ruta que llegue de fuera: es una clave que tiene que existir en el `nodos.json`
-que este servidor acaba de escribir. Lo que no esté en la escena no existe, y una ruta con
-`..` dentro no llega a ninguna parte porque nunca se concatena nada. Además se comprueba que
-lo resuelto siga colgando de la raíz de la escena, que es el mismo cinturón que lleva el
-servidor de la biblioteca.
+En los dos casos el `destino` se busca en el diccionario de la escena que está montada: no
+es una ruta que llegue de fuera, es una clave que tiene que existir en el `nodos.json` que
+este servidor acaba de escribir. Lo que no esté en la escena no existe, y una ruta con `..`
+dentro no llega a ninguna parte porque nunca se concatena nada; además se comprueba que lo
+resuelto siga colgando de la raíz de la escena. Los dos son POST a propósito: una visita
+suelta, una precarga o un enlace no abren nada.
 
-Los dos son POST a propósito: una visita suelta, una precarga o un enlace no abren nada.
-
-## Lo que este servidor NO hace
-
-- No sirve nada fuera de la carpeta de montaje.
-- No ejecuta nada: `abrir` le pasa el fichero al sistema, que decide con qué se abre. Si eso
-  es un programa, lo abre el sistema con las reglas del sistema, no este guion.
-- No recuerda nada entre arranques.
+Lo que este servidor NO hace: no sirve nada fuera de la carpeta de montaje; no ejecuta nada
+(`abrir` le pasa el fichero al sistema, que decide con qué se abre); no recuerda nada entre
+arranques.
 """
 import functools
 import http.server
@@ -46,25 +38,20 @@ except ImportError:
     import consola
 consola.preparar()
 SW_SHOWNORMAL = 1        # que la ventana salga en su tamaño, ni minimizada ni maximizada
-ASFW_ANY = -1            # «cualquier proceso que yo lance puede tomar el primer plano»
+ASFW_ANY = -1            # «cualquier proceso que se lance a continuación puede tomar el primer plano»
 
 
 def _abre_con_el_sistema(ruta):
     """Se lo da al sistema. En Windows `os.startfile`; fuera, `open`/`xdg-open`.
 
-    En Windows no basta con lanzarlo. Windows tiene un bloqueo de primer plano: un proceso
-    que NO tiene el foco tampoco puede dárselo al que lanza, y este servidor no lo tiene
-    nunca —el foco lo tiene la ventana del visor—, así que el programa recién abierto se
-    quedaba parpadeando en la barra de tareas en vez de aparecer delante. Se arregla con
-    dos cosas, no una:
-
-      - `AllowSetForegroundWindow(ASFW_ANY)` cede el turno de primer plano al siguiente
-        proceso que se lance, que es exactamente el permiso que faltaba.
-      - `show_cmd=SW_SHOWNORMAL` le pide al shell que la ventana salga normal. Sin esto,
-        un programa que recuerde haberse cerrado minimizado vuelve a abrirse minimizado.
-
-    Si `AllowSetForegroundWindow` no está o falla, se abre igual: se pierde el primer
-    plano, no el fichero.
+    Windows tiene un bloqueo de primer plano: un proceso sin foco (este servidor nunca lo
+    tiene; el foco lo tiene la ventana del visor) tampoco puede dárselo al que lanza, así
+    que el programa recién abierto se queda parpadeando en la barra de tareas. Se arregla
+    con dos cosas: `AllowSetForegroundWindow(ASFW_ANY)` cede el turno de primer plano al
+    siguiente proceso que se lance, y `show_cmd=SW_SHOWNORMAL` evita que un programa que
+    recuerde haberse cerrado minimizado vuelva a abrirse minimizado. Si
+    `AllowSetForegroundWindow` falla, se abre igual: se pierde el primer plano, no el
+    fichero.
     """
     if sys.platform == "win32":
         try:

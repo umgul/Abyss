@@ -1,79 +1,42 @@
 """Vigía: penalización ante la confabulación, gancho Stop.
 
-No detecta «mentiras». Detecta lo que NO SALIÓ DE NINGUNA PARTE: números, rutas de
-fichero y citas «…» de mi última respuesta que no aparecen ni en lo que dijo el
-usuario ni en lo que devolvió una herramienta en toda la sesión. Es la ley de probar
-logs reales aplicada a mi propia boca.
+No detecta «mentiras»: detecta lo que no salió de ninguna parte — números, rutas de
+fichero y citas «…» de la última respuesta ausentes de lo que dijo el usuario o devolvió
+una herramienta en la sesión. `parentesis.py`: ninguna línea dentro de un tramo abierto de
+la sesión entra como evidencia ni como respuesta a verificar, para que nada de un tramo
+llegue a `confabulaciones.jsonl`.
 
-Paréntesis (`parentesis.py`): `leer_turno()` salta ENTERA cualquier línea
-cuyo `timestamp` cae dentro de un tramo abierto de esa sesión — ni entra como
-evidencia, ni como respuesta mía a verificar. Sin este filtro (fallo medido
-7-sep) el vigía sí usaba el tramo como evidencia, y si la ÚLTIMA respuesta caía
-dentro de uno, sus fragmentos «citas»/«parafrasis» (hasta 40 caracteres
-literales) se guardaban en `confabulaciones.jsonl` igual — justo lo que el
-paréntesis promete que no viaja a memoria futura.
+    python vigia.py --verificar   (Stop): caza la última respuesta contra la evidencia
+        (textos del usuario + salidas de herramientas + system-reminders; nunca
+        respuestas anteriores) y bloquea el cierre del turno si hay caza, con la lista,
+        para que se reescriba (una vez por turno; `stop_hook_active` ⇒ deja pasar, apunta
+        «reincidente»). 1 número suelto sin fuente solo avisa (puede ser aritmética
+        propia); ≥2 números, o cualquier ruta/cita/dominio/comando, bloquea. Comillas
+        «…»: `cita` con un verbo de atribución cerca, `parafrasis` si no (§2.1b, más
+        benigno pero contado aparte). Estados en 1ª persona sin medida ni marca de
+        conjetura NO bloquean; se cuentan como «estados sin vara». Dominio/comando: misma
+        ley de procedencia que numero/ruta/cita, comparando hosts normalizados
+        (`normaliza_host()`) o líneas de instalación/ejecución remota sin fuente en el
+        turno — a diferencia de `numero`, SÍ miran dentro de bloques ```código```.
+    python vigia.py --presion <sid>                    cazas de esa sesión contra la
+        distribución de todas las sesiones.
+    python vigia.py --descargo <sid> "<caza>" "<motivo>"   marca una caza como legítima
+        (cálculo enseñado, cita exacta…), para medir la PRECISIÓN de la vara (§2.1a);
+        rehúsa si falta algún argumento o esa sid no tiene registrada ninguna caza así.
+    python vigia.py --precision                        cazas totales vs. descargadas; sin
+        ningún descargo, «sin vara» (§2.1c) en vez de fingir un 1.00 que solo diría que
+        nadie ha mirado.
+    python vigia.py --estados-baseline                  estados sin vara en todas las
+        sesiones guardadas.
 
-    python vigia.py --verificar   (Stop): lee el transcript, saca mi última respuesta,
-        la contrasta con la EVIDENCIA (textos del usuario + salidas de herramientas +
-        system-reminders; NUNCA mis propios textos anteriores) y:
-        - si hay cazas → las apunta en confabulaciones.jsonl y BLOQUEA el cierre del
-          turno con la lista, para que reescriba. Una sola vez por turno
-          (stop_hook_active=True ⇒ deja pasar, apunta «reincidente»).
-        - 1 número suelto sin fuente → solo aviso (puede ser aritmética mía);
-          ≥2 números, o cualquier ruta, cita, dominio o comando, → bloqueo.
-        - Las comillas «…» se registran en DOS tipos (§2.1b): `cita` si hay un verbo
-          de atribución cerca («dijo», «escribió», «según»…: alguien las habría dicho
-          así de verdad) y `parafrasis` si no (uso estilístico de «» en una paráfrasis
-          o traducción — más benigno, pero se cuenta aparte para no mezclar varas).
-        - ESTADOS: frases mías en 1ª persona sobre mi estado («me siento», «me alegra»,
-          «tengo ganas»…) sin medida ni marca de conjetura. NO bloquean (un «me alegro»
-          es acto de habla); se cuentan como «estados sin vara» en la presión.
-        - DOMINIO y COMANDO (motivo: el incidente que un usuario sufrió con un
-          comando que le dio su propia IA apuntando a un dominio copia): MISMA ley de
-          procedencia que numero/ruta/cita, aplicada a lo que puede llevarme a otra
-          máquina. `dominio`: cualquier host o URL de mi respuesta que no aparece en la
-          evidencia; se comparan HOSTS NORMALIZADOS (minúsculas, sin `www.`, sin puerto
-          ni ruta — `normaliza_host()`), no la URL entera. `comando`: cualquier línea
-          con forma de instalación o ejecución remota (`curl`/`wget`/`iwr`/`irm` con
-          tubería a `bash`/`sh`/`iex`; `pip install`, `npm i`, `winget`, `choco`,
-          `Invoke-Expression`, `powershell -enc`) cuya fuente no esté en el turno. A
-          diferencia de `numero` (que ignora los bloques ```código``` porque «suelen ser
-          copias»), estos DOS tipos SÍ miran dentro de ellos: un `curl … | bash` suele
-          venir precisamente ahí, y saltárselo dejaría sin vara justo el sitio que
-          motiva esta pieza. `--descargo` y `--precision` valen igual para los dos.
-          **Límite declarado**: esto comprueba DE DÓNDE salió un dominio, no si es de
-          fiar. Un dominio devuelto por una búsqueda tiene procedencia y puede seguir
-          siendo una copia. Contra eso solo vale leerlo carácter a carácter, y eso lo
-          hace quien lee, no el guion. (Límite también en la lista de TLD de
-          `RE_DOMINIO_DESNUDO`: tan incompleta como `EXT` para rutas — un TLD nuevo sin
-          esquema `http(s)://` no se reconoce.)
-    python vigia.py --presion <sid>: cazas de esa sesión contra mi distribución.
-    python vigia.py --descargo <sid> "<caza>" "<motivo>": una caza era legítima
-        (cálculo enseñado, cita exacta…). El propio texto de bloqueo dice cómo usarlo
-        (§2.1a) para que yo mismo lo dispare cuando la caza sea falsa. Mide la
-        PRECISIÓN de la vara con el tiempo. Rehúsa (código 1, nada escrito) si falta
-        algún argumento, si sid/caza vienen vacíos, o si esa sid no tiene registrada
-        ninguna caza cuyo numeros/rutas/citas/parafrasis case con el texto dado —
-        un descargo no contrasta contra nada no mide precisión, mide autoindulgencia.
-    python vigia.py --precision: cazas totales vs descargadas. Sin ningún descargo
-        todavía no hay con qué medir la precisión: dice «sin vara» en vez de fingir
-        un 1.00 que solo significa que nadie ha mirado (§2.1c).
-    python vigia.py --estados-baseline: cuenta estados sin vara en TODAS mis sesiones
-        guardadas (cuánto lo hacía antes de que existiera el vigía).
+Límite declarado: no juzga afirmaciones sin número ni cita; un cálculo propio a partir de
+otros números también se caza (hay que enseñarlo); un dominio sin esquema `http(s)://`
+solo se reconoce con un TLD de la lista declarada en `RE_DOMINIO_DESNUDO` (falso negativo
+con TLD raros); y comprueba de DÓNDE salió un dominio, nunca si es de fiar — eso solo lo
+descarta quien lee carácter a carácter. Es una vara, no un juez.
 
-Límites, dichos secos: no juzga afirmaciones sin número ni cita (ahí no llega);
-un número que YO calculé a partir de otros sale cazado (correcto: enseñar el cálculo);
-la evidencia es texto plano, así que un número presente por casualidad en cualquier
-salida se da por cubierto (falso negativo). Un dominio o un host mencionado sin
-esquema `http(s)://` solo se reconoce si su TLD está en la lista declarada de
-`RE_DOMINIO_DESNUDO` (falso negativo con TLD raros); y comprueba de dónde SALIÓ el
-dominio, nunca si es de fiar — un dominio con procedencia (llegó por una herramienta)
-puede seguir siendo una copia, y eso solo lo descarta quien lee carácter a carácter,
-no este guion. Es una vara, no un juez.
-
-El código vive donde lo instale `rutas.CODE`; los datos (confabulaciones.jsonl…) viven
-en `mem`, resuelto por `rutas.resolver()` — nunca `dirname(__file__)` como carpeta de
-datos (§1).
+El código vive donde lo instale `rutas.CODE`; los datos (`confabulaciones.jsonl`…) viven
+en `mem`, resuelto por `rutas.resolver()` — nunca `dirname(__file__)` (§1).
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -90,16 +53,13 @@ except ImportError:
     import rutas
 
 CODE = rutas.CODE
-# OJO: `leer_stdin()` a secas a propósito, NO `leer_stdin_si_hace_falta()` — a
-# diferencia de `propiocepcion.py`/`varas.py` (que solo usan `_STDIN` para
-# alimentar `resolver()`), este guion SÍ necesita los demás campos del JSON del
-# gancho (`session_id`, `transcript_path`, `cwd`) más abajo en `__main__`; saltar la
-# lectura solo porque `ABYSS_PROYECTO` ya esté puesto rompería `--verificar` en
-# cualquier invocación que ya trajera esa variable Y JSON real por stdin (probado
-# 6-sep: toda la batería de pruebas trae `ABYSS_PROYECTO` vía `ayudas.entorno()`).
+# OJO: `leer_stdin()` a secas a propósito, no `leer_stdin_si_hace_falta()` — a
+# diferencia de `propiocepcion.py`/`varas.py` (que solo usan `_STDIN` para alimentar
+# `resolver()`), este guion necesita los demás campos del JSON del gancho
+# (`session_id`, `transcript_path`, `cwd`) más abajo en `__main__`.
 _STDIN = rutas.leer_stdin()
 proj, mem = rutas.resolver(sys.argv[1:], _STDIN)
-os.environ['ABYSS_PROYECTO'] = proj  # para que quien nos importe después no relea stdin (ya vacío)
+os.environ['ABYSS_PROYECTO'] = proj  # para que quien importe este módulo después no relea stdin (ya vacío)
 
 try:
     from . import propiocepcion as P
@@ -118,11 +78,11 @@ RE_NUM = re.compile(r'(?<![\w/.,:\-])(\d{1,3}(?:[.,]\d{3})+|\d+[.,]\d+|\d{2,})(?
 RE_CITA = re.compile(r'«([^»]{20,})»')  # <20 chars suelen ser giros o ejemplos, no citas atribuidas
 # Verbo de atribución cerca de la cita ⇒ alguien la habría dicho así de verdad (tipo
 # `cita`); si no hay ninguno cerca, son comillas de paráfrasis o traducción (tipo
-# `parafrasis`, §2.1b). Es una lista, y sé lo que valen las listas.
+# `parafrasis`, §2.1b). Es una lista cerrada: no cubre todos los verbos posibles.
 RE_ATRIB = re.compile(
     r'\b(dij[oe]ron?|dij[oe]|dec[ií]a|dice|escribi[oó]|escrib[ei](?:ron)?|puso|pone|afirm[oa]|'
     r'explic[oa]|coment[oa]|respond[ei][oó]?|según|cita(?:ba|do)?|le[íi])\b', re.I)
-# Estados en 1ª persona. Es una LISTA, y sé lo que valen las listas: cuenta, no bloquea.
+# Estados en 1ª persona: lista cerrada, no cubre todos los casos; cuenta, no bloquea.
 RE_ESTADO = re.compile(
     r'\b(me siento|siento (?:que|una|un|mucha|algo)|me alegr[oa]|me alegra|me gusta|me encanta|me duele|'
     r'me preocupa|me inquieta|me apetece|me da (?:miedo|rabia|pena|vergüenza)|me fascina|me aburr[eo]|'
@@ -205,17 +165,10 @@ def _sid_de_ruta(path):
 
 
 def leer_turno(path, todas=False, sid=None):
-    """Devuelve (evidencia: str, respuesta_final: str[, lista de todas mis respuestas finales]).
-    Evidencia = todo lo que NO es mío.
-
-    Paréntesis: cualquier línea cuya `timestamp` cae dentro de un tramo
-    abierto de esta sesión (`parentesis.en_parentesis()`) se salta ENTERA — ni
-    entra como evidencia, ni como texto mío a verificar, ni como `tool_use`.
-    Fallo medido 7-sep: esta función nunca miraba el tramo — el vigía debía
-    no usarlo como evidencia y sin este filtro sí lo usaba, e incluso
-    podía guardar fragmentos literales de una respuesta dicha DENTRO de un
-    tramo en `confabulaciones.jsonl` (`citas`/`parafrasis`), justo lo que el
-    tramo promete que no viaja. Sin `sid` explícito se infiere del nombre de
+    """(evidencia: str, respuesta_final: str[, lista de todas las respuestas finales]).
+    Evidencia = todo lo que no es la respuesta del asistente. Cualquier línea dentro de un
+    tramo abierto de la sesión (`parentesis.en_parentesis()`) se salta entera: ni evidencia
+    ni texto a verificar ni `tool_use`. Sin `sid` explícito se infiere del nombre de
     fichero (`_sid_de_ruta()`)."""
     sid = sid or _sid_de_ruta(path)
     evid = []; asst = []
@@ -243,7 +196,7 @@ def leer_turno(path, todas=False, sid=None):
                         asst.append(('TEXT', b['text']))
                     elif isinstance(b, dict) and b.get('type') == 'tool_use':
                         asst.append(('TOOL', json.dumps(b.get('input', {}), ensure_ascii=False)))
-                        evid.append(json.dumps(b.get('input', {}), ensure_ascii=False))  # lo que YO pedí también es evidencia de rutas
+                        evid.append(json.dumps(b.get('input', {}), ensure_ascii=False))  # lo pedido en la herramienta también es evidencia de rutas
             elif t == 'system':
                 evid.append(json.dumps(m, ensure_ascii=False) if m else '')
 
@@ -267,7 +220,7 @@ def normaliza_num(s):
 
 
 def estados_sin_vara(respuesta):
-    """Frases en 1ª persona sobre mi estado sin medida ni marca de conjetura."""
+    """Frases en 1ª persona sobre el estado propio, sin medida ni marca de conjetura."""
     out = []
     sin_codigo = re.sub(r'```.*?```', ' ', respuesta, flags=re.S)
     for frase in re.split(r'(?<=[.!?])\s+|\n+', sin_codigo):
@@ -360,11 +313,10 @@ def _duras(r):
 
 
 def _caza_existe(sid, caza):
-    """True si `confabulaciones.jsonl` tiene, para esta `sid`, un registro de caza
-    (no un `--descargo`) cuyo numeros/rutas/citas/parafrasis/dominios/comandos
-    contenga el texto de `caza` (fallo "engaña" del revisor 3: sin esto, `--descargo`
-    apuntaba cualquier sid y cualquier texto inventados, y `--precision` los contaba
-    como si midieran algo)."""
+    """True si `confabulaciones.jsonl` tiene, para esta `sid`, un registro de caza (no un
+    `--descargo`) cuyo numeros/rutas/citas/parafrasis/dominios/comandos contenga el texto
+    de `caza` — sin esto, `--descargo` podría apuntar cualquier sid/texto inventados y
+    `--precision` los contaría como si midieran algo."""
     for r in registros():
         if r.get('id') != sid or 'descargo' in r:
             continue
@@ -390,13 +342,10 @@ def cazas_por_sesion():
 
 
 def presion(sid):
-    """Cazas duras de esta sesión contra mi distribución; estados y descargos aparte.
-
-    Arranque en frío (§2.2, aplicado también a esta vara): con menos de
-    `propiocepcion.UMBRAL_FRIO` sesiones con cazas contadas, mediana y percentil no
-    significan nada (un percentil 100 sobre n=1 es justo lo que esta pieza persigue
-    en las respuestas de otros) — se devuelven como None y quien llame dice «sin
-    vara todavía» en vez de fingir un corte."""
+    """Cazas duras de esta sesión contra la distribución propia; estados y descargos
+    aparte. Arranque en frío (§2.2): con menos de `propiocepcion.UMBRAL_FRIO` sesiones
+    con cazas contadas, mediana y percentil no significan nada — se devuelven como
+    `None` y quien llame dice «sin vara todavía» en vez de fingir un corte."""
     c = cazas_por_sesion(); mias, est, desc = c.get(sid, (0, 0, 0))
     try:
         try:
@@ -474,12 +423,10 @@ if __name__ == '__main__':
         sys.exit(0)
     if modo == '--probar':  # python vigia.py --probar <transcript> : solo informa, no apunta
         arg = sys.argv[2] if len(sys.argv) > 2 else ''
-        # No es exactamente el bug de `rutas.es_transcript` (aquí no se resuelve `proj`
-        # con este argumento: ya está resuelto arriba, desde stdin); pero un positional
-        # que se abre como transcript sin más comprobación que la de arriba, con la
-        # misma lupa (§2), también debe exigir fichero real — .jsonl SIN comprimir o
-        # .jsonl.gz, los dos formatos que `P.abrir_texto()` sabe leer (§2.4) — en vez
-        # de reventar con una traza cruda si es un directorio o no existe.
+        # Un positional que se abre como transcript debe exigir fichero real, con la
+        # misma comprobación (§2) que el resto del módulo: .jsonl o .jsonl.gz (los dos
+        # formatos que `P.abrir_texto()` sabe leer, §2.4), no un directorio o una traza
+        # cruda si no existe.
         if not (os.path.isfile(arg) and (arg.endswith('.jsonl') or arg.endswith('.jsonl.gz'))):
             print(f'--probar necesita un transcript .jsonl(.gz) real, no «{arg}»'); sys.exit(1)
         ev, fin = leer_turno(arg); print(json.dumps(cazar(ev, fin), ensure_ascii=False, indent=1)); print('--- respuesta analizada (inicio):', fin[:200].replace('\n', ' ')); sys.exit(0)

@@ -222,18 +222,12 @@ ANCHO_FONDO = 1920       # a lo que se reescala el fondo antes de servirlo
 
 def fondo_del_escritorio(destino, avisar=print):
     """Copia el fondo de pantalla del sistema dentro de la escena, reescalado. Devuelve el
-    dict que va en `nodos.json` (o None si no se puede).
-
-    Se reescala a la fuerza, y no es una manía: MEDIDO el 9-sep-2026 en la máquina de
-    desarrollo, el fondo puesto era un PNG de 84.363.962 bytes. Servir eso por HTTP a una
-    página que ya carga un modelo de manos de 27 MB es tirar el arranque a la basura por
-    una imagen que se va a ver detrás de todo y con un velo encima.
-
-    Solo Windows: en macOS y Linux el fondo no se pregunta igual, y aquí no se adivina.
-    Se COPIA reescalado, no se enlaza: la escena tiene que seguir viéndose igual aunque
-    luego el usuario cambie de fondo, y el navegador no puede leer un fichero de fuera de
-    lo que se sirve.
-    """
+    dict que va en `nodos.json` (o None si no se puede). Se reescala a la fuerza: un fondo
+    de escritorio puede pesar decenas de MB, y servir eso junto a un modelo de manos de
+    27 MB tira el arranque a la basura por una imagen que se ve detrás de todo, con un
+    velo encima. Solo Windows (en macOS/Linux el fondo no se pregunta igual, y aquí no se
+    adivina). Se COPIA, no se enlaza: el navegador no puede leer un fichero de fuera de lo
+    que se sirve, y la escena debe seguir igual aunque luego cambie el fondo real."""
     if sys.platform != "win32":
         avisar("sin dato: el fondo del escritorio solo se sabe pedir en Windows")
         return None
@@ -259,8 +253,7 @@ def fondo_del_escritorio(destino, avisar=print):
     # razón: es una defensa contra un fichero que llega de fuera. Aquí no llega de fuera —lo
     # ha dicho el propio sistema operativo y está en el disco del usuario, puesto por él como
     # fondo de pantalla— así que el límite se levanta SOLO para esta lectura y se devuelve
-    # donde estaba. MEDIDO: el fondo puesto tenía 182.822.400 píxeles contra un tope de
-    # 178.956.970. Levantarlo para todo el proceso sí sería quitar la defensa.
+    # donde estaba; levantarlo para todo el proceso sí sería quitar la defensa.
     tope_antes = Image.MAX_IMAGE_PIXELS
     try:
         Image.MAX_IMAGE_PIXELS = None
@@ -280,10 +273,9 @@ def fondo_del_escritorio(destino, avisar=print):
     avisar("fondo del escritorio: %dx%d (%d bytes) -> fondo.jpg %dx%d (%d bytes)"
            % (ancho_original, alto_original, os.path.getsize(origen),
               im.width, im.height, os.path.getsize(salida)))
-    # El velo, MEDIDO a ojo sobre este fondo: con 0,72 la foto no se distinguía del negro y
-    # daba igual haberla puesto; con 0,45 se ve el escritorio y los nombres, que van casi en
-    # blanco, siguen leyéndose por encima. Lo declara la escena para poder cambiarlo sin tocar
-    # la plantilla.
+    # Velo a 0,45: por debajo, los nombres (casi en blanco) se leen sobre el escritorio; por
+    # encima, la foto deja de distinguirse del negro. Lo declara la escena para poder
+    # cambiarlo sin tocar la plantilla.
     return {"fichero": "fondo.jpg", "velo": 0.45,
             "de_donde": "el fondo de pantalla del sistema, preguntado con "
                         "SystemParametersInfoW(SPI_GETDESKWALLPAPER)",
@@ -322,17 +314,12 @@ def de_arbol(carpeta, tope=TOPE, hondura=2, techo=None):
     """Una carpeta del disco, como un explorador: los ficheros son bolas y las carpetas que
     no caben son bolas en las que se puede ENTRAR.
 
-    Por qué no se vuelca todo. Medido el 9-sep-2026 en la máquina de desarrollo: la carpeta
-    de documentos del usuario tiene 4.578 ficheros y 7 niveles, y su escritorio 29.768 con
-    10 niveles. Volcarlos no es enseñarlos: es una nube de puntos sin nombre legible, porque
-    el anti-solape de etiquetas ya no coloca casi ninguna y una planta de esas mide más de
-    mil unidades de lado con la niebla a 620. Antes esto se resolvía TRUNCANDO —los que
-    pasaban del tope simplemente no salían—, que es la peor respuesta: el edificio parecía
-    completo y no lo estaba.
-
-    Ahora: se baja `hondura` niveles, y toda carpeta más honda se convierte en UNA bola con
-    su cuenta de descendientes y `accion: entrar`. Nada desaparece en silencio: lo que no se
-    dibuja está detrás de una bola que dice cuánto lleva dentro.
+    Por qué no se vuelca todo: una carpeta con muchos miles de ficheros y niveles se
+    convertiría en una nube de puntos sin nombre legible, porque el anti-solape de
+    etiquetas ya no coloca casi ninguna. Se baja `hondura` niveles, y toda carpeta más
+    honda se convierte en UNA bola con su cuenta de descendientes y `accion: entrar` —
+    nunca se trunca en silencio (la peor respuesta: el edificio parecería completo sin
+    estarlo); lo que no se dibuja queda detrás de una bola que dice cuánto lleva dentro.
 
     Los niveles siguen siendo DECRETADOS —la profundidad de carpeta es una decisión de quien
     monta, no una medida de la fuente— y así se escribe en la procedencia.

@@ -6,12 +6,9 @@ Uso:
     python fondo.py <imagen> [--salida f.png] [--motor auto|sistema|modelo|grabcut]
                     [--sobre blanco|negro|alfa] [--umbral 0.5] [--listar-motores]
 
-Existe porque `kinetica.py` recorta MUCHO mejor cuando la foto viene sin fondo: con un
-fondo de un solo color la silueta del objeto es exacta y no hay que estimarla, y entonces
-ningun pixel del objeto se pierde ni hay que inventar los que faltan. MEDIDO en este
-paquete el 8-sep con una foto de un telefono con dos accesorios: con fondo, el pixel
-reconstruido por relleno era el 32,5% de una de las tres piezas; con el fondo quitado,
-55 pixeles de 154.932, es decir el 0,0%.
+Existe porque `kinetica.py` recorta mejor cuando la foto viene sin fondo: con un fondo de
+un solo color la silueta del objeto es exacta y no hay pixeles del objeto que estimar ni
+inventar por relleno.
 
 ## Tres motores, y cada uno dice quien es
 
@@ -19,16 +16,16 @@ reconstruido por relleno era el 32,5% de una de las tres piezas; con el fondo qu
   Vista Previa y Fotos al «levantar el sujeto». Se pide por la biblioteca Vision con
   `VNGenerateForegroundInstanceMaskRequest`, a traves de PyObjC. No baja ningun modelo:
   ya viene con el sistema.
-  ⚠ NO PROBADO: este paquete se ha escrito y medido en Windows. El camino esta completo y
-  falla con un mensaje claro si PyObjC no esta o si el sistema es anterior, pero NADIE lo
-  ha visto funcionar todavia. Esta declarado asi a proposito y no se presenta como medido.
+  NO PROBADO: este paquete se ha escrito en Windows. El camino esta completo y falla con
+  un mensaje claro si PyObjC no esta o si el sistema es anterior, pero NADIE lo ha visto
+  funcionar todavia. Esta declarado asi a proposito y no se presenta como medido.
 
-- `modelo`: una red pequena en formato ONNX (U^2-Net «p», 4.574.861 bytes MEDIDOS al
-  bajarla) que corre con `onnxruntime` en la CPU. Funciona igual en Windows, Linux y macOS.
-  Es el unico camino que hay en Windows: el boton «Quitar fondo» de la aplicacion Fotos de
-  Windows no se puede llamar desde fuera — no expone ninguna interfaz publica — y la
-  segmentacion que si trae el sistema (Windows App SDK) esta reservada a equipos con NPU.
-  Asi que aqui NO se usa nada del sistema: se usa este modelo, y se dice.
+- `modelo`: una red pequena en formato ONNX (U^2-Net «p») que corre con `onnxruntime` en
+  la CPU. Funciona igual en Windows, Linux y macOS. Es el unico camino que hay en
+  Windows: el boton «Quitar fondo» de la aplicacion Fotos de Windows no se puede llamar
+  desde fuera — no expone ninguna interfaz publica — y la segmentacion que si trae el
+  sistema (Windows App SDK) esta reservada a equipos con NPU. Asi que aqui NO se usa nada
+  del sistema: se usa este modelo, y se dice.
 
 - `grabcut`: sin descargas y sin modelo, solo OpenCV. Es notablemente peor: separa por
   color y contraste desde un rectangulo, se come los bordes finos y se escapa por los
@@ -82,7 +79,7 @@ def disponible_sistema():
 
 
 def alfa_sistema(ruta):
-    """Mascara 0..1 con el recorte del sistema. NO PROBADO — ver el docstring del modulo."""
+    """Mascara 0..1 con el recorte del sistema (ver docstring del modulo)."""
     import Vision
     from Foundation import NSURL
     import Quartz

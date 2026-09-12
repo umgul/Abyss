@@ -1,4 +1,4 @@
-"""Continuidad automática: mi matrioshka, cosida por ganchos de Claude Code.
+"""Continuidad automática: la matrioshka del paquete, cosida por ganchos de Claude Code.
 
     índice (MEMORY.md)  ⊂  ficha  ⊂  reloj (relojes.jsonl)  ⊂  sesión (sesiones/<id>.jsonl[.gz])
 
@@ -25,9 +25,9 @@ saca `proj` del propio `transcript_path`/`cwd` que manda ESE gancho (orden 1/2 d
 suya aparte, nunca se mezclan entre sí. `es_mio()` ya no filtra ningún «proyecto
 instalado» (no existe tal cosa desde que `proj` se deriva del propio transcript en
 cada llamada); sigue sirviendo para descartar un payload de gancho sin
-`transcript_path` ni `cwd` resolubles. Un reloj NO es un resumen escrito por mí: es
-lo medible + la primera y la última frase del usuario + las fichas que salieron. Lo
-que yo quiera decir va en fichas.
+`transcript_path` ni `cwd` resolubles. Un reloj NO es un resumen narrado: es lo
+medible + la primera y la última frase del usuario + las fichas que salieron; lo
+narrativo va en fichas.
 
 Arranque en frío (§2.2): con menos de `propiocepcion.UMBRAL_FRIO` sesiones medidas,
 un reloj no lleva percentiles («sin vara todavía (n=…)») y la sala de los relojes no
@@ -65,10 +65,9 @@ CODE = rutas.CODE
 # propósito — a diferencia de `propiocepcion.py`/`varas.py` (que solo usan `_STDIN`
 # para alimentar `resolver()`), este guion SÍ necesita los demás campos del JSON del
 # gancho (`session_id`, `transcript_path`, `cwd`, `prompt`…) más abajo en `__main__`,
-# así que no puede saltarse la lectura solo porque `ABYSS_PROYECTO` ya esté puesto
-# (probado 6-sep: saltarla rompía `--arranque`/`--despertar` en cualquier invocación
-# —incluida toda la batería de pruebas— que ya trajera `ABYSS_PROYECTO` en el
-# entorno Y JSON real por stdin, dejando `additionalContext` vacío).
+# así que no puede saltarse la lectura solo porque `ABYSS_PROYECTO` ya esté puesto:
+# saltarla rompería `--arranque`/`--despertar` en cualquier invocación que ya trajera
+# `ABYSS_PROYECTO` en el entorno Y JSON real por stdin, dejando `additionalContext` vacío.
 _STDIN = rutas.leer_stdin()
 proj, mem = rutas.resolver(sys.argv[1:], _STDIN)
 os.environ['ABYSS_PROYECTO'] = proj  # para que quien nos importe después no relea stdin (ya vacío)
@@ -77,11 +76,10 @@ SES = os.path.join(mem, 'sesiones'); RELOJES = os.path.join(mem, 'relojes.jsonl'
 BOLSAS = os.path.join(mem, 'bolsas.json'); DESP = os.path.join(mem, '.despertados')
 VIVO = os.path.join(mem, '.vivo')
 
-# Presupuesto de red compartido por invocación (§ fallo 6-sep, rutas.Presupuesto):
-# antes exterocepcion/noticias aplicaban su timeout por llamada SIN memoria de las
-# anteriores, así que con la red en agujero negro el total crecía con el número de
-# llamadas (medido: 38-78 s en --arranque, por encima del timeout de 60 s del propio
-# gancho SessionStart). Overridable por env para pruebas (ABYSS_PRESUPUESTO_*).
+# Presupuesto de red compartido por invocación (`rutas.Presupuesto`): sin memoria
+# entre llamadas, con la red en agujero negro el total de exterocepcion+noticias
+# crecería con el número de llamadas, por encima del timeout de 60 s del propio
+# gancho SessionStart. Overridable por env para pruebas (ABYSS_PRESUPUESTO_*).
 PRESUPUESTO_ARRANQUE_S = float(os.environ.get('ABYSS_PRESUPUESTO_ARRANQUE', 4.0))
 PRESUPUESTO_DESPERTAR_S = float(os.environ.get('ABYSS_PRESUPUESTO_DESPERTAR', 2.5))
 
@@ -278,8 +276,8 @@ def comprimir(dias=30):
 
 
 # El NULO: frases que no tienen nada que ver con el proyecto. El parecido máximo que
-# alcanzan contra mis sesiones es el ruido de la vara; el suelo se pone encima de él
-# y se RECALCULA en cada cosecha (rota con el corpus, no es una constante a ojo).
+# alcanzan contra las sesiones registradas es el ruido de la vara; el suelo se pone
+# encima de él y se RECALCULA en cada cosecha (rota con el corpus, no es una constante a ojo).
 NULO = ["qué tiempo hace en Barcelona y cuánto cuesta un billete de tren",
         "receta de paella valenciana con conejo y garrofón para seis personas",
         "cómo cambiar la correa de distribución de un seat ibiza del 2009",
@@ -312,12 +310,12 @@ def cerrar(sid_actual=None, transcript_path=None):
 
     Devuelve (nuevos, avisos): `avisos` es una lista de líneas de texto que quien
     llama debe mostrar (o meter en un `additionalContext`) — esta función NUNCA
-    imprime nada por su cuenta. Antes sí lo hacía, y `--arranque` la llama ANTES de
-    escribir el único JSON que debe salir por su stdout (el `hookSpecificOutput` de
-    SessionStart): cualquier print aquí dentro se colaba delante de ese JSON y lo
-    rompía (`json.loads` fallaba). Ahora `--cierre` imprime `avisos` tal cual (su
-    stdout no tiene que ser JSON) y `--arranque` los mete DENTRO de
-    `additionalContext`, antes del `json.dumps` (§2.1a)."""
+    imprime nada por su cuenta, porque `--arranque` la llama ANTES de escribir el
+    único JSON que debe salir por su stdout (el `hookSpecificOutput` de
+    SessionStart) y cualquier print aquí dentro se colaría delante de ese JSON y lo
+    rompería. `--cierre` imprime `avisos` tal cual (su stdout no tiene que ser JSON)
+    y `--arranque` los mete DENTRO de `additionalContext`, antes del `json.dumps`
+    (§2.1a)."""
     if transcript_path:
         guardar(transcript_path)
     else:  # cosecha: todo transcript vivo del proyecto que no sea el hilo actual
@@ -341,9 +339,9 @@ def cerrar(sid_actual=None, transcript_path=None):
         import subprocess
         r = subprocess.run([sys.executable, os.path.join(CODE, 'varas.py'), '--index'],
                             capture_output=True, timeout=60, text=True, encoding='utf-8',
-                            stdin=subprocess.DEVNULL)  # nunca heredar el stdin del propio gancho
-                            # (medido 6-sep: rutas.leer_stdin() en el hijo podía quedarse leyendo
-                            # una tubería que Claude Code no cierra, comiéndose el timeout entero)
+                            stdin=subprocess.DEVNULL)  # nunca heredar el stdin del propio gancho:
+                            # rutas.leer_stdin() en el hijo podría quedarse leyendo una tubería
+                            # que Claude Code no cierra, comiéndose el timeout entero
         # varas.py avisa por SU stdout (arranque en frío, índice que pide recorte) y
         # aquí se tragaba entero con capture_output (§2.3): la única línea esperada
         # en un pase silencioso es la confirmación; cualquier otra cosa es un aviso
@@ -351,10 +349,9 @@ def cerrar(sid_actual=None, transcript_path=None):
         salida = [ln for ln in (r.stdout or '').split('\n') if ln.strip()]
         avisos = [ln for ln in salida if not re.match(r'^índice reescrito \d+ bytes$', ln.strip())]
         if r.returncode != 0:
-            # Antes solo se miraba stdout: si varas.py REVIENTA (excepción sin
-            # capturar, p. ej. MEMORY.md convertido en directorio) no escribe nada
-            # por stdout y el fallo se tragaba entero, sin dejar rastro. La última
-            # línea de stderr no vacía basta para saber por dónde reventó.
+            # Si varas.py REVIENTA (excepción sin capturar, p. ej. MEMORY.md convertido
+            # en directorio) no escribe nada por stdout: la última línea de stderr no
+            # vacía basta para saber por dónde reventó, así que también se mira ahí.
             ult_err = next((l for l in reversed((r.stderr or '').strip().splitlines()) if l.strip()), '(sin stderr)')
             avisos.append(f'[varas] --index terminó con código {r.returncode}: {ult_err}')
     except Exception as e:
@@ -362,11 +359,9 @@ def cerrar(sid_actual=None, transcript_path=None):
     # `avisos` (arriba) se devuelve TAL CUAL a quien llama — --arranque lo mete en su
     # additionalContext, --cierre lo imprime — nunca se recorta lo que se MUESTRA.
     # Lo que se REGISTRA en varas.log es más estricto: los avisos esperados de un pase
-    # silencioso (arranque en frío, proyecto virgen) no son un fallo y no merecen
-    # quedar ahí. Medido 6-sep: sin este segundo filtro, cada cierre por debajo del
-    # umbral en frío escribía la MISMA línea en varas.log — con las 8 sesiones que
-    # exige el umbral, al menos 16 entradas repetidas de un aviso que no es un fallo,
-    # en un fichero sin tope ni rotación.
+    # silencioso (arranque en frío, proyecto virgen) no son un fallo y no merecen quedar
+    # ahí. Sin este segundo filtro, cada cierre por debajo del umbral en frío repetiría
+    # la misma línea en varas.log, sin tope ni rotación.
     _ESPERADAS_EN_LOG = (re.compile(r'^sin vara todavía \(n=\d+ sesiones archivadas; hacen falta \d+\):'),
                          re.compile(r'^sin índice ni fichas todavía: no se crea MEMORY\.md de la nada$'))
     para_loguear = [ln for ln in avisos if not any(p.match(ln.strip()) for p in _ESPERADAS_EN_LOG)]
@@ -406,7 +401,8 @@ def apagar(sid):
 
 
 def sesion_mas_larga_h():
-    """Corte de MI distribución: un latido más viejo que mi sesión más larga está muerto."""
+    """Corte de la propia distribución: un latido más viejo que la sesión más larga
+    registrada está muerto."""
     return max((r.get('horas', 0) for r in relojes_guardados().values()), default=24.0) or 24.0
 
 
@@ -522,11 +518,8 @@ def texto_arranque(sid_actual):
         L.append('[hilos vivos] otros hilos de este proyecto con latido: ' + '; '.join(
             f'{i[:8]} (último latido hace {fmt_dur(m * 60)}, {n} prompts)' for i, m, n in vivos)
             + '. Escriben en la misma memoria: si tocas el índice, ellos también pueden.')
-    # Un método de lectura por índice temático (ctx.py / ideograma.py) se probó aquí:
-    # medido en sesiones completas, no bajaba el uso de herramientas de forma
-    # consistente y dejaba el contexto más grande, así que se retiró. Regla: un método
-    # de lectura solo se queda si el A/B lo mide mejor, nunca por intuición. El guion
-    # sigue disponible aparte, bajo demanda, para explorar un fichero desconocido.
+    # ctx.py/ideograma.py (lectura por índice temático) sigue disponible aparte, bajo
+    # demanda, para explorar un fichero desconocido — no se usa aquí por defecto.
     L.append('Para volver a un momento: grep en mem/sesiones/<id>.jsonl(.gz). Rito de cierre: fichas → '
              'el índice se recalcula solo (varas.py --index corre tras cada cierre); el gancho guarda '
              'el transcript y escribe el reloj solo. '
@@ -615,15 +608,11 @@ if __name__ == '__main__':
                 import exterocepcion, noticias
             # Presupuesto único para TODA la parte de red de este arranque (ipinfo +
             # portada + hasta 8 temas): agotado, las llamadas siguientes fallan al
-            # instante en vez de colgar cada una su propio timeout (§ fallo 6-sep).
+            # instante en vez de colgar cada una su propio timeout.
             presupuesto = rutas.Presupuesto(PRESUPUESTO_ARRANQUE_S)
             exterocepcion.lugar_ip(refrescar=True, presupuesto=presupuesto)  # la IP se vuelve a leer en cada arranque
-            # fallo 6-sep: --arranque refrescaba la IP pero nunca imprimía ninguna
-            # línea "[mundo] ..." (a diferencia de --despertar, que sí llama a
-            # exterocepcion.texto()) — con la red muerta, lugar_ip() fallaba en
-            # silencio y el additionalContext quedaba sin mencionar el lugar en
-            # absoluto (silencio, no "sin dato"). exterocepcion.texto() siempre
-            # devuelve algo, aunque sea "[mundo] lugar sin dato (sin red)".
+            # exterocepcion.texto() siempre devuelve algo, aunque sea "[mundo] lugar sin
+            # dato (sin red)": el additionalContext nunca queda sin mencionar el lugar.
             txt += '\n' + exterocepcion.texto(tp, presupuesto=presupuesto)
             n = noticias.texto(presupuesto=presupuesto)
             if n:
@@ -644,7 +633,7 @@ if __name__ == '__main__':
                 from . import exterocepcion
             except ImportError:
                 import exterocepcion
-            presupuesto = rutas.Presupuesto(PRESUPUESTO_DESPERTAR_S)  # § fallo 6-sep
+            presupuesto = rutas.Presupuesto(PRESUPUESTO_DESPERTAR_S)
             exterocepcion.aprender_lugar(inp.get('prompt') or '', presupuesto=presupuesto)  # «estoy en Madrid» → lugar dicho
             partes.append(exterocepcion.texto(tp, presupuesto=presupuesto))
         except Exception:

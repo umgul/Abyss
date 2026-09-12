@@ -1,86 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Volumen: lo que el ojo VE en relieve — un despiece por capas (2,5D) de una foto, y un
-prompt de diseño 3D medido de ella. NO es reconstrucción 3D ni un escáner de profundidad:
-todo lo de aquí sale de heurísticas DECLARADAS sobre una sola imagen 2D, nunca de una
-cámara estéreo ni de un sensor de profundidad — se dice aquí, en `skills/ojo/SKILL.md` y en
-la propia página que abre `render3d.py` (ver más abajo, «--html»).
+"""Volumen: despiece por capas (2,5D) de una foto y un prompt de diseño 3D medido de ella.
+No es reconstrucción 3D ni un escáner de profundidad: usa heurísticas declaradas sobre una
+sola imagen 2D, nunca una cámara estéreo ni un sensor de profundidad (ver también
+`skills/ojo/SKILL.md` y el aviso que inserta en la página de `render3d.py`).
 
 Uso:
     python volumen.py despiece <imagen> [--capas 4] [--salida escena.json] [--html]
     python volumen.py prompt3d <imagen> [--salida f.txt] [--escena f.json]
 
-DEPENDENCIA obligatoria: OpenCV (`cv2`) y `numpy`. Sin ellas, este guion dice EXACTAMENTE
-qué instalar («sin dato: pip install opencv-python numpy», igual que `lienzo.py`) y sale con
-código 2 — nunca instala nada por su cuenta ni deja salir una traza cruda.
+Requiere OpenCV (`cv2`) y `numpy`; sin ellas sale con código 2 y dice exactamente qué
+instalar, sin traza cruda.
 
-## despiece — GrabCut + una heurística de profundidad declarada
+despiece: separa el objeto del fondo con `cv2.grabCut` (rectángulo inicial con margen del
+5% por lado; si no separa nada usa ese rectángulo entero como primer plano) y reparte el
+primer plano en `--capas`-1 tramos por percentiles de nitidez+luminancia (capa 0 = más
+nítida/luminosa = "más cerca"); todo lo que quedó fuera del primer plano es la última capa,
+el fondo, y una capa sin píxeles no aparece. Cada capa se recorta con canal alfa a
+`<salida sin extensión>_capas/capa_N.png`. La `escena.json` (mismo formato que
+`pruebas/datos/escena_prueba.json`) lleva un plano por capa con su color medio y, en
+`capa_png`, la ruta a ese PNG (campo extra que `render3d.py` ignora). El ancho total de la
+foto ocupa `ANCHO_ESCENA_M` (2 unidades: constante de diseño, no una medida real del
+objeto) y las capas se separan `SEPARACION_CAPA_M` (0,2) en Z. `--html` además llama a
+`render3d.renderizar()` y le inserta un aviso fijo de que es un despiece 2,5D, no 3D.
 
-1. `cv2.grabCut` (inicializado con un rectángulo que deja un margen del 5% por lado; probado
-   el 6-sep en este mismo paquete) separa el objeto principal del fondo. Si no separa nada
-   (foto sin contraste claro, medido con una imagen de un solo color: 0 píxeles de primer
-   plano) se avisa «GrabCut no separó nada: se toma el recuadro central como primer plano,
-   sin fingir un recorte más fino» y se sigue con ese rectángulo entero.
-2. Sobre el primer plano se mide, por píxel, una puntuación de «cercanía aparente» =
-   0,6×nitidez_local + 0,4×luminancia, cada una normalizada por percentiles 5/95 DE ESTE
-   primer plano (mismo patrón de cortes propios que el resto del paquete). La nitidez local
-   es la varianza del laplaciano en una ventana de 9×9: MIDE contraste de borde, no
-   distancia — una pared lisa y cercana sale tan «lejana» como una pared lisa y lejana. Es
-   una heurística de composición fotográfica (lo enfocado y luminoso suele estar delante en
-   una foto bien compuesta), NUNCA una medida de profundidad real, y se declara como tal.
-3. El primer plano se reparte en `--capas`-1 tramos por PERCENTILES de esa puntuación (capa 0
-   = puntuación más alta = "más cerca"); todo lo que GrabCut dejó fuera del primer plano es
-   la última capa, el fondo. Una capa sin ningún píxel simplemente no aparece (el resultado
-   dice cuántas capas *efectivas* salieron; nunca se inventa una capa vacía).
-4. Cada capa se recorta a su caja delimitadora con un canal alfa (transparente fuera de esa
-   capa) y se guarda como PNG aparte, en `<salida sin extensión>_capas/capa_N.png` — ESA es
-   la textura real, con los píxeles de la foto. La `escena.json` no la referencia como
-   textura (el «plano» de `render3d.py` no pinta texturas, solo color liso: no se ha tocado
-   `render3d.py` para eso, fuera del encargo de esta tanda) — cada plano de la escena lleva
-   el COLOR MEDIO de su capa y, en un campo extra `capa_png` que `render3d.py` ignora sin
-   más (no valida campos desconocidos), la ruta a la imagen real, por si una tanda futura le
-   añade materiales con textura. La escena resultante SÍ es la que abre `render3d.py` con su
-   deslizador de explosión (mismo esquema `escena.json` que `pruebas/datos/escena_prueba.json`:
-   piezas tipo/pos/tam/color/grupo — un grupo por capa, así cada una explosiona por separado).
-5. Escala: el ancho TOTAL de la foto ocupa 2 unidades de escena (constante de diseño, igual
-   de arbitraria que la de cualquier otro `escena.json` de este paquete — no es una medida
-   real del objeto) y las capas se separan 0,2 unidades cada una en Z, capa 0 más cerca.
-6. `--html`: además de la `escena.json`, llama a `render3d.renderizar()` (sin tocar su
-   código: solo se le pasa la ruta) para escribir la página, y le inserta un aviso fijo en
-   una esquina — «Despiece 2,5D — capas por heurística (nitidez+luminancia), NO
-   reconstrucción 3D» — escrito sobre el HTML ya generado (no se modifica `render3d.py`
-   para esto: es este guion quien retoca el fichero de salida que él mismo pidió escribir).
+prompt3d: mide paleta dominante (k-medias, k=5), proporciones del primer plano, horizonte
+(línea recta más larga dentro de ±5° de la horizontal) y formas dominantes por circularidad
+del contorno — ≥0,85 esfera; 4-6 vértices y <0,85 rectángulo; razón de aspecto ≥1,6 y
+circularidad 0,30-0,85 sin 4-6 vértices cilindro; el resto irregular — sin reconocer QUÉ es
+el objeto. Sin horizonte claro o sin primer plano separable declara «sin dato», nunca lo
+inventa. Escribe un prompt ES/EN para three.js en `--salida` (por defecto
+`<base>_prompt3d.txt`); con `--escena` además escribe una `escena.json` de primitivas
+(caja/cilindro/esfera) solo con las formas clasificables.
 
-## prompt3d — lo que SE MIDE de la foto, nunca lo que se adivina
-
-- **Paleta**: k-medias (`cv2.kmeans`, k=5 por defecto) sobre TODOS los píxeles de la foto en
-  RGB; cada color con su proporción de píxeles, de mayor a menor. Es la paleta medida de
-  ESTA foto, no un juicio de que "pega" o "no pega".
-- **Proporciones del objeto**: caja delimitadora del primer plano (mismo GrabCut de arriba)
-  → ancho/alto en píxeles y su razón. Sin primer plano separable: «sin dato».
-- **Horizonte**: la línea recta más larga dentro de ±5° de la horizontal (Canny + Hough)
-  sobre TODA la foto, como fracción de la altura. Sin ninguna línea así de clara: «sin
-  dato» — no se inventa un horizonte en una foto que no lo tiene.
-- **Formas dominantes**: por cada contorno externo del primer plano (o de los bordes Canny
-  de toda la foto si GrabCut no separó nada) con área ≥1% de la foto, circularidad
-  (4π·área/perímetro²) y vértices tras `approxPolyDP`:
-    - circularidad ≥ 0,85               → "esfera" (silueta redonda)
-    - 4-6 vértices y circularidad < 0,85 → "rectangulo" (silueta poligonal de pocos lados)
-    - razón de aspecto ≥ 1,6 y circularidad entre 0,30 y 0,85, sin 4-6 vértices → "cilindro"
-      (silueta alargada y redondeada — una elipse o un óvalo visto de perfil)
-    - cualquier otro caso                → "irregular" (no se fuerza a encajar en las tres)
-  Es una clasificación DECLARADA por geometría de la silueta 2D, no un reconocedor de
-  objetos: no dice QUÉ es, dice qué círculo/rectángulo/óvalo se parece más a su contorno.
-- Con estos cuatro números se escribe un prompt de diseño en castellano E inglés para
-  three.js (`--salida f.txt`, por defecto `<base>_prompt3d.txt`) citando exactamente lo
-  medido (paleta, razón del objeto, fracción de horizonte si la hay, formas con su
-  circularidad). Con `--escena f.json` además se escribe una `escena.json` de primitivas
-  (caja/cilindro/esfera reales de `render3d.py`, sin campos extra) colocadas y coloreadas
-  según esas mismas formas medidas — sin adivinar qué es el objeto, solo lo que se vio.
-
-Ninguno de los dos verbos toca `mem` ni resuelve un proyecto de Claude Code (como
-`render3d.py`/`pintor.py`: guiones de fichero a fichero, sin gancho); por eso se puede
-importar este módulo en el propio proceso de una prueba sin arriesgarse a que aborte
-por falta de `--proyecto`/`ABYSS_PROYECTO`.
+Ninguno de los dos verbos toca `mem` ni un proyecto de Claude Code: es seguro importar este
+módulo en proceso sin `--proyecto`/`ABYSS_PROYECTO`.
 """
 import json
 import math
@@ -115,12 +68,9 @@ def _leer_imagen(ruta):
 
 
 def mascara_primer_plano(img, avisar=print):
-    """Máscara booleana (True=primer plano) por GrabCut, inicializado con un rectángulo que
-    deja fuera un margen de `MARGEN_GRABCUT` por cada lado. Si GrabCut no separa NADA
-    (0 píxeles de primer plano — medido con una imagen de un único color de fondo a fondo),
-    se avisa y se usa el propio rectángulo inicial entero como primer plano: fail-closed
-    hacia "todo es objeto", nunca hacia una máscara vacía que dejaría el resto del guion
-    sin nada que despiezar."""
+    """Máscara booleana (True=primer plano) por GrabCut, con un rectángulo inicial que deja
+    fuera un margen de `MARGEN_GRABCUT` por lado. Si no separa nada, avisa y usa ese
+    rectángulo entero como primer plano: fail-closed, nunca una máscara vacía."""
     alto, ancho = img.shape[:2]
     mx = max(1, int(ancho * MARGEN_GRABCUT))
     my = max(1, int(alto * MARGEN_GRABCUT))
@@ -176,11 +126,9 @@ def _mapa_profundidad(img, fg):
 
 
 def _indices_de_capa(mapa, fg, num_capas):
-    """Índice de capa por píxel: 0 = puntuación más alta ("más cerca") … `num_capas`-2 =
-    puntuación más baja dentro del primer plano; `num_capas`-1 = fondo (todo lo que GrabCut
-    dejó fuera). El primer plano se reparte por PERCENTILES de `mapa` (no por tramos iguales
-    del rango de valores): así cada capa se lleva, a ojo, el mismo número de píxeles de
-    objeto, no una porción arbitraria de la escala de puntuación."""
+    """Índice de capa por píxel: 0 = puntuación más alta ("más cerca") … `num_capas`-2 = más
+    baja dentro del primer plano; `num_capas`-1 = fondo. Reparte por percentiles de `mapa`,
+    no por tramos iguales del rango: cada capa se lleva un número similar de píxeles."""
     fondo = num_capas - 1
     idx = np.full(mapa.shape, fondo, dtype=np.int32)
     if num_capas <= 1:
@@ -282,11 +230,9 @@ _AVISO_2_5D = (
 
 
 def _insertar_aviso_2_5d(ruta_html):
-    """Retoca el HTML que ACABA de escribir `render3d.renderizar()` (no su código: el
-    fichero de salida) para dejar el aviso "no es 3D" también en la propia página, como
-    pide el docstring del módulo. Si por lo que sea no hay `<body>` que anclar (HTML
-    ajeno, no el que genera este mismo paquete), no revienta: no encuentra nada que
-    insertar y deja el fichero tal cual estaba."""
+    """Inserta el aviso "no es 3D" en el HTML que acaba de escribir `render3d.renderizar()`
+    (el fichero de salida, no su código). Sin `<body>` que anclar, no revienta: deja el
+    fichero tal cual."""
     with open(ruta_html, encoding='utf-8') as fh:
         texto = fh.read()
     marca = '<body>'
@@ -302,15 +248,10 @@ def _insertar_aviso_2_5d(ruta_html):
 # ───────────────────────────────── prompt3d ─────────────────────────────────
 
 def paleta_dominante(img, k=5):
-    """k-medias (`cv2.kmeans`) sobre TODOS los píxeles en RGB. Devuelve hasta `k` colores con
-    su proporción de píxeles, de mayor a menor. Medido de ESTA foto, no un juicio estético.
-
-    Cuando `k` pide más grupos de los que la foto realmente tiene (fotos con pocos colores
-    reales: capturas sintéticas, ilustraciones planas), `cv2.kmeans` puede devolver dos
-    centros casi idénticos en vez de uno vacío — medido con una imagen de 3 colores planos y
-    k=5. Se fusionan aquí los centros a menos de 10 de distancia (suma de canales RGB) y se
-    descartan los que se quedan sin ni un píxel asignado: la paleta que se devuelve son
-    colores que de verdad aparecen en la foto, no ruido de una k demasiado alta."""
+    """k-medias (`cv2.kmeans`) sobre todos los píxeles en RGB: hasta `k` colores con su
+    proporción de píxeles, de mayor a menor. Fusiona centros a menos de 10 de distancia RGB
+    y descarta los sin ningún píxel asignado, para no devolver ruido de una `k` más alta
+    que los colores reales de la foto."""
     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     datos = rgb.reshape((-1, 3)).astype(np.float32)
     k = max(1, min(int(k), datos.shape[0]))
@@ -364,9 +305,8 @@ def horizonte(img):
                               minLineLength=max(10, ancho // 3), maxLineGap=max(2, ancho // 30))
     if lineas is None:
         return None
-    # `cv2.HoughLinesP` devuelve (N,1,4) en unas versiones de OpenCV y (N,4) en otras
-    # (medido: opencv-contrib-python 5.0.0 da (N,4) en esta máquina) — se normaliza con
-    # `reshape` antes de desempaquetar en vez de asumir una forma fija.
+    # `cv2.HoughLinesP` devuelve (N,1,4) en unas versiones de OpenCV y (N,4) en otras: se
+    # normaliza con `reshape` antes de desempaquetar en vez de asumir una forma fija.
     mejor_y, mejor_long = None, 0.0
     for x1, y1, x2, y2 in np.asarray(lineas).reshape(-1, 4):
         dx, dy = float(x2 - x1), float(y2 - y1)
@@ -381,11 +321,10 @@ def horizonte(img):
 
 
 def formas_dominantes(img, fg=None, avisar=print, area_minima_frac=0.01):
-    """Contornos externos del primer plano (o de los bordes Canny de toda la foto si no hay
-    primer plano separable) con área ≥ `area_minima_frac` de la foto: circularidad, vértices
-    (`approxPolyDP`, épsilon 2% del perímetro) y razón de aspecto del rectángulo mínimo.
-    Clasificación DECLARADA en el docstring del módulo — nunca un reconocedor de objetos.
-    Lista ordenada por área descendente; vacía si no hay ningún contorno así de grande."""
+    """Contornos externos del primer plano (o bordes Canny de toda la foto si no hay primer
+    plano separable) con área ≥ `area_minima_frac`: circularidad, vértices (`approxPolyDP`)
+    y razón de aspecto. Clasificación declarada, nunca un reconocedor de objetos; lista
+    ordenada por área descendente."""
     if fg is None:
         fg = mascara_primer_plano(img, avisar=avisar)
     fuente = (fg.astype(np.uint8)) * 255
@@ -463,12 +402,10 @@ def _escena_de_formas(img, formas, ancho_img, alto_img):
 
 
 def prompt3d(ruta_imagen, salida=None, escena=None, avisar=print):
-    """Mide paleta, proporciones del objeto, horizonte y formas dominantes (ver docstring del
-    módulo) y escribe un prompt de diseño ES/EN para three.js. Con `escena`, además escribe
-    una `escena.json` de primitivas (solo con las formas que sí clasificó como
-    caja/cilindro/esfera; las "irregular" no fuerzan ninguna). Devuelve un dict con `prompt`
-    (ruta del .txt) y, si aplica, `escena` (ruta del .json) y `sin_escena` (motivo si no se
-    escribió ninguna: ninguna forma clasificable)."""
+    """Mide paleta, proporciones, horizonte y formas dominantes (ver docstring del módulo) y
+    escribe un prompt ES/EN para three.js. Con `escena`, escribe además una `escena.json` de
+    primitivas (solo formas clasificadas como caja/cilindro/esfera). Devuelve `prompt`,
+    `escena` si aplica, y `sin_escena` con el motivo si no se escribió ninguna."""
     ruta_imagen = os.path.abspath(ruta_imagen)
     img = _leer_imagen(ruta_imagen)
     alto, ancho = img.shape[:2]
@@ -543,9 +480,8 @@ def _cli(argv):
         print(f'sin dato: {e}')
         return 2
     except Exception as e:
-        # cualquier otro fallo (p. ej. una versión de OpenCV con otra forma de salida en
-        # alguna llamada que no se haya normalizado) sale como "sin dato", nunca como
-        # traza cruda — igual que el resto de guiones del paquete.
+        # cualquier otro fallo sale como "sin dato", nunca como traza cruda — igual que el
+        # resto de guiones del paquete.
         print(f'sin dato: {type(e).__name__} {e}')
         return 2
     print(json.dumps(r, ensure_ascii=False))

@@ -5,36 +5,32 @@
     mundo.descargar(candidato, dir) -> (ruta_imagen, ruta_atribucion)
     mundo.contexto(motivo, cfg=None) -> dict (qué es, dónde está, lat/lon) o {}
 
-Petición del usuario (7-sep-2026): la búsqueda de
-motivos «debe incluir Street View o Google Maps, webs museísticas, de historia, de
-arte, no los repos de imágenes; tiene que plasmar cosas del mundo real». Seis fuentes
-(medido 7-sep 07:54 desde la máquina del usuario):
+Cubre Street View/Google Maps, museos y webs de historia y arte — no repositorios de
+imágenes genéricas: el objetivo es reflejar el mundo real. Seis fuentes:
 
-    fuente     | qué da                                    | clave            | medido
-    met        | obras de la colección, dominio público    | ninguna          | 200 en 0,5s; «Last Supper» 67 resultados; objeto 437213 con primaryImage
-    artic      | obras del Art Institute of Chicago, IIIF  | ninguna          | 200 en 0,7s; «Michelangelo» 3 de dominio público
-    commons    | la obra o el lugar en alta resolución      | ninguna          | La última cena de Leonardo: 9600x4800, dominio público
-    streetview | vista a pie de calle (Google Street View) | google_maps_key  | 403 sin clave: «You must use an API key»
-    mapillary  | vista a pie de calle, CC BY-SA             | mapillary_token  | error 190 sin token
-    webcam     | cámara pública EN DIRECTO (Windy)          | windy_key        | 403 sin clave
+    fuente     | qué da                                    | clave
+    met        | obras de la colección, dominio público    | ninguna
+    artic      | obras del Art Institute of Chicago, IIIF  | ninguna
+    commons    | la obra o el lugar en alta resolución      | ninguna
+    streetview | vista a pie de calle (Google Street View) | google_maps_key
+    mapillary  | vista a pie de calle, CC BY-SA             | mapillary_token
+    webcam     | cámara pública EN DIRECTO (Windy)          | windy_key
 
-`met`, `artic` y `commons` no piden clave: se prueban SIEMPRE que se pidan. Las otras
-tres SÍ necesitan una clave o token en `imagen_config.json` (`google_maps_key`,
-`mapillary_token`, `windy_key`, plantilla en `plantillas/imagen_config.json`) — sin
-ella, ESTE módulo NUNCA intenta la red: avisa «sin clave: …» (nunca una traza) y esa
-fuente sencillamente no aporta candidatos, igual que hacen los proveedores sin
-configurar de `imagen.py crear`.
+`met`, `artic` y `commons` no piden clave: se prueban siempre que se pidan. Las otras
+tres necesitan su clave/token en `imagen_config.json` (plantilla en
+`plantillas/imagen_config.json`); sin ella, este módulo nunca intenta la red: avisa
+«sin clave: …» (nunca una traza) y esa fuente sencillamente no aporta candidatos, igual
+que los proveedores sin configurar de `imagen.py crear`.
 
-`contexto(motivo)` (Wikidata `wbsearchentities` + Wikipedia REST, sin clave; 200
-medido) trae qué es el motivo, de quién y su latitud/longitud si Wikipedia la conoce
-— así `buscar()` puede pedir la vista a pie de calle sin que el usuario tenga que dar
-`--lugar` a mano cuando el motivo ya es un lugar reconocible. Nunca lanza: sin red o
-sin resultado, `{}` (un candidato sin contexto no revienta la búsqueda entera).
+`contexto(motivo)` (Wikidata `wbsearchentities` + Wikipedia REST, sin clave) trae qué es
+el motivo, de quién y su latitud/longitud si Wikipedia la conoce, para que `buscar()`
+derive la vista a pie de calle sin `--lugar` a mano. Nunca lanza: sin red o sin
+resultado, `{}` (un candidato sin contexto no revienta la búsqueda entera).
 
-Sin combinar ni componer (decisión del usuario, 7-sep, igual que `imagen.py buscar`):
-el motivo se pinta tal cual llega, o se esboza en el taller y se pinta. El TEXTO del
-motivo viaja a cada fuente que se consulte (se dice); `descargar()` además trae la
-imagen (o el fotograma de la webcam) desde el host que indique cada fuente.
+Sin combinar ni componer (igual que `imagen.py buscar`): el motivo se pinta tal cual
+llega, o se esboza en el taller y se pinta. El texto del motivo viaja a cada fuente
+consultada; `descargar()` además trae la imagen (o el fotograma de la webcam) desde el
+host que indique cada fuente.
 
 Este módulo no toca `imagen.py`: expone `buscar()`/`descargar()`/`contexto()` y su
 propio `_cli()` para que `imagen.py mundo …` delegue en él (mismo patrón que
@@ -170,11 +166,10 @@ def _buscar_artic(motivo, n, cfg, pedir_fn):
 
 
 def _buscar_commons(motivo, n, cfg, pedir_fn):
-    """Wikimedia Commons: sin clave; sirve tanto para la obra como para el lugar. La
-    URL de `imageinfo.url` YA es la de resolución completa, no una miniatura (medido:
-    La última cena de Leonardo, 9600x4800). El `Artist`
-    de la API trae HTML de verdad (enlaces, a veces anidados en `<bdi>`/`<span>`):
-    `_sin_html()` lo deja en texto plano."""
+    """Wikimedia Commons: sin clave; sirve tanto para la obra como para el lugar. La URL de
+    `imageinfo.url` ya es la de resolución completa, no una miniatura. El `Artist` de la
+    API trae HTML de verdad (enlaces, a veces anidados): `_sin_html()` lo deja en texto
+    plano."""
     q = urllib.parse.urlencode({
         "action": "query", "generator": "search", "gsrnamespace": 6, "gsrsearch": motivo,
         "gsrlimit": int(n), "prop": "imageinfo", "iiprop": "url|extmetadata|size", "format": "json",
@@ -209,10 +204,9 @@ DESPACHO_ABIERTAS = {"met": _buscar_met, "artic": _buscar_artic, "commons": _bus
 # ── fuentes con clave: NUNCA tocan la red sin ella ───────────────────────────
 
 def _buscar_streetview(motivo, n, cfg, pedir_fn, opciones):
-    """Google Street View Static: pide primero `/metadata` (gratis, no gasta cuota
-    de imagen) para saber si el punto tiene cobertura antes de dar la URL de la
-    imagen. Sin `google_maps_key`, ni se intenta la red (medido sin clave, HTTP 403
-    «You must use an API key»)."""
+    """Google Street View Static: pide primero `/metadata` (gratis, no gasta cuota de
+    imagen) para saber si el punto tiene cobertura antes de pedir la imagen. Sin
+    `google_maps_key`, no intenta la red."""
     clave = (cfg.get("google_maps_key") or "").strip()
     if not clave:
         raise RuntimeError("sin clave: pon google_maps_key en imagen_config.json")
@@ -239,9 +233,8 @@ def _buscar_streetview(motivo, n, cfg, pedir_fn, opciones):
 
 
 def _buscar_mapillary(motivo, n, cfg, pedir_fn, opciones):
-    """Mapillary Graph API: sin `mapillary_token`, ni se intenta la red (medido sin
-    token, error 190). Vistas a pie de calle con licencia
-    CC BY-SA 4.0."""
+    """Mapillary Graph API: sin `mapillary_token`, no intenta la red. Vistas a pie de
+    calle con licencia CC BY-SA 4.0."""
     token = (cfg.get("mapillary_token") or "").strip()
     if not token:
         raise RuntimeError("sin clave: pon mapillary_token en imagen_config.json")
@@ -271,9 +264,8 @@ def _buscar_mapillary(motivo, n, cfg, pedir_fn, opciones):
 
 
 def _buscar_webcam(motivo, n, cfg, pedir_fn, opciones):
-    """Windy webcams API v3: sin `windy_key`, ni se intenta la red (medido sin clave,
-    HTTP 403). El mundo EN DIRECTO: a diferencia de las
-    otras cinco fuentes, la imagen puede ser distinta en cada descarga."""
+    """Windy webcams API v3: sin `windy_key`, no intenta la red. A diferencia de las
+    otras fuentes, la imagen es EN DIRECTO: puede cambiar en cada descarga."""
     clave = (cfg.get("windy_key") or "").strip()
     if not clave:
         raise RuntimeError("sin clave: pon windy_key en imagen_config.json")
@@ -305,13 +297,11 @@ DESPACHO_CON_CLAVE = {"streetview": _buscar_streetview, "mapillary": _buscar_map
 # ── contexto: Wikidata + Wikipedia, sin clave ────────────────────────────────
 
 def contexto(motivo, cfg=None, pedir_fn=None):
-    """Wikidata `wbsearchentities` + Wikipedia REST, sin clave (medido 7-sep: ambas
-    200). Qué es el motivo, de quién, y su latitud/longitud
-    SI Wikipedia la conoce (campo `coordinates` del resumen; ausente en artículos que
-    no son de un lugar, p. ej. una persona) — para poder derivar la vista a pie de
-    calle sin que el usuario dé `--lugar` a mano. Nunca lanza: sin red, sin resultado
-    en Wikidata o sin resumen en Wikipedia, devuelve lo que haya podido reunir (o
-    `{}` si nada respondió) — un motivo sin contexto no debe reventar la búsqueda."""
+    """Wikidata `wbsearchentities` + Wikipedia REST, sin clave. Qué es el motivo, de
+    quién, y su latitud/longitud si Wikipedia la conoce (campo `coordinates` del resumen;
+    ausente en artículos que no son de un lugar), para derivar la vista a pie de calle sin
+    `--lugar` a mano. Nunca lanza: sin red o sin resultado, devuelve lo que haya reunido
+    (o `{}`)."""
     pedir_fn = pedir_fn or _pedir
     try:
         q = urllib.parse.urlencode({"action": "wbsearchentities", "search": motivo,
@@ -350,25 +340,13 @@ def contexto(motivo, cfg=None, pedir_fn=None):
 
 def buscar(motivo, fuentes=None, n=5, cfg=None, lugar=None, rumbo=0, inclinacion=0, campo=80,
            avisar=print, pedir_fn=None, contexto_previo=None):
-    """Devuelve una lista de candidatos (dicts `fuente`/`titulo`/`autor`/`licencia`/
-    `tamano`/`url`/`pagina`) del `motivo` en las `fuentes` pedidas.
-
-    `fuentes`: `None` → las tres abiertas (`met`, `artic`, `commons`); `"todas"` →
-    las seis; un nombre suelto o una lista/tupla de nombres → exactamente esas.
-
-    Nunca lanza: cada fuente que falle (sin clave, sin lugar, HTTP, parseo) se avisa
-    por `avisar` con `"<fuente>: <motivo>"` y sencillamente no aporta candidatos —
-    igual que `imagen.buscar()`. El texto de `motivo` viaja a cada fuente consultada.
-
-    `lugar=(lat, lon)`: punto para `streetview`/`mapillary`/`webcam`. Si no se da y
-    se pide alguna de esas tres, se intenta derivar de `contexto(motivo)` (Wikidata +
-    Wikipedia); si tampoco esa trae coordenadas, esa fuente se avisa `"sin lugar: …"`
-    y no aporta candidatos — nunca se inventa un punto. `contexto_previo`: si quien
-    llama ya calculó `contexto(motivo, cfg)` por su cuenta (la CLI lo hace para poder
-    avisar de él), se pasa aquí para no volver a pedirlo a Wikidata/Wikipedia.
-
-    El resultado se recorta a `n` en total (no a `n` por fuente), igual que
-    `imagen.buscar()`."""
+    """Candidatos (dicts `fuente`/`titulo`/`autor`/`licencia`/`tamano`/`url`/`pagina`) de
+    `motivo` en `fuentes` (`None`=las tres abiertas, `"todas"`=las seis, nombre suelto o
+    lista=exactamente esas). Nunca lanza: cada fuente que falle se avisa por `avisar` y no
+    aporta candidatos, igual que `imagen.buscar()`. `lugar=(lat, lon)` para
+    streetview/mapillary/webcam; sin él se deriva de `contexto(motivo)` (o de
+    `contexto_previo`, si quien llama ya lo calculó) — sin coordenadas, esa fuente avisa
+    `"sin lugar: …"` y no aporta candidatos. Recorta a `n` en total, no a `n` por fuente."""
     cfg = cfg or {}
     pedir_fn = pedir_fn or _pedir
     if fuentes is None:
@@ -485,12 +463,9 @@ def _cli(argv, mem, pedir_fn=None):
         return 1
 
     cfg = _cfg(mem)
-    # El contexto (Wikidata+Wikipedia) solo se pide si hace falta: una búsqueda
-    # corriente de met/artic/commons no necesita lat/lon, y pedirlo siempre pagaría
-    # dos llamadas de red de más en el camino común. Mismo criterio que usa `buscar()`
-    # por dentro (para quien la llame sin pasar por esta CLI) — aquí se calcula antes
-    # para poder AVISAR del contexto encontrado, y se pasa ya resuelto a `buscar()`
-    # para no volver a pedirlo.
+    # El contexto (Wikidata+Wikipedia) solo se pide si hace falta: una búsqueda de
+    # met/artic/commons no necesita lat/lon. Se calcula aquí antes para poder avisar del
+    # contexto encontrado, y se pasa ya resuelto a `buscar()` para no repetirlo.
     fuentes_pedidas = (FUENTES_TODAS if opts["fuente"] == "todas"
                         else (opts["fuente"],) if opts["fuente"] else FUENTES_ABIERTAS)
     ctx = None

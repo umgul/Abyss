@@ -16,61 +16,37 @@
                            [--n 5] [--descargar] [--lugar lat,lon --rumbo N --inclinacion N --campo N]
 
 `crear` recorre una CASCADA de proveedores y se queda con el primero que devuelva una imagen:
-  1. `local`: un servidor de imagen en tu máquina, estilo A1111/Forge/SD.Next (POST /sdapi/v1/txt2img)
-     o compatible con OpenAI (POST /v1/images/generations, p. ej. stable-diffusion.cpp). Es la única
-     vía en la que el prompt NO sale de tu máquina.
-  2. Proveedores con clave, en el orden en que los pongas en `imagen_config.json`:
-     `pollinations` (gen.pollinations.ai, clave en enter.pollinations.ai/keys),
-     `cloudflare` (Workers AI, flux-1-schnell: account_id + api_token),
-     `together` (api.together.xyz, modelo FLUX.1-schnell-Free),
-     `huggingface` (router.huggingface.co, FLUX.1-schnell).
-  3. `horde`: AI Horde (aihorde.net) con la clave anónima pública `0000000000`: sin registro, cola
-     de voluntarios con prioridad mínima; el prompt se procesa en máquinas de terceros. La imagen
-     final se descarga de un host de almacenamiento que algunas redes bloquean.
-Medido el 6-sep-2026: el host antiguo image.pollinations.ai ya no sirve imágenes sin clave.
-
-Lo que sale de la máquina: con cualquier vía que no sea `local`, el texto del prompt viaja a un
-servidor ajeno. Ningún proveedor del lote declara en una página legible cuánto tiempo guarda los
-prompts. Nada íntimo ni de casa por aquí.
-
-Configuración: `<memoria>/imagen_config.json` (plantilla en plantillas/). Claves solo ahí, nunca en el
-código. Cada petición se apunta en `<memoria>/imagen.log` (cuándo, vía, bytes, ruta, prompt recortado).
-Las imágenes van a `<memoria>/imagenes/` salvo que des una salida.
-
-`pintar` y `video` son locales por completo (Pillow + numpy; el vídeo, imageio-ffmpeg). Ver pintor.py
-y video_pintura.py para las opciones.
-
-`buscar` NO genera nada: busca imágenes con licencia libre ya hechas por alguien, en dos bancos sin
-clave — Openverse (`api.openverse.org/v1/images/?q=…&license_type=commercial`, MEDIDO 6-sep: 200 en
-0,6 s) y Wikimedia Commons (`commons.wikimedia.org/w/api.php?action=query&generator=search&
-gsrnamespace=6&prop=imageinfo&iiprop=url|extmetadata`, MEDIDO 6-sep: 200 en 0,6 s). Imprime título,
-autor, licencia y URL de cada resultado; con `--descargar` guarda la PRIMERA en `<memoria>/imagenes/`
-junto a un `.txt` con la atribución completa (título, autor, licencia, página de origen, URL). Solo
-busca y trae con atribución: NO monta, NO compone ni entiende la escena (decisión del usuario, 7-sep:
-fuera el montaje automático de imágenes buscadas). Lo que sale de la máquina: el TEXTO de la búsqueda
-viaja a esos dos servicios (nunca al resto de proveedores de `crear`); con `--descargar`, además, se
-descarga la imagen elegida desde el host que indique cada banco. Las URLs base son fijas salvo por
-`ABYSS_OPENVERSE_URL`/`ABYSS_COMMONS_URL`, que solo existen para poder probar esta pieza sin red
-(`pruebas/test_imagen_buscar.py`, contra JSON guardado): en uso normal nunca se definen.
-
-`render` delega en `render3d.renderizar()`: escribe SIEMPRE la
-página three.js autocontenida y, con `--png` (o con `--pintar`, que necesita una imagen de la que
-partir y por eso fuerza `--png` aunque no se pida a mano), una captura vía navegador sin cabeza —
-sin uno, «sin dato: no hay navegador sin cabeza» y código 2 (la página HTML ya se ha escrito: eso
-no depende del navegador). Con `--pintar`, el PNG resultante se pasa tal cual a
-`pintor.pintar(..., estilo=...)`: las DOS salidas (el render y, si toca, el cuadro) se apuntan en
-`<memoria>/imagen.log`, igual que `crear`. El resto de banderas (`--explosion`, `--camara`,
-`--mirar`, `--fondo`, `--luz`) son las de `render3d.py`, que documenta también sus límites (visor y
-editor de vistas, no modelador; three.js embebido en `abyss/vendor/`, sin red para verlo).
-
-`mundo` delega ENTERO en `mundo._cli()`: motivos DEL MUNDO REAL
-para pintar — The Met, el Art Institute of Chicago y Wikimedia Commons sin clave; Street View,
-Mapillary y las webcams de Windy con clave/token propios en `imagen_config.json`
-(`google_maps_key`, `mapillary_token`, `windy_key`) — sin ellas, esa fuente ni toca la red: avisa
-«sin clave: …» y sencillamente no aporta candidatos. Sin combinar ni componer (mismo criterio que
-`buscar`): el motivo se pinta tal cual llega. Ver `mundo.py` para el detalle de cada fuente y de
-`contexto()` (Wikidata + Wikipedia: deriva lat/lon del motivo cuando hace falta `--lugar` para
-streetview/mapillary/webcam y no se ha dado a mano).
+  1. `local`: servidor de imagen en tu máquina, estilo A1111/Forge/SD.Next o compatible con
+     OpenAI — la única vía en la que el prompt NO sale de tu máquina.
+  2. Proveedores con clave, en el orden de `imagen_config.json`: `pollinations`, `cloudflare`
+     (Workers AI), `together`, `huggingface`.
+  3. `horde` (AI Horde) con la clave anónima pública `0000000000`: sin registro, cola de
+     voluntarios con prioridad mínima; el prompt se procesa en máquinas de terceros.
+Lo que sale de la máquina: con cualquier vía que no sea `local`, el prompt viaja a un servidor
+ajeno; ningún proveedor declara cuánto tiempo lo guarda.
+Configuración: `<memoria>/imagen_config.json` (claves solo ahí, nunca en el código). Cada
+petición se apunta en `<memoria>/imagen.log` (cuándo, vía, bytes, ruta, prompt recortado); las
+imágenes van a `<memoria>/imagenes/` salvo que se dé una salida.
+`pintar`/`video` son locales por completo (Pillow + numpy; el vídeo, imageio-ffmpeg) — ver
+`pintor.py`/`video_pintura.py` para las opciones.
+`buscar` NO genera nada: busca en dos bancos con licencia libre y sin clave, Openverse y
+Wikimedia Commons. Imprime título, autor, licencia y URL; con `--descargar` guarda la PRIMERA
+en `<memoria>/imagenes/` junto a un `.txt` con la atribución completa. NO monta, NO compone ni
+entiende la escena. Solo el TEXTO de la búsqueda viaja a esos dos servicios (nunca al resto de
+proveedores de `crear`); con `--descargar`, además, se descarga la imagen elegida. Las URLs
+base son fijas salvo `ABYSS_OPENVERSE_URL`/`ABYSS_COMMONS_URL`, solo para probar esta pieza sin
+red (`pruebas/test_imagen_buscar.py`); en uso normal nunca se definen.
+`render` delega en `render3d.renderizar()`: escribe SIEMPRE la página three.js autocontenida y,
+con `--png` (o con `--pintar`, que lo fuerza), una captura vía navegador sin cabeza — sin uno,
+«sin dato: no hay navegador sin cabeza» y código 2 (la página ya se ha escrito). Con
+`--pintar`, el PNG resultante pasa a `pintor.pintar(..., estilo=...)`; ambas salidas se apuntan
+en `imagen.log`. El resto de banderas son las de `render3d.py`, que documenta sus propios
+límites (visor y editor de vistas, no modelador; three.js sin red para verlo).
+`mundo` delega ENTERO en `mundo._cli()`: motivos DEL MUNDO REAL para pintar — The Met, el Art
+Institute of Chicago y Wikimedia Commons sin clave; Street View, Mapillary y las webcams de
+Windy con clave/token propios en `imagen_config.json` (`google_maps_key`, `mapillary_token`,
+`windy_key`) — sin ellas, esa fuente ni toca la red. Sin combinar ni componer, igual que
+`buscar`. Ver `mundo.py` para cada fuente y `contexto()` (deriva lat/lon cuando falta `--lugar`).
 """
 import base64
 import json
@@ -458,7 +434,7 @@ def _cli(argv):
     verbo, resto = argv[0], list(argv[1:])
     proj, mem = rutas.resolver(resto, {})
     if "--proyecto" in resto:  # se resolvió arriba: fuera también su valor, o queda
-        i = resto.index("--proyecto")  # colándose como salida/prompt del verbo (medido 6-sep)
+        i = resto.index("--proyecto")  # colándose como salida/prompt del verbo
         del resto[i:i + 2]
     if verbo == "vias":
         for n, ok, estado in vias(mem):
@@ -522,11 +498,10 @@ def _cli(argv):
         i = 1
         while i < len(resto):
             a = resto[i]
-            # `i + 1 < len(resto)` sin más ya no basta (fallo "roza" del revisor 3,
-            # 6-sep): si detrás de una bandera conocida viene OTRA bandera
-            # (`--ancho --via local`), eso es un valor que falta, no un valor —
-            # tratarlo como si lo fuera reventaba `int()` con una traza cruda. Se
-            # exige además que el siguiente token no empiece por `--`.
+            # Si detrás de una bandera conocida viene OTRA bandera (`--ancho --via
+            # local`), eso es un valor que falta, no un valor — tratarlo como si lo
+            # fuera revienta `int()` con una traza cruda; por eso se exige además que
+            # el siguiente token no empiece por `--`.
             if a in ("--ancho", "--alto", "--semilla", "--via") and i + 1 < len(resto) and not resto[i + 1].startswith("--"):
                 i += 1
                 v = resto[i]
@@ -542,13 +517,10 @@ def _cli(argv):
             elif not a.startswith("--") and opts["salida"] is None:
                 opts["salida"] = a
             else:
-                # antes: cualquier otra cosa (un segundo posicional, un `--ancho`
-                # sin valor detrás, una bandera desconocida) se tragaba en silencio
-                # y `crear` seguía con sus valores por defecto (1024x1024, semilla
-                # al azar) sin avisar de que el argumento pedido no se había usado
-                # (ESPECIFICACION.md §3, medido 6-sep: `crear "gato" g1.png 512 384
-                # 7 --via local` generaba 1024x1024, los tres posicionales de más
-                # ignorados del todo). También cae aquí una bandera conocida sin
+                # Un segundo posicional, un `--ancho` sin valor detrás o una bandera
+                # desconocida deben avisar, nunca tragarse en silencio siguiendo con
+                # los valores por defecto sin decir que el argumento pedido no se usó
+                # (ESPECIFICACION.md §3). También cae aquí una bandera conocida sin
                 # valor real detrás (fin de la lista, o seguida de otra bandera).
                 print(f"argumento no reconocido: {a} (usa --ancho/--alto/--semilla)")
                 return 1

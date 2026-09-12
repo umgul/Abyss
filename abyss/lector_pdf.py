@@ -7,51 +7,27 @@
     python lector_pdf.py --leer <pdf> <sección|rango-de-páginas>
     python lector_pdf.py --ahorro <pdf> "consulta" [k=5]
 
-`--indexar`: extrae el texto de cada página con PyMuPDF (`fitz`) si está instalado;
-si no, con `pypdf`; si ninguno de los dos está, «sin dato: pip install pymupdf» y
-código 1 — no hay fallback silencioso que invente texto. Con `fitz` las secciones
-salen de una heurística de TAMAÑO DE FUENTE (una línea corta, ≤80 caracteres, cuyo
-tamaño de letra supera la mediana Y el percentil 90 de tamaños de esa página cuenta
-como título — es una heurística sobre maquetación real, no una tabla de contenidos:
-puede fallar en PDFs sin jerarquía tipográfica clara). Sin `fitz`, la heurística es
-de TEXTO (línea en MAYÚSCULAS, o que empieza por un número de apartado tipo «1.2 »,
-o por «Capítulo»/«Chapter»/«Sección»/«Section» — más pobre, se dice). El índice
-completo (texto de cada página + secciones con su página de inicio) se guarda en
-`mem/pdf/<sha1 del fichero>.json`, indexado por el HASH del contenido: el mismo PDF
-nunca se re-extrae dos veces; un PDF distinto (aunque tenga el mismo nombre) tiene
-otro sha1 y por tanto otro índice, nunca se pisan. `--secciones`, `--buscar`,
-`--leer` y `--ahorro` cargan el índice si ya existe o lo construyen la primera vez
-(no hace falta llamar a `--indexar` aparte, aunque se puede).
+`--indexar`: extrae texto con PyMuPDF (`fitz`) si está instalado, si no con `pypdf`; sin
+ninguno, «sin dato: pip install pymupdf» y código 1 — nunca un fallback que invente
+texto. Las secciones salen de una heurística de tamaño de fuente con `fitz` (más precisa)
+o de texto en mayúsculas/numeración con `pypdf` (más pobre). El índice (texto de cada
+página + secciones) se guarda en `mem/pdf/<sha1 del fichero>.json`, por HASH del
+contenido: el mismo PDF nunca se re-extrae dos veces, y un PDF distinto con el mismo
+nombre nunca pisa el índice de otro. Los demás verbos cargan el índice si ya existe o lo
+construyen la primera vez.
 
-`--buscar`: TF-IDF de biblioteca estándar (`math`, `collections.Counter`) sobre las
-páginas ya indexadas — no es semántico, es frecuencia de términos; tokens en
-minúscula sin acentos (`unicodedata`), con una lista corta de stopwords en
-castellano e inglés y un mínimo de 3 caracteres. Devuelve página, puntuación y la
-sección a la que pertenece esa página (la última sección cuya página de inicio sea
-≤ la página encontrada).
+`--buscar`: TF-IDF de biblioteca estándar sobre las páginas indexadas — no es semántico,
+es frecuencia de términos. `--leer`: un rango de páginas o el título de una sección.
+`--ahorro`: caracteres que leería `--buscar` frente al PDF entero, como proporción — mide
+ahorro de LECTURA, nunca calidad de respuesta (eso solo lo mediría un A/B con preguntas y
+respuestas reales, que esta pieza no hace).
 
-`--leer`: acepta un rango de páginas (`3`, `2-5`, `p2-p5`, sin distinguir
-mayúsculas en la «p») o el título de una sección (subcadena, sin acentos ni
-mayúsculas) — imprime su texto tal cual quedó extraído.
+Sin gancho: se invoca a mano, nunca desde `settings.json`. Sin red: nada sale de la
+máquina, ni se sube el PDF a ningún sitio. `ABYSS_PDF_FORZAR_MOTOR=fitz|pypdf` fuerza un
+motor aunque el otro esté instalado, para probar las dos heurísticas de sección en la
+misma máquina.
 
-`--ahorro`: caracteres que se LEERÍAN con `--buscar` (el texto de las k páginas que
-devolvería) frente a los caracteres del PDF entero, como proporción < 1. Mide
-ahorro de LECTURA (menos caracteres que pasan por el contexto), NO calidad de
-respuesta — eso solo lo mediría un A/B con preguntas y respuestas reales contra el
-PDF entero, y esta pieza no lo hace ni lo pretende.
-
-Sin gancho: se invoca a mano, nunca desde `settings.json`. Nada sale de la
-máquina: no hay ninguna llamada de red en todo el módulo, ni se sube el PDF a
-ningún sitio.
-
-Diseño para las pruebas (igual que `cuerpo.py`): las funciones de extracción,
-índice, búsqueda y lectura son puras/reciben `mem` como argumento; nada se
-resuelve ni se lee de stdin al importar el módulo — solo dentro de
-`if __name__ == '__main__':`. `ABYSS_PDF_FORZAR_MOTOR=fitz|pypdf` fuerza un motor
-aunque el otro esté instalado, para poder probar las dos heurísticas de sección en
-la misma máquina.
-
-Carpeta de datos: NUNCA `dirname(__file__)`; la resuelve `rutas.resolver()` (§1 de
+Carpeta de datos: nunca `dirname(__file__)`; la resuelve `rutas.resolver()` (§1 de
 ESPECIFICACION.md), solo dentro de `__main__`.
 """
 import sys
@@ -110,12 +86,10 @@ def extraer_fitz(ruta_pdf):
                 continue
             tamanos = sorted(t for _, t in lineas)
             n = len(tamanos)
-            # mediana DE VERDAD (media de los dos centrales si n es par) — con
-            # `tamanos[n // 2]` (mediana SUPERIOR), una página de EXACTAMENTE
-            # dos líneas (título + una sola línea de cuerpo, el caso mínimo
-            # usado como falsador) daba mediana == p90 == el tamaño del
-            # propio título, y `tamano > mediana` no era nunca cierto: ninguna
-            # sección salía detectada en ese caso (fallo medido 7-sep).
+            # mediana DE VERDAD (media de los dos centrales si n es par), no la mediana
+            # superior `tamanos[n // 2]`: en una página de exactamente dos líneas (título
+            # + una de cuerpo) la mediana superior coincide con el p90 y con el propio
+            # título, y `tamano > mediana` nunca sería cierto.
             mediana = tamanos[n // 2] if n % 2 else (tamanos[n // 2 - 1] + tamanos[n // 2]) / 2
             p90 = tamanos[min(n - 1, max(0, round(0.9 * (n - 1))))]
             for texto_linea, tamano in lineas:
@@ -143,21 +117,11 @@ def _es_titulo_heuristico(linea):
 
 
 def extraer_pypdf(ruta_pdf):
-    """(paginas_texto, secciones) con `pypdf`. Sin tamaños de fuente (pypdf no los
-    da por línea de forma sencilla): la heurística de sección es de TEXTO —
-    MAYÚSCULAS o numeración/«Capítulo». `ImportError` si `pypdf` no está
-    instalado.
-
-    `pypdf` avisa por su PROPIO logger (`logging.getLogger(__name__)` de sus
-    módulos internos, p. ej. `pypdf._reader`) de cada anomalía que encuentra
-    (cabecera inválida, marcador EOF ausente...) — fallo "roza" medido 7-sep:
-    con un fichero que no es un PDF de verdad, esas líneas salían por STDERR
-    aunque el mensaje limpio que compone `extraer()` ya explicaba el motivo
-    real por STDOUT, ensuciando también la salida de la propia batería de
-    pruebas. Se sube el nivel del logger raíz `pypdf` a CRITICAL solo durante
-    esta llamada (los loggers hijos como `pypdf._reader` no fijan su propio
-    nivel, así que heredan este) y se restaura después, se haya conseguido
-    leer el PDF o no."""
+    """(paginas_texto, secciones) con `pypdf`. Sin tamaños de fuente: la heurística de
+    sección es de TEXTO — MAYÚSCULAS o numeración/«Capítulo». `ImportError` si `pypdf`
+    no está instalado. Sube el logger raíz `pypdf` a CRITICAL solo durante esta llamada
+    y lo restaura después, para no dejar pasar por STDERR los avisos de anomalías de un
+    PDF que no lo es de verdad, cuando `extraer()` ya explica el motivo real por STDOUT."""
     from pypdf import PdfReader
     logger_pypdf = logging.getLogger('pypdf')
     nivel_previo = logger_pypdf.level
@@ -178,22 +142,15 @@ def extraer_pypdf(ruta_pdf):
 
 
 def extraer(ruta_pdf):
-    """(paginas_texto, secciones, motor, motivo) probando fitz primero (mejor:
-    usa tamaño de letra real) y pypdf como respaldo. `motor` es `None` si
-    NINGUNO de los dos pudo leer el fichero — en ese caso `motivo` explica por
-    qué (sin adjetivos: el texto real de cada intento). `ABYSS_PDF_FORZAR_MOTOR
-    =fitz|pypdf` fuerza uno de los dos aunque el otro esté disponible (para
-    probar ambas heurísticas en la misma máquina).
+    """(paginas_texto, secciones, motor, motivo) probando `fitz` primero (usa tamaño de
+    letra real) y `pypdf` como respaldo. `motor` es `None` si ninguno pudo leer el
+    fichero; `motivo` explica por qué. `ABYSS_PDF_FORZAR_MOTOR=fitz|pypdf` fuerza uno de
+    los dos aunque el otro esté disponible.
 
-    Antes solo se atrapaba `ImportError`: un motor INSTALADO que revienta sobre
-    ESTE fichero concreto (PDF truncado, cifrado, o un `.pdf` que en realidad es
-    otra cosa — texto plano renombrado, por ejemplo) se propagaba entero como
-    traceback crudo por stderr (con la ruta del fichero dentro), Y la cascada a
-    `pypdf` nunca llegaba a intentarse (fallo medido 7-sep: `indexar()`
-    prometía en su propio docstring «nunca revienta» y sí lo hacía). Ahora cada
-    motor atrapa su propio fallo (`ImportError` -no instalado- o cualquier otra
-    excepción -instalado pero no pudo con este fichero-) y deja que se intente
-    el siguiente."""
+    Cada motor atrapa tanto `ImportError` (no instalado) como cualquier otra excepción
+    (instalado pero no pudo con este fichero concreto: PDF truncado, cifrado, o un
+    `.pdf` que en realidad es otra cosa) y deja que se intente el siguiente, sin
+    propagar nunca un traceback crudo."""
     forzado = os.environ.get('ABYSS_PDF_FORZAR_MOTOR')
     fallos = []
     if forzado != 'pypdf':
@@ -237,10 +194,9 @@ def _ruta_indice(mem, sha1):
 
 def indexar(mem, ruta_pdf):
     """Construye (o reconstruye) el índice de `ruta_pdf` y lo escribe en
-    `mem/pdf/<sha1>.json`. Devuelve `(indice, None)`, o `(None, mensaje)` si el
-    fichero no existe, no hay motor de extracción instalado, o los motores
-    instalados no pudieron leer ESTE fichero (PDF roto/cifrado/no-PDF) — nunca
-    revienta con un traceback crudo (fallo medido 7-sep, ver `extraer()`)."""
+    `mem/pdf/<sha1>.json`. Devuelve `(indice, None)`, o `(None, mensaje)` si el fichero
+    no existe o ningún motor pudo leerlo — nunca revienta con un traceback crudo (ver
+    `extraer()`)."""
     if not ruta_pdf or not os.path.isfile(ruta_pdf):
         return None, f'no existe el fichero: {ruta_pdf}'
     sha1 = sha1_fichero(ruta_pdf)
@@ -411,12 +367,10 @@ if __name__ == '__main__':
             print('sin resultados'); sys.exit(0)
         for r in resultados:
             print(f"página {r['pagina']}  puntuación {r['puntuacion']}  sección: {r['seccion'] or '(sin sección)'}")
-            # Y un trozo del texto de verdad. Antes salían solo página y puntuación, así que
-            # quien lo lee no podía juzgar NADA sin otra llamada a --leer: se tenía que fiar
-            # del orden. Esto no arregla la búsqueda —sigue siendo frecuencia de términos—,
-            # pero deja que quien lee decida si el candidato pega o no.
-            # `paginas` es una LISTA y la página va en base 1: mismo acceso que usa
-            # `leer()` (línea 345) y `ahorro()` (línea 360)
+            # Un trozo de texto real deja que quien lee decida si el candidato pega, sin
+            # otra llamada a --leer (la búsqueda sigue siendo frecuencia de términos, esto
+            # no la arregla). `paginas` es una lista y la página va en base 1: mismo
+            # acceso que usan `leer()` y `ahorro()`.
             crudo = indice['paginas'][r['pagina'] - 1]
             trozo = ' '.join(str(crudo).split())[:280]
             if trozo:

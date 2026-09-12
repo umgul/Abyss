@@ -5,8 +5,6 @@ Método (Hertzmann 1998, simplificado): por cada radio de pincel se difumina la 
 radio, se mide el error entre lienzo y referencia por celdas y, donde el error supera el umbral de
 la capa, se pone una pincelada del color de la referencia, perpendicular al gradiente (sigue el
 contorno) y con curvatura suave. Las capas gruesas dan la mancha; las finas, pestañas y mechones.
-Motor único: los estilos de abajo son el MISMO bucle con otro dict de parámetros, no un algoritmo
-distinto.
 
 Uso:
     python pintor.py <foto> [--salida DIR] [--ancho N] [--alta] [--suave [2]] [--acabado]
@@ -108,7 +106,6 @@ ESTILOS = {
     "pastel": dict(radios=[30, 16, 9, 5], umbral=[52, 40, 30, 24], longitud=[8, 8, 6, 5],
                    alfa=0.7, jitter_color=8, jitter_rumbo=0.25, papel=(245, 240, 232),
                    saturacion=0.65, luz=1.12, mezcla_blanco=0.18),
-    # "Estilos añadidos" (7-sep 07:54, petición del usuario: "el David a carbón"):
     "carbon": dict(radios=[6, 3, 2, 1], umbral=[26, 20, 16, 12], longitud=[7, 6, 5, 4],
                    alfa=0.6, jitter_color=0, jitter_rumbo=0.5, papel=(220, 219, 219),
                    saturacion=0.0, luz=1.0, mezcla_blanco=0.0,
@@ -171,19 +168,11 @@ def _a_rgb(color):
 
 def pintar(ruta, salida=None, ancho=None, alta=False, html=False, html_r_min=2, semilla=7,
            nombre=None, supermuestreo=1, acabado=False, estilo="oleo", avisar=print, **ajustes):
-    """Pinta `ruta` con el estilo `estilo` y devuelve un dict con las rutas escritas y las medidas.
-
-    ancho=None: 1400 px (o el nativo hasta 3000 con alta=True). estilo: "oleo" (por defecto),
-    "impresionista", "acuarela", "pastel", "carbon" o "tinta" — tabla de parámetros en el
-    docstring del módulo. `ajustes` pisa sueltas claves de ese estilo (`radios`, `umbral`,
-    `longitud`, `alfa`, `jitter_color`, `jitter_rumbo`, `papel`, `saturacion`, `luz`,
-    `mezcla_blanco`) sin cambiar las demás — un `TypeError` si llega una clave que ningún
-    estilo usa (probable error de escritura).
-    supermuestreo=2: pinta a doble tamaño y reduce al final (pinceladas sin dientes de sierra;
-    cuesta ~4x en el dibujo). acabado=True: una capa final más de pincel de 1 px con umbral
-    más bajo, que repasa lo que las capas anteriores dejaron sin cubrir. Las dos valen para
-    cualquier estilo.
-    Devuelve {"png", "trazos", "html" (o None), "pinceladas", "error_medio", "W", "H", "estilo"}."""
+    """Pinta `ruta` con el estilo `estilo` y devuelve un dict con las rutas escritas y las
+    medidas (tabla de estilos y de banderas en el docstring del módulo). `ajustes` pisa
+    claves sueltas del estilo elegido; `TypeError` si alguna no la usa ningún estilo.
+    Devuelve {"png", "trazos", "html" (o None), "pinceladas", "error_medio", "W", "H",
+    "estilo"}."""
     if estilo not in ESTILOS:
         raise ValueError(f"estilo desconocido: {estilo!r} (usa uno de: {', '.join(ESTILOS)})")
     desconocidos = sorted(k for k in ajustes if k not in _CLAVES_ESTILO)

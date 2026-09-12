@@ -1,31 +1,29 @@
-"""Exterocepción: lo de FUERA que puedo medir en cada prompt.
+"""Exterocepción: lo de FUERA que se puede medir en cada prompt.
 
-- lugar: DOS instrumentos, y cuando no coinciden se enseñan los dos, no decido yo:
+- lugar: DOS instrumentos; cuando no coinciden se enseñan los dos, sin que ninguno decida
+  por el otro:
     · `ip`   → geolocalización por IP (ipinfo.io, https); se refresca en cada arranque.
     · `dicho`→ lo que el usuario dice en la conversación («estoy en Madrid», «desde
                París», «he llegado a la torre Eiffel»): se geocodifica (open-meteo;
                si no es una ciudad, Nominatim/OpenStreetMap) y se guarda con hora.
                Gana el más reciente en la lectura principal; el otro se muestra si
                discrepa.
-  NO se usa ningún otro programa de mensajería: leer sus actualizaciones le robaría
-  los mensajes a quien los escribió.
+  No se usa ningún otro programa de mensajería: leer sus actualizaciones robaría los
+  mensajes a quien los escribió.
 - meteo: open-meteo.com (sin clave) con la lat/lon del lugar principal; cache 15 min.
 - canal: `entrypoint` + `origin.kind` del último mensaje del usuario en el transcript.
-         Hasta hoy todo es «claude-desktop»; si un día aparece otro valor, ese será el móvil.
 - ojo:   la webcam va aparte (`ojo.py`), solo cuando el usuario lo pide.
 
-DEPENDENCIAS EXTERNAS declaradas: ipinfo.io (lugar por IP), open-meteo.com (geocodificar
+Dependencias externas declaradas: ipinfo.io (lugar por IP), open-meteo.com (geocodificar
 ciudades y leer el tiempo), nominatim.openstreetmap.org (geocodificar lo que no es una
 ciudad). Todo es LECTURA de instrumentos: nada se inventa; sin red o con la API caída,
 «sin dato», nunca un valor puesto a mano.
 
 Carpeta de datos: NUNCA `dirname(__file__)` (eso sería la carpeta del CÓDIGO instalado).
 Se resuelve con `rutas.resolver()` (ver `rutas.py` y ESPECIFICACION.md §1) a partir de la
-pista disponible en cada llamada (normalmente el `transcript_path` que ya trae quien nos
-invoca). Si NADA la resuelve —p. ej. nos importa `continuidad.py` con el stdin del gancho
-ya consumido y sin `ABYSS_PROYECTO`— no reventamos al que nos llama: cada función dice
-«sin dato» (fail-closed), salvo el uso manual por `__main__`, que si no hay proyecto avisa
-claro y sale (para eso está `rutas.resolver()`: quien lo teclea a mano necesita saberlo).
+pista disponible en cada llamada (normalmente el `transcript_path` que ya trae quien
+invoca). Si nada la resuelve, cada función dice «sin dato» (fail-closed) sin reventar a
+quien llama, salvo el uso manual por `__main__`, que si no hay proyecto avisa claro y sale.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -42,7 +40,7 @@ WMO = {0: 'despejado', 1: 'casi despejado', 2: 'nubes y claros', 3: 'cubierto', 
        51: 'llovizna ligera', 53: 'llovizna', 55: 'llovizna densa', 61: 'lluvia ligera', 63: 'lluvia', 65: 'lluvia fuerte',
        71: 'nieve ligera', 73: 'nieve', 75: 'nieve fuerte', 80: 'chubascos ligeros', 81: 'chubascos', 82: 'chubascos fuertes',
        95: 'tormenta', 96: 'tormenta con granizo', 99: 'tormenta con granizo fuerte'}
-# Es una lista, y sé lo que valen las listas: si falla, el lugar queda como estaba (no se inventa).
+# Lista cerrada de patrones: si no matchea, el lugar queda como estaba (no se inventa).
 RE_DICHO = re.compile(
     r'\b(?:estoy|estamos|ando|me encuentro|he llegado|hemos llegado|llegu[eé]|acabo de llegar|te escribo|escribo|me pillas)\s+'
     r'(?:en|a|desde)\s+(?:la |el |los |las )?([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñü]+(?:\s+(?:de|del|la|el|los|las|d\')?\s*[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñü]+){0,3})',
@@ -53,10 +51,10 @@ _CACHE = {}  # 'proj'/'mem' una vez resueltos en este proceso: no se vuelve a pr
 
 def _mem(tp=None, stdin_json=None):
     """Carpeta de datos para ESTA llamada, cacheada por proceso. `tp` es el
-    `transcript_path` si lo tenemos a mano (lo trae quien nos invoca); con él
-    `rutas.resolver()` acierta sin tocar stdin. Si no hay pista ni caché previa y
-    tampoco `--proyecto`/`ABYSS_PROYECTO`, no reventamos: devolvemos None y quien
-    llama dice «sin dato» (fail-closed, [[verificar-antes-de-construir]])."""
+    `transcript_path` si está a mano (lo trae quien invoca); con él `rutas.resolver()`
+    acierta sin tocar stdin. Si no hay pista ni caché previa ni
+    `--proyecto`/`ABYSS_PROYECTO`, devuelve `None` sin reventar: quien llama dice «sin
+    dato» (fail-closed)."""
     if _CACHE.get('mem'):
         return _CACHE['mem']
     if stdin_json is None:
@@ -75,17 +73,16 @@ def _ruta(nombre, tp=None):
 
 
 def _get(url, timeout=3, presupuesto=None):
-    """Petición GET → JSON. `timeout` bajado de 6 a 3 s por defecto (medido 6-sep: con
-    la red en agujero negro cada llamada consumía su timeout entero; presupuesto o no,
-    una llamada suelta no debe poder colgar más de unos pocos segundos).
+    """Petición GET → JSON. `timeout` de 3 s por defecto: una llamada suelta no debe
+    poder colgar más de unos pocos segundos, con red caída o no.
 
     `presupuesto` (`rutas.Presupuesto`), si se pasa, ACOTA el timeout de ESTA llamada
     al tiempo que quede del total compartido — y si ya no queda nada, ni lo intenta
     (`TimeoutError` inmediato, sin tocar la red).
 
-    `ABYSS_SIN_RED=1`: interruptor explícito para pruebas (§6/§9 del encargo 6-sep) —
-    corta la red al instante, nunca a medio timeout, para que la suite no dependa de
-    si la máquina que la corre tiene internet."""
+    `ABYSS_SIN_RED=1`: interruptor explícito para pruebas — corta la red al instante,
+    nunca a medio timeout, para que la suite no dependa de si la máquina que la corre
+    tiene internet."""
     if os.environ.get('ABYSS_SIN_RED') == '1':
         raise RuntimeError('sin red (ABYSS_SIN_RED=1)')
     if presupuesto is not None:
@@ -161,7 +158,7 @@ def aprender_lugar(prompt, tp=None, presupuesto=None):
     try:
         _escribir(d, tp)
     except Exception:
-        pass  # sin proyecto resoluble no se guarda esta vez; no debe tumbar al que nos llama
+        pass  # sin proyecto resoluble no se guarda esta vez; no debe tumbar a quien llama
     return g['nombre']
 
 
@@ -259,21 +256,17 @@ def texto(transcript_path=None, presupuesto=None):
 
 
 def _texto_lugar_ip(ip):
-    """Frase legible para `--refrescar-ip` (fallo 6-sep, "roza"): antes se hacía
-    `print(lugar_ip(...))`, que imprimía el repr crudo del dict de Python (con el
-    timestamp en bruto) cuando había dato, o literalmente la palabra `None` sin red
-    — ninguna de las dos es una frase. El punto 5 de la filosofía del README ("sin
-    red no hay lugar ni meteo: la respuesta siempre es 'sin dato'") ya lo cumple
-    `texto()`; esto compone la misma idea para esta salida más corta."""
+    """Frase legible para `--refrescar-ip`: nunca el repr crudo del dict de Python (con
+    el timestamp en bruto) ni la palabra `None` sin red — solo una frase, con la misma
+    idea que ya cumple `texto()` ("sin red no hay lugar ni meteo")."""
     if not ip:
         return 'lugar por IP: sin dato (sin red)'
     return f"lugar por IP: {ip.get('nombre') or '?'} ({ip.get('pais') or '?'})"
 
 
 def _texto_aprendido(nombre):
-    """Frase legible para `--dicho` (fallo 6-sep, "roza"): antes `aprendido: None`
-    cuando la frase no traía ningún lugar reconocible (ni por regex, ni porque el
-    geocodificador no tuvo red)."""
+    """Frase legible para `--dicho`: nunca `aprendido: None` cuando la frase no trae
+    ningún lugar reconocible (ni por regex, ni porque el geocodificador no tuvo red)."""
     return f'aprendido: {nombre}' if nombre else 'no reconocí ningún lugar en la frase'
 
 
@@ -281,11 +274,11 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     # uso manual: si se pasa un transcript como posicional, es también la pista de proyecto.
     # `rutas.es_transcript` exige fichero real + `.jsonl` (§2 ESPECIFICACION.md): ni una
-    # bandera como `--proyecto` ni un directorio como `.` cuelan como transcript_path
-    # (medido 6-sep: `.` resolvía `proj` como el PADRE del cwd).
+    # bandera como `--proyecto` ni un directorio como `.` cuelan como transcript_path (un
+    # directorio resolvería `proj` como su propio padre).
     tp_arg = a[0] if a and rutas.es_transcript(a[0]) else None
     sj = {'transcript_path': tp_arg} if tp_arg else None
-    # a mano SÍ queremos el error claro de rutas.resolver() si no hay proyecto (no lo tragamos)
+    # a mano conviene el error claro de rutas.resolver() si no hay proyecto: no se traga.
     _CACHE['proj'], _CACHE['mem'] = rutas.resolver(argv=a, stdin_json=sj)
     if a and a[0] == '--refrescar-ip':
         print(_texto_lugar_ip(lugar_ip(refrescar=True)))

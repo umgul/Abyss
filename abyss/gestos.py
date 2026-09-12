@@ -8,111 +8,58 @@ Uso:
                       [--vocabulario f.json]
 
 DEPENDENCIA declarada: `mediapipe`. Ausente o roto, `main()`/la CLI dicen EXACTAMENTE qué
-instalar y salen con código 2 ANTES de abrir la cámara o levantar el servidor — nunca
-instalan nada por su cuenta. "Roto" no es un caso teórico: MEDIDO el 7-sep-2026 que
-`mediapipe` 1.0.1 puede estar instalado e importar sin error y aun así no traer
-`mediapipe.solutions` (`AttributeError` dentro de `crear_detector()`), así que la
-comprobación mira el atributo, no solo el `import` (`_mediapipe_utilizable()`). El módulo
-en sí SÍ se puede importar sin `mediapipe` (las funciones puras de más abajo no lo
-necesitan): solo `main()`/la CLI comprueban la dependencia y cortan ahí.
+instalar y salen con código 2 ANTES de abrir la cámara o levantar el servidor. "Roto" no es
+teórico: `mediapipe` puede importar sin error y aun así no traer `mediapipe.solutions`, así
+que la comprobación mira el atributo, no solo el `import` (`_mediapipe_utilizable()`). El
+módulo en sí SÍ se puede importar sin `mediapipe` (las funciones puras no lo necesitan):
+solo `main()`/la CLI comprueban la dependencia y cortan ahí.
+La copia que MANDA del vocabulario es `abyss/plantillas/gestos_comun.js`; `kinetica.html`
+la importa y este fichero es su ESPEJO en Python, para quien quiera el estado de la mano
+desde fuera del navegador (hay que mantenerlo a mano: nada comprueba todavía que los dos
+digan lo mismo). El estado sigue igual: este servidor HTTP no lo consume nadie — los
+visores kinéticos leen la mano en el navegador con MediaPipe; esto está para el día que
+haga falta desde otro proceso.
+De una referencia externa (el post de Jhon Jairo Torres sobre gestos con MediaPipe) se toman
+TÉCNICAS, nunca su diseño: está PROHIBIDO su vocabulario
+de figuritas (una flor, un aguacate...). El de este paquete es PROPIO (tabla abajo) y la
+mano no invoca objetos: MANEJA la escena de despiece que ya sabe abrir `render3d.py`.
+- Dedo extendido: distancia(punta, muñeca) > `ratio_dedo_extendido` (1,7 por defecto,
+  heredado tal cual, no una medida propia todavía). Pose de la palma: `cv2.solvePnP`
+  contra un modelo plano NOMINAL; `None` si falta `cv2`, algún punto, o si no converge.
+- Pellizco y distancia entre manos: normalizados por los percentiles 10/90 de TODAS las
+  lecturas de ESTA sesión (`NormalizadorPercentil`); con menos de `muestras_para_vara`
+  lecturas (30 por defecto) el campo `vara_*` dice «sin vara todavía (n=…)» y el valor se
+  queda en 0,5 en vez de fingir un corte sobre pocas muestras. Calibración
+  (`segundos_calibracion_inicial`, 5 por defecto de mano libre): sugerencia en pantalla,
+  no una puerta — la puerta real es el conteo de muestras.
+- Suavizado: filtro One Euro (Casiez, Roussel y Vogel 2012) por coordenada de cada uno de los
+  21 puntos, antes de calcular
+  dedos/pellizco/pose/distancia. Nada se muestra hasta que el gesto está completo: un
+  fotograma sin una mano con exactamente 21 puntos se descarta ENTERO; el estado se queda
+  en su último valor bueno.
+Vocabulario PROPIO, cambiable por fichero (`--vocabulario f.json`; este guion no lo busca
+solo, se le pasa la ruta):
 
-## DÓNDE VIVE EL VOCABULARIO (decisión de 8-sep-2026)
+| gesto de la mano                | qué mueve en la escena                | campo en `/estado`   |
+|-----------------------------------|-----------------------------------------|-------------------------|
+| nº de dedos extendidos            | aísla capas: 0 todas, 1 la primera…      | `capas_visibles`        |
+| pellizco (pulgar-índice)          | desliza la explosión                    | `pellizco`/`explosion`  |
+| pose de la palma (`solvePnP`)     | orbita la cámara (giro/inclinación)     | `orbita`                |
+| mano abierta y quieta ≥1 s        | captura PNG de lo que se ve             | `gesto_completado`      |
+| dos manos                         | escala por la distancia entre ellas     | `escala`                |
 
-La copia que MANDA es `abyss/plantillas/gestos_comun.js`. Hasta hoy la misma gramática
-estaba escrita tres veces —aquí, dentro de `kinetica.html`, y en un módulo suelto— y las
-tres habían divergido: solo la del módulo tenía las reglas nuevas (sin espejo, más lenta,
-dos puños paran). Ahora `kinetica.html` la importa y este fichero es su ESPEJO en Python,
-para quien quiera el estado de la mano desde fuera del navegador.
-
-Espejo quiere decir que hay que mantenerlo a mano: no hay nada que compruebe que los dos
-dicen lo mismo. Si cambias uno, cambia el otro, y si algún día alguien consume este
-servidor de verdad, lo primero es una prueba que compare los dos vocabularios.
-
-Y el estado sigue siendo el de siempre: **este servidor HTTP no lo consume nadie**. Los
-visores kinéticos NO lo usan; leen la mano en el navegador con MediaPipe y el módulo de
-arriba. Esto está aquí para el día que haga falta desde otro proceso.
-
-## CORRECCIÓN DEL AUTOR (7-sep-2026, manda sobre cualquier versión anterior de este fichero)
-
-Del post citado abajo se toman TÉCNICAS, nunca su diseño. Está PROHIBIDO su vocabulario
-(un dedo una flor, dos un aguacate, tres una calavera): eso es un catálogo de figuritas
-ajeno. El vocabulario de este paquete es PROPIO, está en la tabla de más abajo, y la mano
-no invoca objetos: MANEJA la escena de despiece que ya sabe abrir `render3d.py`.
-
-## Lo heredado del post (Jhon Jairo Torres, leído 7-sep-2026) — técnica, no diseño
-
-- **Dedo extendido**: distancia(punta, muñeca) > 1,7 × distancia(nudillo, muñeca). Es una
-  RAZÓN, invariante a lo grande que salga la mano en el encuadre — el `1,7` es del autor
-  citado, heredado tal cual, no una medida propia todavía (se declara así, no se presenta
-  como medido en esta máquina). Cambiable por vocabulario (`ratio_dedo_extendido`).
-- **Pose de la palma**: `cv2.solvePnP` de muñeca + nudillos de índice/corazón/meñique
-  contra un modelo plano NOMINAL de la palma (proporciones relativas fijadas para poder
-  resolver una orientación; NO es una medida antropométrica de ninguna mano real, y la
-  cámara se asume sin calibrar — focal ≈ ancho del fotograma). `None` si `cv2` falta, si
-  falta algún punto, o si `solvePnP` no converge.
-- **Apertura del pellizco y distancia entre manos**: normalizadas con los percentiles 10 y
-  90 de TODAS las lecturas de ESTA sesión (`NormalizadorPercentil`, mismo patrón de cortes
-  propios que usa el resto del paquete, ver `propiocepcion.py`/`vigia.py`) — 0,0 en el
-  percentil 10 o por debajo, 1,0 en el percentil 90 o por encima. Con menos de
-  `muestras_para_vara` lecturas (30 por defecto, vocabulario) todavía no hay distribución
-  que valga: el campo `vara_*` correspondiente dice «sin vara todavía (n=…)» y el valor
-  normalizado se queda en 0,5 (ni abierto ni cerrado, ni cerca ni lejos) en vez de fingir
-  un corte sobre un puñado de muestras. **Calibración**: al arrancar, este guion pide unos
-  segundos de mano libre (`segundos_calibracion_inicial`, 5 por defecto) para que la
-  sesión acumule sus propias lecturas — es una sugerencia impresa en pantalla, no una
-  puerta que bloquee nada: la única puerta real es el conteo de muestras de arriba.
-- **Suavizado**: filtro One Euro (Casiez, Roussel y Vogel 2012) por cada coordenada de cada
-  uno de los 21 puntos de CADA mano, ANTES de calcular dedos/pellizco/pose/distancia.
-- **Nada se muestra hasta que el gesto está completo**: si un fotograma no trae ninguna
-  mano con exactamente 21 puntos, ese fotograma se descarta ENTERO — el estado servido se
-  queda en su último valor bueno (o en `ESTADO_INICIAL` si aún no hubo ninguno). Nunca se
-  predice ni se extrapola un punto que falta.
-
-## Vocabulario PROPIO — la mano no invoca objetos, MANEJA el despiece
-
-Cada fila es cambiable por fichero (`--vocabulario f.json`, p. ej. guardado en
-`mem/gestos_vocabulario.json` del proyecto de quien lo use — este guion no lo busca solo
-ahí, se le pasa la ruta explícita, ver la CLI): un vocabulario decretado que no se puede
-cambiar es un decreto, no una interfaz.
-
-| gesto de la mano                    | qué mueve en la escena                              | campo en `/estado`              | parámetro del vocabulario |
-|--------------------------------------|-------------------------------------------------------|----------------------------------|----------------------------|
-| nº de dedos extendidos               | aísla capas del despiece: 0 todas, 1 la primera, 2 las dos primeras… | `capas_visibles` (subconjunto de `grupos`) | `ratio_dedo_extendido` |
-| pellizco (apertura pulgar-índice)    | desliza la explosión: cerrado = montado, abierto = despiezado | `pellizco` (alias `explosion`), 0..1 | `percentil_bajo`/`percentil_alto`, `muestras_para_vara` |
-| pose de la palma (`solvePnP`)        | orbita la cámara: gira e inclina                        | `orbita` (`giro`=yaw, `inclinacion`=pitch) | — (misma pose, sin parámetro propio) |
-| mano abierta y quieta ≥1 s           | captura PNG de lo que se está viendo                    | `gesto_completado` = `"captura"` | `segundos_captura_quieta`, `umbral_movimiento_quieta` |
-| dos manos                            | escala por la distancia entre ellas                     | `escala`, 0..1                   | mismos percentiles, normalizador aparte |
-
-**Regla de diseño heredada, también técnica**: nada en pantalla se adelanta a un gesto sin
-terminar — por eso `capas_visibles`/`escala`/`orbita` solo se actualizan con un fotograma
-de 21 puntos completo, y `gesto_completado` solo vale `"captura"` durante el fotograma en
-que se dispara (antes y después, `None`): no queda pegado avisando de una captura vieja.
-
-## El servidor HTTP
-
-Sirve, SOLO en `127.0.0.1` (igual que `taller.py`: esto vive en la mesa de casa, nunca en
-0.0.0.0):
-
-    GET /estado   -> ver `ESTADO_INICIAL` para la forma completa (todos los campos de la
-                      tabla de arriba, más `dedos`, `dedos_extendidos`, `pellizco_bruto`,
-                      `pose`, `manos`, `grupos` (solo con --escena), `holograma`, `muestras`)
-    GET /health   -> {"ok": true}
-
-Con `--escena f.json`, lee sus grupos (mismo `escena.json` de `render3d.py`/`volumen.py`)
-y arranca con `capas_visibles` = TODAS (0 dedos todavía). `--holograma` solo viaja como un
-campo más del estado (`true`); ESTE guion no dibuja nada.
-
-**Límite declarado y honesto**: este paquete se pide a sí mismo que "la página de
-`render3d.py` lo lea y reaccione" a este estado — eso exigiría añadir JS de sondeo a la
-página que genera `render3d.py`, y el encargo de esta tanda para este guion limita los
-cambios en `render3d.py` a AÑADIR `--holograma` (cuatro cuadrantes), nada más. Esa
-reactividad (leer este `/estado` desde la página y mover la cámara/el corte de capas/el
-zoom) NO está hecha aquí: este guion sirve el JSON correcto y probado, con el vocabulario
-propio ya resuelto en cada campo; conectarlo a la página es trabajo pendiente, declarado,
-no prometido como hecho.
-
-Sin gancho. No escribe en `mem`, no resuelve un proyecto de Claude Code (como `taller.py`):
-la cámara se abre porque este guion se invoca a mano, nunca desde un hook.
+`capas_visibles`/`escala`/`orbita` solo se actualizan con un fotograma completo, y
+`gesto_completado` solo vale `"captura"` durante el fotograma que dispara — nunca queda
+pegado avisando de una captura vieja.
+Servidor SOLO en `127.0.0.1` (nunca `0.0.0.0`): `GET /estado` (ver `ESTADO_INICIAL` para la
+forma completa) y `GET /health` -> `{"ok": true}`. Con `--escena f.json`, lee sus grupos
+(mismo `escena.json` de `render3d.py`/`volumen.py`) y arranca con `capas_visibles`=TODAS.
+`--holograma` solo viaja como un campo más del estado; ESTE guion no dibuja nada.
+Límite declarado: este paquete no hace que la página de `render3d.py` lea este `/estado` y
+reaccione (mover cámara/capas/zoom) — sirve el JSON correcto y probado, con el vocabulario
+ya resuelto en cada campo; conectarlo a la página es trabajo pendiente, declarado, no
+prometido como hecho. Sin gancho: no escribe en `mem`, no resuelve un proyecto de Claude
+Code, la cámara se abre porque este guion se invoca a mano, nunca desde un hook.
 """
 import json
 import math
@@ -148,7 +95,7 @@ DEDOS = (
     ('anular', 13, 16),
     ('menique', 17, 20),
 )
-RATIO_EXTENDIDO_HEREDADO = 1.7  # del post citado (ver docstring), no medido aquí todavía
+RATIO_EXTENDIDO_HEREDADO = 1.7  # de una referencia externa (ver docstring), no medido aquí todavía
 MUESTRAS_PARA_VARA = 30         # por debajo de esto, «sin vara todavía (n=…)»
 
 VOCABULARIO_POR_DEFECTO = {
@@ -172,12 +119,10 @@ ESTADO_INICIAL = {
 
 
 def _mediapipe_utilizable():
-    """`import mediapipe` puede tener éxito y aun así dejar un módulo inservible: MEDIDO
-    en esta máquina el 7-sep-2026 que `mediapipe` 1.0.1 importa pero no trae
-    `mediapipe.solutions` (`AttributeError` dentro de `crear_detector()`). Comprobar solo
-    `mp is None` no basta — `main()` debe tratar este caso exactamente igual que "falta
-    mediapipe" y cortar ANTES de abrir la cámara o levantar el servidor (nunca a mitad de
-    fotograma, con hardware ya encendido)."""
+    """`import mediapipe` puede tener éxito y aun así dejar un módulo inservible (sin
+    `mediapipe.solutions`, `AttributeError` dentro de `crear_detector()`): comprobar solo
+    `mp is None` no basta. `main()` trata este caso igual que "falta mediapipe" y corta
+    ANTES de abrir la cámara o levantar el servidor, nunca a mitad de fotograma."""
     return mp is not None and hasattr(mp, 'solutions') and hasattr(mp.solutions, 'hands')
 
 

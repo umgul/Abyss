@@ -1,132 +1,57 @@
-"""Huella: todo lo que un hilo toca FUERA de su propia carpeta de código.
+"""Huella: todo lo que un hilo toca FUERA de su propia carpeta de código — para poder
+decir, al cerrar, QUÉ tocó, y limpiarlo él mismo si hace falta, sin adivinar.
 
-Motivo: el 6-sep el asistente dejó un servidor
-escuchando en un puerto y tres clones de un proyecto ajeno en el directorio
-temporal, y los tuvo que cazar a mano. Un hilo debe poder decir, al cerrar, QUÉ
-tocó — y limpiarlo él mismo si hace falta, sin adivinar.
+Tres ganchos, cada uno con el JSON de stdin que espera Claude Code:
 
-Tres ganchos, y el JSON de stdin que cada uno espera de Claude Code (documentado
-aquí porque el enunciado de esta tarea lo pide explícitamente):
+    --arranque    (SessionStart)   foto inicial de puertos en escucha y procesos con su
+                                    hora de arranque, guardada como snapshot base (nada
+                                    se imprime).
+    --herramienta (PostToolUse)    Write/Edit/NotebookEdit: registra la ruta escrita.
+                                    Bash/PowerShell: registra el comando (recortado a 200
+                                    caracteres) y la DIFERENCIA de puertos/procesos contra
+                                    la última foto — puertos nuevos y procesos nuevos (pid
+                                    que no estaba, o con otra hora de arranque). Nada se
+                                    imprime: es instrumentación silenciosa.
+    --fin         (Stop)           texto PLANO (no JSON), solo si algo registrado en esta
+                                    sesión sigue vivo AHORA MISMO (foto fresca, no el
+                                    snapshot guardado); sin nada vivo, silencio total.
+                                    Solo cuentan los procesos que cuelgan del proceso de
+                                    esta sesión; los de atribución incierta (su padre ya
+                                    murió) salen en `--informe`, no aquí. Un proceso que
+                                    cuelga de otro vivo ajeno no se registra.
 
-    --arranque    (SessionStart)   {"session_id", "transcript_path", "cwd",
-                                     "hook_event_name", ...}
-                  Foto inicial de puertos en escucha y procesos con su hora de
-                  arranque; se guarda como snapshot base (nada se imprime: no
-                  hay nada nuevo que contar todavía).
+Registro: `mem/huella/<session_id>.jsonl`, una línea JSON por evento (`ts` ISO UTC, `tipo`
+`inicio`|`escrito`|`comando`|`puerto_nuevo`|`proceso_nuevo`, y según el tipo
+`ruta`/`comando`/`puerto`/`pid`/`nombre`/`inicio`); nunca sale de `mem` ni por red. El tipo
+`comando` guarda el TEXTO LITERAL (recortado a 200 caracteres): un token, una cabecera
+`Authorization` o una URL firmada pasada por línea de comandos quedan ahí en local.
 
-    --herramienta (PostToolUse)    {"session_id", "transcript_path", "cwd",
-                                     "hook_event_name", "tool_name", "tool_input",
-                                     "tool_response"}
-                  Si `tool_name` es Write/Edit/NotebookEdit: registra la ruta
-                  escrita (`tool_input['file_path']`, o `notebook_path` si el
-                  primero no viene). Si es Bash/PowerShell: registra el comando
-                  (recortado a 200 caracteres) y, tras él, la DIFERENCIA de
-                  puertos/procesos contra la última foto guardada — puertos
-                  nuevos en escucha y procesos nuevos (pid que no estaba, o que
-                  estaba con otra hora de arranque). Cualquier otra herramienta
-                  no genera ningún evento (no toca nada fuera del sandbox que a
-                  esta pieza le importe). Nada se imprime: es instrumentación
-                  silenciosa.
+Diagnóstico manual (sin gancho): `python huella.py --informe [id]` lista ficheros escritos,
+procesos y puertos que este hilo vio nacer/abrirse y que SIGUEN vivos ahora. `python
+huella.py --limpiar [id] [--si]`: sin `--si` solo dice qué HARÍA; con `--si` mata SOLO los
+procesos cuyo pid Y hora de arranque coinciden con lo registrado AHORA MISMO (reconsultado
+al limpiar, no fiado de un `--informe` viejo) y borra SOLO los ficheros bajo el directorio
+temporal o bajo `mem/huella|mapas|pdf` — cualquier otra ruta registrada (incluida cualquier
+cosa suelta en la raíz de `mem`, como `MEMORY.md`) se LISTA y no se toca. `[id]`: sin él, se
+usa `session_id` del stdin, o si no, el hilo con el latido más reciente en `mem/.vivo/`
+(heurística); sin ninguna de las dos cosas, se rehúsa (código 1).
 
-    --fin         (Stop)           {"session_id", "transcript_path", "cwd",
-                                     "hook_event_name", "stop_hook_active", ...}
-                  Una línea de texto PLANO (no JSON: como `continuidad.py
-                  --cierre`, este gancho informa, no bloquea) SOLO si algo de lo
-                  registrado en esta sesión sigue vivo AHORA MISMO, comprobado con
-                  una foto FRESCA (no el último snapshot guardado — ver más abajo
-                  por qué compararlo contra el snapshot rancio es tautológico):
-                  «[huella] 1 proceso y 1 puerto abiertos por este hilo siguen
-                  vivos: --informe». Si no hay nada vivo, silencio total. Sin
-                  ningún `proceso_nuevo`/`puerto_nuevo` registrado en absoluto no
-                  se paga ni siquiera esa foto: se calla directo.
+Coste declarado, no escondido: `mem/huella/_costes.json` guarda las últimas 30 medidas (ms)
+de la foto (siempre la llamada COMBINADA a `powershell.exe`, más rápida que dos separadas).
+Con menos de 3 medidas, `--herramienta` fotografía siempre; con 3 o más, si la MEDIANA
+supera 1500 ms —por encima de eso solo se fotografía tras comandos que parecen persistentes
+(contienen `start`/`python`/`node`/`serve`/`nohup`/`&`); la foto mide ~1 s en la máquina de
+desarrollo— se activa esa heurística declarada como tal. El comando en sí SIEMPRE se
+registra, se tome o no la foto.
 
-Registro: `mem/huella/<session_id>.jsonl`, una línea JSON por evento — `ts`
-(ISO UTC), `tipo` (`inicio`|`escrito`|`comando`|`puerto_nuevo`|`proceso_nuevo`) y,
-según el tipo, `ruta`/`comando`/`puerto`/`pid`/`nombre`/`inicio`. Fuera de `mem`,
-nada — ni aquí ni en ningún otro sitio: esta pieza no manda nada por red. Dicho
-sin adornos (README, `docs/leyes.md`): el tipo `comando` guarda el TEXTO
-LITERAL del comando (recortado a 200 caracteres) — si sueles pasar un token,
-una cabecera `Authorization` o una URL firmada por línea de comandos, quedarán
-ahí en local. Todo bajo `mem` y con el módulo apagado por defecto, pero es
-justo el tipo de dato sobre el que este paquete exige honestidad al resto de
-piezas.
+Windows: `Get-NetTCPConnection`/`Get-CimInstance Win32_Process` en una sola invocación de
+`powershell.exe` (timeout 8 s). Linux/macOS: `ss`/`lsof` y `ps`, escrito contra la
+especificación pero SIN EJECUTAR en esta máquina (es Windows): sin medida propia de esa
+rama. `--limpiar`/`--informe` nunca inventan un proceso o puerto "vivo": sin dato, lo dice.
 
-Diagnóstico manual (sin gancho):
-
-    python huella.py --informe [id]
-        Ficheros escritos por este hilo (agrupados por su raíz: unidad/primer
-        directorio en Windows, `/` + primer directorio en POSIX), procesos que
-        este hilo vio nacer y que SIGUEN vivos ahora (pid, nombre, hora de
-        arranque) y puertos que vio abrirse y que SIGUEN en escucha ahora.
-    python huella.py --limpiar [id] [--si]
-        Sin `--si`: solo dice qué HARÍA (simulación). Con `--si`: mata SOLO los
-        procesos cuyo pid Y hora de arranque coinciden con lo registrado AHORA
-        MISMO (se reconsulta en el momento de limpiar, no se fía de un
-        `--informe` de hace rato: un pid reciclado por el sistema para otro
-        proceso, con otra hora de arranque, no se toca) y borra SOLO los
-        ficheros registrados que estén bajo el directorio temporal del sistema
-        o bajo una subcarpeta de `mem` que este mismo paquete genera por su
-        cuenta (`mem/huella/`, `mem/mapas/`, `mem/pdf/`) — cualquier otro
-        fichero registrado, INCLUIDO cualquier cosa suelta en la raíz de `mem`
-        como `MEMORY.md` o una ficha `*.md` (fallo "rompe" medido 7-sep: antes
-        contaba como borrable CUALQUIER ruta bajo `mem`, así que un `Write` de
-        la sesión sobre la memoria de verdad del usuario se borraba sin copia
-        de seguridad), se LISTA y no se toca, tenga o no `--si`.
-    `[id]` es opcional en los dos: sin él, se usa `session_id` del JSON de stdin
-    si llega, y si no, el hilo con el latido más reciente en `mem/.vivo/`
-    (heurística — mismo mecanismo y misma advertencia que en `parentesis.py`).
-    Sin ninguna de las dos cosas, se rehúsa (código 1) en vez de adivinar.
-
-Medida de la foto de puertos/procesos, en ESTA máquina (Windows, 7-sep-2026,
-sobre la versión viva): dos llamadas SEPARADAS a `powershell.exe` (una para
-`Get-NetTCPConnection`, otra para `Get-Process`) dieron una mediana de 1229 ms
-en 5 repeticiones (el coste no es el cmdlet: es arrancar el proceso
-`powershell.exe`, ~lo mismo cada vez). Una única llamada COMBINADA (las dos
-consultas en un mismo script, una `ConvertTo-Json` con las dos ramas) bajó la
-mediana a 946-971 ms — por eso `foto()` usa siempre la combinada. Es una medida
-de ESTA máquina, no una ley: en otra más cargada (antivirus escaneando cada
-`powershell.exe` nuevo, disco más lento) puede ser mayor, y el mecanismo de
-abajo está para eso.
-
-Coste declarado como problema, no escondido: `mem/huella/_costes.json`
-guarda las últimas 30 medidas de coste (ms) de la foto. Con menos de 3 medidas
-todavía no hay mediana que valga, así que `--herramienta` fotografía siempre
-(para poder medir). Con 3 o más, si la MEDIANA de esas medidas supera 1500 ms,
-`--herramienta` deja de fotografiar tras CADA Bash/PowerShell y solo lo hace si
-el comando contiene alguna de `start`, `python`, `node`, `serve`, `nohup`, o el
-carácter `&` — heurística declarada como tal (un `pip install` largo sin
-ninguna de esas palabras se salta la foto aunque tarde; un `echo start` la
-dispara aunque no arranque nada persistente). El comando en sí SIEMPRE se
-registra, se tome o no la foto — lo caro es la foto, no apuntar el texto.
-En la máquina de desarrollo, remedido el 8-sep-2026 (793 ms de mediana en 5 llamadas
-del gancho entero tras un comando que parece persistente; 96 ms cuando no hay nada
-que fotografiar) el
-heurístico NO llegaría a activarse por defecto (queda por debajo de 1500 ms):
-el mecanismo está implementado y probado con costes inyectados
-(`pruebas/test_huella.py`), no porque esta máquina lo dispare sola.
-
-Windows: `Get-NetTCPConnection -State Listen` (puerto → pid) y `Get-CimInstance
-Win32_Process` (pid → nombre, padre y hora ISO), en una sola invocación de
-`powershell.exe -NoProfile -NonInteractive` con timeout (8 s; agotado o con
-`returncode != 0`: `None`, "sin dato"). Linux/macOS: `ss -ltnp` y, si no existe,
-`lsof -iTCP -sTCP:LISTEN -P -n` para puertos; `ps -eo pid,lstart,comm` para
-procesos — implementado tal cual pide la especificación, pero SIN EJECUTAR en
-esta máquina (es Windows): no hay medida propia que citar de esa rama, solo el
-código escrito contra el formato documentado de esos comandos.
-
-`--limpiar`/`--informe` NUNCA inventan un proceso o puerto "vivo" cuando el
-instrumento de esta máquina falló: si `foto()` devuelve `None` en un campo, el
-informe lo dice explícitamente («sin dato: no se pudo consultar») en vez de
-mostrar una lista vacía que parecería un «no hay nada».
-
-Diseño para las pruebas (igual que `cuerpo.py`): NINGUNA función de este
-módulo toca `rutas.resolver()` ni stdin al importarse — todas reciben `mem`
-como argumento. Solo `if __name__ == '__main__':` resuelve `proj`/`mem` y lee
-stdin. Así se puede importar el módulo directamente en las pruebas y
-monkeypatchear `foto()` (o las funciones de un solo instrumento) sin lanzar
-ningún subproceso real, y aparte probar el ciclo de vida real (arrancar un
-proceso de verdad, verlo en `--informe`, matarlo con `--limpiar --si`) con el
-propio CLI por subproceso, como al resto de `abyss/`.
+Diseño para las pruebas (igual que `cuerpo.py`): ninguna función toca `rutas.resolver()` ni
+stdin al importarse — todas reciben `mem` como argumento; solo `__main__` resuelve
+`proj`/`mem` y lee stdin.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar

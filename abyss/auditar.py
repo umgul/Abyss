@@ -1,112 +1,39 @@
 # -*- coding: utf-8 -*-
-"""Auditar: las cinco comprobaciones de Cohen sobre un paquete, con evidencia.
+"""Auditar: cinco comprobaciones sobre un paquete, con evidencia (fichero y línea, nunca una
+promesa ni una nota de confianza): de dónde viene, qué ejecuta y cuándo, qué toca fuera de su
+carpeta, adónde manda datos, y qué dominios hay que leer con lupa. Siguen el planteamiento
+de Yonathan Cohen: a alguien lo comprometió un comando dado por su propia IA que apuntaba a
+un dominio copia; esto es la misma pregunta hecha a un paquete ENTERO antes de instalarlo.
 
     python auditar.py <ruta_de_paquete> [--json] [--markdown salida.md]
 
-Motivo: el incidente que cuenta Yonathan Cohen es
-que a alguien lo comprometieron con un comando que le dio su propia IA, apuntando a
-un dominio copia. Esto es la misma pregunta aplicada a un paquete ENTERO antes de
-instalarlo: ¿de dónde viene, qué ejecuta y cuándo, qué toca fuera de su carpeta,
-adónde manda datos, y qué dominios hay que leer con lupa? Cinco comprobaciones,
-cada una con FICHERO y LÍNEA como evidencia — nunca una promesa ni una nota de
-confianza.
-
-NUNCA ejecuta el código del paquete auditado (ni lo importa, ni lo corre): todo
-sale de leer texto y, para el historial, de `git log` LOCAL sobre el propio
-`.git` del paquete (`git log` no toca ningún remoto — sigue siendo "sin red").
-Auditar un paquete malicioso con este guion no lo dispara: solo se lee.
-
-Las cinco comprobaciones (§comprobación N — cada una devuelve su propio dict
-con `evidencia` y, si procede, `hallazgos`):
-
-  1. **Procedencia**: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
-     `package.json`, `pyproject.toml` (los que existan) — ¿hay un autor con nombre
-     real (no un hueco de plantilla: `<tu nombre>`, `TODO`, vacío...), un
-     repositorio/homepage, una licencia? Con `.git`: número de commits y fecha del
-     primero (`git log`, LOCAL, ver arriba). Un paquete sin autor NI historia de
-     commits es de nadie — verificado sobre la máquina de desarrollo el 7-sep:
-     `pyproject.toml` usa `tomllib` (biblioteca estándar, Python 3.11+); sin él, un
-     lector de respaldo por regex, más pobre, declarado como tal en el propio
-     resultado (`_regex_fallback`).
-  2. **Comandos**: qué corre y cuándo. Lee `hooks/hooks.json`, `settings.json` y
-     `.claude/settings.json` (los que haya, formato de plugin CON clave `hooks` o
-     el más plano de `docs/ganchos_settings_ejemplo.json`) y lista cada evento con
-     su comando y línea; marca los que disparan en CADA mensaje
-     (`UserPromptSubmit`) o tras CADA herramienta (`PreToolUse`/`PostToolUse` SIN
-     `matcher` que los restrinja) — si ese gancho no aparece nombrado (ni su
-     fichero) en ningún `README*` del paquete, es un hallazgo `rompe` (corre
-     siempre y en silencio). Además busca en el código llamadas a `subprocess`,
-     `os.system`, `eval`, `exec`, y líneas de descarga-con-tubería-a-un-intérprete
-     (`curl/wget/iwr/irm | bash/sh/iex`) — como EVIDENCIA (no todo uso de
-     `subprocess` es malo), para que quien lea las vea todas juntas.
-  3. **Permisos**: qué escribe FUERA de su propia carpeta — rutas bajo `~/.claude`,
-     `settings.json`, el registro de Windows (`HKCU`/`HKLM`/`winreg`/`reg add`), o
-     una ruta absoluta pasada a una llamada de escritura — y si el paquete declara
-     en algún `README*` cómo deshacerlo (palabras como "desinstalar", "revertir",
-     "manifiesto", "backup"...). Escribir fuera Y no declarar cómo deshacerlo es
-     `rompe`; escribir fuera con un README que sí lo explica no genera hallazgo
-     (es evidencia igualmente, para poder leerla).
-  4. **Qué sale de la máquina** (la comprobación que importa de verdad): TODOS
-     los hosts de red del paquete — no solo el CÓDIGO: `EXT_RED` (arreglo posterior
-     al primer informe) es `EXT_CODIGO` MÁS los ficheros de datos y configuración
-     (`.json`, `.yaml`/`.yml`, `.toml`, `.ini`, `.cfg`, `.env`, `.txt`, `.bat`/`.cmd`),
-     porque un host puesto en `config/ajustes.json` y leído por el código con
-     `cfg['endpoint']` es tan "qué sale de la máquina" como uno escrito a mano en un
-     `.py`, y antes de este arreglo pasaba entero sin verse (medido: caso real
-     reportado, ver `pruebas/test_auditar.py`). Quedan FUERA los propios
-     `RUTAS_MANIFIESTO` (`package.json`, `pyproject.toml`...): su
-     `repository`/`homepage` ya lo lee la comprobación 1, y sus dominios entran
-     en la comprobación 5 tal cual — meterlos también aquí convertiría
-     cualquier `repository` de GitHub legítimo en un "host oculto". Se busca
-     una URL completa en cualquier parte del fichero, o el primer argumento de
-     una llamada reconocida
-     (`urlopen`/`requests.*`/`fetch`/`axios.*`/sockets) sin esquema — agrupados por
-     host, y CONTRASTADOS contra el texto de `README*`: un host que el código usa y
-     ningún README nombra es un hallazgo `rompe`, con fichero y línea de cada
-     aparición. Esta es la comprobación que ningún antivirus hace. `vendor/dist/build`
-     se leen APARTE (`extraer_hosts_terceros_embebidos`, `hosts_terceros_embebidos`
-     en el resultado): terceros embebidos no son "el código de este paquete" y por
-     eso nunca cuentan como hallazgo contra el README, pero antes de este arreglo se
-     saltaban EN SILENCIO — ahora se declaran, con sus hosts, para que un informe
-     "sin hallazgos" no sea indistinguible de "no miré ahí".
-  5. **Dominio**: reúne los dominios que aparecen en `README*` y en los manifiestos
-     (de instalación, de proveedor...) para que una persona los compare CARÁCTER A
-     CARÁCTER. Nunca genera un hallazgo: el propio límite es el resultado —
-     `pollinations.ai` y `pollinations.ai` se leen igual de rápido y el guion no
-     sabe distinguirlos.
-
-Veredicto en tres niveles (como `/esceptico`, con otro vocabulario para
-paquetes): **rompe** (hace algo que no declara: comprobaciones 2-4), **engaña**
-(declara algo que no cumple — no se infiere aquí de forma automática: hace falta
-saber qué afirma el README para saber que miente, y eso lo lee una persona o el
-Opus de `/esceptico --paquete`, no un regex; queda declarado como límite, no
-fingido con una heurística frágil) y **roza** (procedencia floja pero con algo de
-rastro: falta un campo, o falta autor pero hay `.git` con commits reales). El
-veredicto global es el peor hallazgo de las comprobaciones 1-4; sin ninguno,
-`"sin hallazgos"` — nunca un "roza" de relleno cuando no hay nada que decir.
-
-Límite declarado de TODO este guion, secamente: es texto y regex, no un parser ni
-un sandbox — un comentario que solo MENCIONA una URL de ejemplo (para explicarla,
-o para demostrar que se ha quitado antes de escribirla en otro sitio, como hace
-`render3d.py` con la URL de `three.js`) cuenta igual que una llamada real, y una
-URL construida por concatenación en dos líneas no se ve. Se prefiere un candidato
-de más para que lo descarte quien lee, a un host real que se cuele sin que nadie
-lo mire — la misma filosofía que `vigia.py` declara para sus propias cazas.
-
-Y el límite simétrico, el que motivó el arreglo posterior al primer informe: un
-"sin hallazgos" NUNCA debe leerse como "no hay nada" cuando en realidad es "esta
-vara no mira ahí". Por eso `a_texto()`/`a_markdown()` nunca imprimen "sin
-hallazgos" a secas — dicen "sin hallazgos EN LO QUE ESTA VARA MIRA" y listan
-debajo, siempre, qué extensiones quedan fuera de `EXT_RED`, qué carpetas no se
-leen ni siquiera como terceros (`EXCLUIR_DIRS_SIEMPRE`) y que una URL partida por
-concatenación no se reconoce — la misma disciplina que `vigia.py` aplica a sus
-propios falsos negativos.
-
-Diseño para las pruebas (igual que `mapa_codigo.py`/`huella.py`): todas las
-funciones son puras y reciben `ruta` como argumento; nada se resuelve con
-`rutas.resolver()` ni se lee de stdin — este guion no guarda nada en `mem` (no
-mide el propio hilo, audita un paquete de terceros) y por eso no necesita
-proyecto. Solo `if __name__ == '__main__':` toca argv/stdout/ficheros de salida.
+NUNCA ejecuta ni importa el código auditado: todo sale de leer texto y de `git log` LOCAL
+sobre el propio `.git` (sin red).
+  1. Procedencia: autor con nombre real, repositorio/homepage y licencia en los
+     manifiestos (`.claude-plugin/plugin.json`, `package.json`, `pyproject.toml`...);
+     con `.git`, número de commits y fecha del primero. Sin autor ni historia de
+     commits: de nadie.
+  2. Comandos: qué gancho corre y cuándo (`hooks/hooks.json`/`settings.json`); uno que
+     dispara en cada mensaje o herramienta y no está nombrado en ningún README es
+     hallazgo `rompe`. Además señala, como evidencia, todo `subprocess`/`os.system`/
+     `eval`/`exec` y tubería de descarga a intérprete.
+  3. Permisos: qué escribe FUERA de su carpeta (`~/.claude`, `settings.json`, registro
+     de Windows...); escribir fuera sin que el README diga cómo deshacerlo es `rompe`.
+  4. Qué sale de la máquina: todos los hosts de red del código Y de sus ficheros de
+     datos/configuración (`EXT_RED`), contrastados contra `README*` — uno que el
+     código usa y ningún README nombra es `rompe`. `vendor/dist/build` y las pruebas
+     se leen aparte y se declaran con sus hosts, nunca se acusan ni se callan.
+  5. Dominio: dominios de `README*` y manifiestos, para comparar carácter a carácter
+     (`pollinations.ai` vs. una copia); nunca genera hallazgo por sí solo.
+Veredicto: **rompe** (algo no declarado, comprobaciones 2-4), **engaña** (declara algo que
+no cumple — lo decide una persona leyendo el README, nunca un regex) y **roza** (procedencia
+floja). El veredicto global es el peor hallazgo 1-4; sin ninguno, `"sin hallazgos"`.
+Límite declarado: es texto y regex, no un parser ni un sandbox — un comentario que solo
+MENCIONA una URL cuenta igual que una llamada real, y una URL partida por concatenación no
+se ve. Por eso un "sin hallazgos" nunca se imprime a secas: `a_texto()`/`a_markdown()` listan
+siempre qué extensiones quedan fuera de `EXT_RED` y qué carpetas no se leen ni como terceros.
+Funciones puras sobre `ruta` (igual que `mapa_codigo.py`/`huella.py`): nada usa
+`rutas.resolver()` ni lee stdin ni escribe en `mem`. Solo `__main__` toca argv/stdout/ficheros.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -131,17 +58,15 @@ EXCLUIR_DIRS_SIEMPRE = {'.git', 'venv', '.venv', 'node_modules', '__pycache__',
 # de callarlos — ver docstring del módulo.
 DIRS_TERCEROS_EMBEBIDOS = {'vendor', 'dist', 'build'}
 # Las pruebas son contenido del paquete, pero sus hosts son ATREZO, no llamadas: un
-# fichero que prueba a un auditor tiene que inventarse dominios para que los cace. Antes
-# se contaban como hallazgos reales — medido el 8-sep-2026 auditando este mismo paquete:
-# `api.declarado.com`, `api.oculto.net`, `api.sinesquema.io` y `cdn.de-terceros.example`
-# salían acusando al paquete de llamar a sitios que no existen. Se leen APARTE y se
-# declaran, con el mismo criterio que vendor/dist/build: nunca callarlas, nunca acusarlas.
+# fichero que prueba a un auditor tiene que inventarse dominios para que los cace. Se leen
+# APARTE y se declaran, con el mismo criterio que vendor/dist/build: nunca se callan, nunca
+# se acusan.
 DIRS_PRUEBAS = {'pruebas', 'tests', 'test'}
 EXCLUIR_DIRS = EXCLUIR_DIRS_SIEMPRE | DIRS_TERCEROS_EMBEBIDOS | DIRS_PRUEBAS
 EXT_CODIGO = {'.py', '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.ps1', '.sh', '.rb', '.go'}
-# Ficheros de datos/configuración: la comprobación 4 también los
-# lee, porque un host puesto aquí y leído por el código (`cfg['endpoint']`) sale
-# de la máquina igual que uno escrito a mano en un `.py` — antes pasaba sin verse.
+# Ficheros de datos/configuración: la comprobación 4 también los lee, porque un host
+# puesto aquí y leído por el código (`cfg['endpoint']`) sale de la máquina igual que uno
+# escrito a mano en un `.py`.
 EXT_DATOS = {'.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.env', '.txt', '.bat', '.cmd'}
 EXT_RED = EXT_CODIGO | EXT_DATOS
 
@@ -210,12 +135,10 @@ def _listar_ficheros(ruta, extensiones, excluir=EXCLUIR_DIRS):
 
 
 def _listar_ficheros_terceros_embebidos(ruta, extensiones):
-    """Como `_listar_ficheros`, pero SOLO lo que cae bajo alguna carpeta
-    `vendor/`, `dist/` o `build/` de `ruta` (a cualquier profundidad) — usada
-    por la comprobación 4 para declarar esos hosts APARTE en vez
-    de saltárselos en silencio como hacían las comprobaciones 2 y 3. Sigue sin
-    bajar a `EXCLUIR_DIRS_SIEMPRE` (un `.git` o `node_modules` anidado dentro de
-    `vendor/` tampoco es contenido legible del paquete)."""
+    """Como `_listar_ficheros`, pero SOLO bajo alguna carpeta `vendor/`, `dist/` o `build/`
+    de `ruta` (a cualquier profundidad) — usada por la comprobación 4 para declarar esos
+    hosts APARTE en vez de saltárselos en silencio. Sigue sin bajar a
+    `EXCLUIR_DIRS_SIEMPRE`: un `.git`/`node_modules` anidado no es contenido legible."""
     for raiz, dirs, ficheros in os.walk(ruta):
         dirs[:] = [d for d in dirs if d not in EXCLUIR_DIRS_SIEMPRE]
         partes = set(os.path.relpath(raiz, ruta).replace(os.sep, '/').split('/'))
@@ -276,13 +199,10 @@ def _texto_docs_deshacer(ruta):
 
 
 def _linea_de_comando_json(texto_json, comando):
-    """Línea del `command` de un gancho DENTRO del JSON crudo del fichero. El
-    `comando` que entrega `json.loads()` ya no lleva las comillas escapadas
-    (`\\"`) que sí tiene el fichero en disco (los ganchos reales casi siempre
-    envuelven la ruta entre comillas, `python \"...\" --flag`) — medido: buscar
-    el comando tal cual contra `hooks/hooks.json` de este mismo repo no
-    encontraba NINGUNA línea. Se re-escapa con `json.dumps` (la misma regla de
-    escape que usa cualquier JSON válido) antes de buscarlo."""
+    """Línea del `command` de un gancho DENTRO del JSON crudo del fichero: `json.loads()`
+    quita las comillas escapadas (`\\"`) que el fichero en disco sí tiene (los ganchos
+    reales casi siempre envuelven la ruta entre comillas, `python \"...\" --flag`), así que
+    se re-escapa con `json.dumps` antes de buscarlo."""
     if not comando:
         return None
     return _linea_de_texto(texto_json, json.dumps(comando)[1:-1][:80])
@@ -443,12 +363,10 @@ def _extraer_repo(rel, datos):
 
 
 def leer_git(ruta):
-    """Historial de `.git` bajo `ruta`: número de commits y fecha ISO del primero,
-    con `git log --format=%cI` — LOCAL sobre el repo ya presente en disco (`git
-    log` no consulta ningún remoto: sigue siendo "sin red"). Sin `.git`:
-    `hay_git=False`. Con `.git` pero sin `git` en PATH, con el comando fallando, o
-    agotado el tiempo (10 s): `sin_dato` con el motivo — nunca se inventa un
-    número de commits."""
+    """Historial de `.git` bajo `ruta`: commits y fecha ISO del primero, con `git log`
+    LOCAL (nunca consulta un remoto). Sin `.git`: `hay_git=False`. Sin `git` en PATH, con
+    el comando fallando, o agotado el tiempo (10 s): `sin_dato` con el motivo — nunca se
+    inventa un número de commits."""
     if not os.path.isdir(os.path.join(ruta, '.git')):
         return {'hay_git': False, 'commits': None, 'primer_commit': None, 'sin_dato': None}
     try:
@@ -526,12 +444,10 @@ def _nombre_script(comando):
 
 
 def _grupos_de_eventos(datos):
-    """{evento: [grupo, ...]} de un fichero de ganchos ya parseado — formato de
-    plugin (clave `hooks` con los eventos dentro, igual en `hooks/hooks.json` y en
-    el `settings.json` real que escribe `instalar.py`) o el más plano donde los
-    eventos están en el nivel superior (visto en `docs/ganchos_settings_ejemplo.json`
-    y en paquetes de terceros). Un elemento de la lista con `command` pero sin
-    `hooks` se trata como un grupo de un solo hook sin `matcher`."""
+    """{evento: [grupo, ...]} de un fichero de ganchos ya parseado — formato de plugin
+    (clave `hooks` con los eventos dentro) o el más plano con los eventos en el nivel
+    superior (`docs/ganchos_settings_ejemplo.json` y paquetes de terceros). Un elemento
+    con `command` pero sin `hooks` se trata como un grupo de un solo hook sin `matcher`."""
     base = datos.get('hooks') if isinstance(datos.get('hooks'), dict) else datos
     out = {}
     if not isinstance(base, dict):
@@ -612,18 +528,10 @@ def comprobar_comandos(ruta):
 # ---------- comprobación 3: permisos ----------
 
 def comprobar_permisos(ruta):
-    """Evidencia de escritura fuera de la carpeta del paquete. Dos pasos, no uno
-    solo: primero, ¿este FICHERO escribe algo en absoluto en algún sitio
-    (`RE_ESCRITURA`, en cualquier línea)? Si no, se salta entero (más rápido, y
-    una ruta sin más contexto en un fichero que nunca escribe nada no es una
-    escritura). Si sí, cada línea que además nombre una ruta fuera de la carpeta
-    (`RE_FUERA_DE_CARPETA`) es evidencia — AUNQUE la propia llamada de escritura
-    esté unas líneas más abajo (medido: la ruta y el `open(..., 'w')` casi
-    siempre caen en líneas distintas — `p = os.path.expanduser(...)` y luego
-    `open(p, 'w')` — exigir las dos cosas en la MISMA línea no encontraba nada de
-    esto). Sigue siendo una heurística declarada: puede colar un fichero que solo
-    MENCIONA esa ruta sin escribir ahí (falso positivo) o perderse una ruta
-    construida por partes (falso negativo)."""
+    """Evidencia de escritura fuera de la carpeta del paquete, en dos pasos: si el fichero
+    no escribe nada (`RE_ESCRITURA`) se salta entero; si escribe, cualquier línea que
+    nombre una ruta fuera de la carpeta (`RE_FUERA_DE_CARPETA`) es evidencia, aunque la
+    escritura esté líneas más abajo — heurística declarada, puede fallar en ambos sentidos."""
     evidencia = []
     for p in _listar_ficheros(ruta, EXT_CODIGO):
         rel = os.path.relpath(p, ruta).replace(os.sep, '/')
@@ -662,13 +570,10 @@ def normalizar_host(host_o_url):
 
 
 def _hosts_en_ficheros(ficheros, ruta):
-    """{host: [(fichero_relativo, línea), ...]} de los `ficheros` dados (rutas
-    absolutas bajo `ruta`), excepto `HOSTS_QUE_NO_SALEN` (loopback: nunca salen
-    de la máquina). Compartida por `extraer_hosts_codigo` y
-    `extraer_hosts_terceros_embebidos` — misma lectura, distinto barrido de
-    carpetas. Ver el límite declarado en el docstring del módulo: es un regex
-    sobre texto, cuenta tanto una llamada real como una URL solo mencionada en
-    un comentario, y no ve una URL partida por concatenación."""
+    """{host: [(fichero_relativo, línea), ...]} de los `ficheros` dados, excepto
+    `HOSTS_QUE_NO_SALEN` (loopback). Compartida por `extraer_hosts_codigo` y
+    `extraer_hosts_terceros_embebidos` — misma lectura, distinto barrido de carpetas;
+    mismo límite regex declarado en el docstring del módulo."""
     out = {}
     for p in ficheros:
         rel = os.path.relpath(p, ruta).replace(os.sep, '/')
@@ -692,12 +597,9 @@ def _hosts_en_ficheros(ficheros, ruta):
 def extraer_hosts_codigo(ruta):
     """{host: [(fichero_relativo, línea), ...]} del código Y de los ficheros de
     datos/configuración PROPIOS de `ruta` (`EXT_RED` = `EXT_CODIGO` más
-    `.json`/`.yaml`/`.yml`/`.toml`/`.ini`/`.cfg`/`.env`/`.txt`/`.bat`/`.cmd` —
-    Arreglo: antes solo se leía `EXT_CODIGO` y un host puesto en un
-    `.json` de configuración pasaba entero sin verse), nunca `vendor/dist/build`
-    (leídos aparte por `extraer_hosts_terceros_embebidos`, nunca como código
-    propio) NI los propios `RUTAS_MANIFIESTO` (ver la constante: su
-    `repository`/`homepage` ya tiene comprobación propia, en la 1 y la 5)."""
+    `.json`/`.yaml`/`.yml`/`.toml`/`.ini`/`.cfg`/`.env`/`.txt`/`.bat`/`.cmd`), nunca
+    `vendor/dist/build` (aparte, `extraer_hosts_terceros_embebidos`) ni `RUTAS_MANIFIESTO`
+    (su `repository`/`homepage` ya tiene comprobación propia, en la 1 y la 5)."""
     ficheros = (p for p in _listar_ficheros(ruta, EXT_RED)
                 if os.path.relpath(p, ruta) not in RUTAS_MANIFIESTO_NORM)
     return _hosts_en_ficheros(ficheros, ruta)
@@ -710,12 +612,9 @@ def extraer_hosts_pruebas(ruta):
 
 
 def extraer_hosts_terceros_embebidos(ruta):
-    """Igual que `extraer_hosts_codigo`, pero solo de lo que cae bajo
-    `vendor/`, `dist/` o `build/`: antes esas carpetas se
-    saltaban EN SILENCIO en la comprobación 4 y un "sin hallazgos" no
-    distinguía "no hay nada" de "no miré ahí". Se declaran aparte a propósito:
-    nunca cuentan como código de ESTE paquete, así que nunca generan hallazgo
-    contra su README (ver `comprobar_red`)."""
+    """Igual que `extraer_hosts_codigo`, pero solo de lo que cae bajo `vendor/`, `dist/`
+    o `build/`. Se declaran aparte a propósito: nunca cuentan como código de ESTE
+    paquete, así que nunca generan hallazgo contra su README (ver `comprobar_red`)."""
     return _hosts_en_ficheros(_listar_ficheros_terceros_embebidos(ruta, EXT_RED), ruta)
 
 
@@ -798,10 +697,9 @@ def _texto_historia_git(g):
 
 
 def _que_no_leyo(r):
-    """Lista de lo que ESTA pasada no leyó, declarado en vez de callado (arreglo,
-    misma disciplina que `vigia.py` aplica a sus falsos negativos): un
-    "sin hallazgos" sin esta lista no distingue "no hay nada" de "no miré ahí".
-    Se usa igual con o sin hallazgos — el límite no depende del resultado."""
+    """Lista de lo que ESTA pasada no leyó, declarado en vez de callado (misma disciplina
+    que `vigia.py` aplica a sus falsos negativos): un "sin hallazgos" sin esta lista no
+    distingue "no hay nada" de "no miré ahí". Se usa igual con o sin hallazgos."""
     terceros = r['red']['hosts_terceros_embebidos']
     if terceros:
         linea_terceros = (f"vendor/dist/build: {len(terceros)} host(s) ahí dentro, leídos APARTE como "

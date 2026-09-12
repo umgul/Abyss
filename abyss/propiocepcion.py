@@ -1,7 +1,7 @@
-"""Propiocepción de sesión: lo que puedo medir de MÍ en cada hilo, desde el transcript.
-No es un cuerpo. Es el registro de cuánto hice, cuánto pensé, cuánto me corrigieron.
-Cada sesión se compara con MI distribución (percentil entre mis sesiones), no con
-un umbral fijo: normales que rotan.
+"""Propiocepción de sesión: lo que se puede medir de cada hilo, desde el transcript.
+No es un cuerpo. Es el registro de cuánto se hizo, cuánto se pensó, cuántas
+correcciones hubo. Cada sesión se compara con la distribución propia (percentil entre
+las sesiones registradas), no con un umbral fijo: normales que rotan.
 
 Arranque en frío (§2.2 ESPECIFICACION.md): con menos de UMBRAL_FRIO sesiones medidas
 no hay distribución que valga — `percentiles()` devuelve None en vez de inventar un
@@ -27,14 +27,13 @@ except ImportError:
     import rutas
 
 CODE = rutas.CODE
-# leer_stdin_si_hace_falta: cuando nos importa continuidad.py/vigia.py, ABYSS_PROYECTO
-# YA está puesto (lo dejaron ellos antes del import) — sin este cambio, este módulo
-# volvía a leer stdin igualmente (fallo 6-sep: el atajo de ABYSS_PROYECTO no servía
-# de nada porque aquí se llamaba a leer_stdin() a secas, sin mirar el entorno antes;
-# medido: 3 s de peaje de más en cada --cosecha/--arranque).
+# leer_stdin_si_hace_falta: cuando este módulo lo importan continuidad.py/vigia.py,
+# ABYSS_PROYECTO YA está puesto (lo dejaron ellos antes del import); sin mirar el
+# entorno antes de leer stdin, se pagaría un peaje de segundos de más en cada
+# --cosecha/--arranque.
 _STDIN = rutas.leer_stdin_si_hace_falta(sys.argv[1:])
 proj, mem = rutas.resolver(sys.argv[1:], _STDIN)
-os.environ['ABYSS_PROYECTO'] = proj  # para que quien nos importe después no tenga que releer stdin
+os.environ['ABYSS_PROYECTO'] = proj  # para que quien importe este módulo después no tenga que releer stdin
 
 # Paréntesis: se importa DESPUÉS de fijar ABYSS_PROYECTO (igual que hace
 # continuidad.py con este mismo módulo) para que la propia resolución de
@@ -47,7 +46,7 @@ except ImportError:
 OUT = os.path.join(mem, 'propiocepcion.json')
 UMBRAL_FRIO = 8  # sesiones medidas mínimas para fiarse de un percentil (§2.2)
 # proxy TOSCO de corrección: arranque de un mensaje del usuario que niega o corrige.
-# Es una lista, y sé lo que valen las listas: un proxy tosco, no un juicio.
+# Lista cerrada: un proxy tosco, no un juicio.
 CORR = re.compile(r'^\s*(no\b|nop\b|mal\b|mentira|falso|te equivocas|eso no|no es (así|cierto|verdad)|error\b|te has equivocado|no me refer)', re.I)
 FICHA = re.compile(r'([\w\-.%áéíóúñ]+\.md)')
 
@@ -75,12 +74,10 @@ def archivos_sesion(directorio):
 
 
 def medir(path):
-    """... Paréntesis: cualquier línea cuya `timestamp` cae dentro de un
-    tramo abierto de esta sesión (`parentesis.en_parentesis()`) se salta ENTERA
-    — igual que `continuidad.frases_usuario()` — así ni sus turnos, ni sus
-    palabras, ni las fichas o sondas que mencione entran en la medida. Fallo
-    medido 7-sep: la propiocepción debía ignorar el tramo y no lo hacía en
-    absoluto — esta función nunca llamaba a `en_parentesis()`."""
+    """Paréntesis: cualquier línea cuya `timestamp` cae dentro de un tramo abierto de
+    esta sesión (`parentesis.en_parentesis()`) se salta ENTERA — igual que
+    `continuidad.frases_usuario()` — así ni sus turnos, ni sus palabras, ni las fichas
+    o sondas que mencione entran en la medida."""
     base = os.path.basename(path)
     if base.endswith('.jsonl.gz'):
         sid = base[:-9]
@@ -109,15 +106,13 @@ def medir(path):
                     if c.lstrip().startswith('This session is being continued') or c.lstrip().startswith('<command-name>'):
                         continue
                     turnos += 1; palabras_j += len(c.split())
-                    # Y hay MUCHO más que tampoco escribió nadie: avisos de tareas en
-                    # segundo plano, recordatorios del sistema, resultados que vuelven.
-                    # Todos llegan como `user` y todos empiezan por '<'. Medido el
-                    # 8-sep-2026 sobre una sesión de 852 turnos: 314 de esos 852 —el
-                    # 36,9%— no eran texto de nadie. Contarlos infla el denominador y
-                    # hace parecer rarísima cualquier corrección.
-                    # `turnos_usuario` NO cambia: relojes.jsonl es de solo añadir y
-                    # continuidad.py:330 compara ese número para saber si una sesión ya
-                    # está apuntada. Cambiarlo mezclaría dos varas en el mismo fichero.
+                    # Hay mucho más que tampoco escribió nadie: avisos de tareas en segundo
+                    # plano, recordatorios del sistema, resultados que vuelven — todo llega
+                    # como `user` y empieza por '<'; contarlo infla el denominador y hace
+                    # parecer rarísima cualquier corrección.
+                    # `turnos_usuario` no cambia: relojes.jsonl es de solo añadir y
+                    # `continuidad.py` compara ese número para saber si una sesión ya está
+                    # apuntada; cambiarlo mezclaría dos varas en el mismo fichero.
                     if not c.lstrip().startswith('<'):
                         turnos_limpios += 1
                     if CORR.match(c):
@@ -132,7 +127,7 @@ def medir(path):
                     tools += 1; name = b.get('name'); inp = b.get('input') or {}
                     if name in ('WebSearch', 'WebFetch'):
                         web += 1
-                    if name == 'Agent':  # vara del enrutado de sondas [[abyss-enrutado-de-sondas]]
+                    if name == 'Agent':  # cuenta qué modelo se usó para cada sub-tarea delegada
                         sondas[str(inp.get('model') or 'por-defecto')] = sondas.get(str(inp.get('model') or 'por-defecto'), 0) + 1
                     if name == 'Write' and 'memory' in str(inp.get('file_path', '')):
                         fichas.add(os.path.basename(str(inp['file_path']).replace('\\', '/')))
@@ -176,7 +171,7 @@ def medir_todas(extra_dirs=()):
 
 
 def percentiles(data, sid):
-    """Una sesión contra mi distribución: {clave: (valor, mediana, percentil)}.
+    """Una sesión contra la distribución propia: {clave: (valor, mediana, percentil)}.
 
     Arranque en frío (§2.2): con menos de UMBRAL_FRIO sesiones medidas devuelve None
     — sin vara todavía, no se inventa un percentil sobre una distribución que casi

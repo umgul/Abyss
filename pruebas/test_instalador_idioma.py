@@ -318,10 +318,10 @@ class TextosDeclaraLasMismasClavesEnLosDosIdiomas(unittest.TestCase):
 
     def test_ninguna_plantilla_vacia_salvo_la_declarada(self):
         """Toda clave debe tener texto no vacío en los dos idiomas — salvo
-        `listar_detalle_nota` en castellano, que es intencionadamente '' (en
-        castellano SÍ se imprime el detalle `toca`/`aviso`; no hace falta nota)."""
+        `listar_detalle_nota`, que es '' en ambos: el detalle `toca`/`aviso` se
+        imprime traducido en los dos y no hace falta nota."""
         inst = _cargar_instalador()
-        vacias_permitidas = {('es', 'listar_detalle_nota')}
+        vacias_permitidas = {('es', 'listar_detalle_nota'), ('en', 'listar_detalle_nota')}
         for idioma, tabla in inst.TEXTOS.items():
             for clave, valor in tabla.items():
                 if (idioma, clave) in vacias_permitidas:

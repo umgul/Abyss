@@ -1,22 +1,10 @@
 # -*- coding: utf-8 -*-
 """Hablar con un navegador sin ventana por su propio protocolo, sin dependencias.
 
-## Por qué existe
-
-Capturar una página se venía haciendo con la bandera `--screenshot` de la línea de órdenes.
-Eso dejó de funcionar. Medido el 9-sep-2026 con Edge 152.0.4191.66 en la máquina de
-desarrollo:
-
-  - página trivial (tres líneas de HTML): la misma orden da 0 bytes en un intento y 1.981 en
-    el siguiente. No está rota: es una carrera, el proceso termina antes de escribir.
-  - página con WebGL (la que genera `render3d.py`): **0 bytes en las tres variantes
-    probadas** — `--headless`, `--headless=old` y `--headless=new`, con y sin
-    `--disable-gpu`, con y sin SwiftShader. Tres intentos, todos vacíos.
-  - la MISMA página por este camino: 51.109 bytes, y `webgl2` disponible.
-
-Así que el arreglo no es otra bandera: es dejar de pedir la foto por la puerta de la calle y
-pedirla por el protocolo del navegador, que responde cuando la página está lista en vez de
-cuando al proceso le parece.
+Existe porque la bandera `--screenshot` de la línea de órdenes es una carrera: el
+proceso puede terminar antes de que la página (sobre todo con WebGL, como la que genera
+`render3d.py`) haya escrito el fichero, dando 0 bytes sin avisar de nada. El protocolo
+del navegador responde cuando la página está lista, no cuando al proceso le parece.
 
 ## Por qué a mano y no con una biblioteca
 

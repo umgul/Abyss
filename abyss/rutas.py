@@ -1,9 +1,7 @@
 """rutas.py — el único sitio donde se decide dónde vive el CÓDIGO y dónde viven los DATOS.
 
-Antes (guiones sueltos en memory/ de un solo proyecto) daba igual: `mem = dirname(__file__)`
-y `proj = dirname(mem)` porque código y datos compartían carpeta. En el paquete publicable
-ya no: el código se instala UNA VEZ (aquí, en `CODE`) y los datos siguen viviendo por
-proyecto, dentro de la memoria automática de Claude Code para ese proyecto
+El código se instala UNA VEZ (aquí, en `CODE`); los datos viven por proyecto, dentro de la
+memoria automática de Claude Code para ese proyecto
 (`~/.claude/projects/<proyecto-saneado>/memory/`). Todo guion que necesite datos debe
 llamar a `resolver()` y nunca calcular `proj`/`mem` por su cuenta.
 
@@ -23,11 +21,13 @@ nunca se combinan ni se adivina uno por defecto):
      Sirve para invocar un guion a mano con el cwd que habría llegado por stdin.
   4. Variable de entorno `ABYSS_PROYECTO`: a diferencia de (2) y (3), aquí se espera
      la ruta YA RESUELTA a la carpeta del proyecto (no un cwd, no se sanea) — para
-     pruebas automatizadas o para que el instalador la fije sin pasar por stdin.
+     pruebas automatizadas o para que el instalador la fije sin pasar por stdin. Un
+     nombre sin separadores se toma como carpeta bajo `~/.claude/projects/`, nunca
+     relativo al cwd.
 
 Si ninguna de las cuatro fuentes resuelve un proyecto, `resolver()` aborta (mensaje claro
 por stderr y `sys.exit(1)`): sin proyecto no hay datos, nunca se inventa uno ni se cae a
-un directorio por defecto (fail-closed, [[verificar-antes-de-construir]]).
+un directorio por defecto (fail-closed).
 
 `mem = proj/memory` se crea si no existe (es memoria de DATOS, no de código: nada del
 paquete instalado escribe ahí salvo lo que cada pieza declare).
@@ -52,30 +52,25 @@ def leer_stdin(tope_s=None):
 
     Fail-closed también con un terminal interactivo: si stdin es (o parece) una tty,
     NO se lee (`.read()` se quedaría colgado esperando un EOF que nunca llega cuando
-    alguien ejecuta un guion a mano). En ese caso no hay JSON de gancho que leer, así
-    que se devuelve {} igual que con stdin vacío — quien llame usará --proyecto o
-    ABYSS_PROYECTO (§1 de ESPECIFICACION.md).
+    alguien ejecuta un guion a mano) — se devuelve {} igual que con stdin vacío; quien
+    llame usará --proyecto o ABYSS_PROYECTO (§1 de ESPECIFICACION.md).
 
-    Medido 6-sep: si stdin es una TUBERÍA ABIERTA que nunca manda EOF (`( sleep 30 ) |
-    python ojo.py` se quedaba colgado sin límite, y `continuidad.cerrar()` lanza
-    `varas.py --index` con `subprocess.run` heredando el stdin del propio gancho — si
-    Claude Code no lo cierra, el cierre de sesión se come el timeout entero), un
-    `.read()` directo no vuelve jamás. Ahora se lee en un hilo aparte (daemon: no
-    bloquea la salida del proceso aunque nunca termine) con `join(tope)`: si no ha
-    acabado a tiempo, se abandona esa lectura y se devuelve {} igual que con stdin
-    vacío — nunca se espera más de `tope` segundos (por defecto `ABYSS_TOPE_STDIN`,
-    3 s).
+    Con una TUBERÍA ABIERTA que nunca manda EOF, un `.read()` directo no vuelve jamás
+    (p. ej. `subprocess.run` heredando el stdin del propio gancho si Claude Code no lo
+    cierra). Se lee en un hilo aparte (daemon: no bloquea la salida del proceso aunque
+    nunca termine) con `join(tope)`: si no ha acabado a tiempo, se abandona esa lectura
+    y se devuelve {} igual que con stdin vacío — nunca se espera más de `tope` segundos
+    (por defecto `ABYSS_TOPE_STDIN`, 3 s).
 
-    OJO (medido de nuevo 6-sep, esta vez hasta el final): agotado el tope, el hilo
-    daemon SIGUE vivo, bloqueado para siempre en `sys.stdin.read()` — no se puede
-    matar un hilo desde fuera en Python. Aislado con un guion mínimo: pasado el tope,
-    el siguiente `import` que toque hilos (`import cv2`, en `ojo.py`) se traba contra
-    ese lector colgado y el proceso entero deja de avanzar, sin volver jamás — el
-    tope evita el bloqueo EN `leer_stdin()`, pero no borra el hilo colgado que deja
-    detrás. Por eso no se debe llamar a esta función en absoluto cuando ya hay una
-    pista directa de proyecto sin tocar stdin (`--proyecto` en argv o
-    `ABYSS_PROYECTO` en el entorno): usa `leer_stdin_si_hace_falta()` en vez de esta,
-    salvo que de verdad quieras forzar la lectura."""
+    LÍMITE: agotado el tope, el hilo daemon SIGUE vivo, bloqueado para siempre en
+    `sys.stdin.read()` (no se puede matar un hilo desde fuera en Python) — el
+    siguiente `import` que toque hilos (`import cv2`, en `ojo.py`) puede trabarse
+    contra ese lector colgado y dejar el proceso entero sin avanzar; el tope evita el
+    bloqueo EN `leer_stdin()`, pero no borra el hilo colgado que deja detrás. Por eso
+    no se debe llamar a esta función cuando ya hay una pista directa de proyecto sin
+    tocar stdin (`--proyecto` en argv o `ABYSS_PROYECTO` en el entorno): usa
+    `leer_stdin_si_hace_falta()` en vez de esta, salvo que de verdad quieras forzar la
+    lectura."""
     try:
         if sys.stdin is None or sys.stdin.isatty():
             return {}
@@ -107,19 +102,16 @@ def _tiene_pista_directa(argv):
 
 
 def leer_stdin_si_hace_falta(argv=None, tope_s=None):
-    """Como `leer_stdin()`, pero se ahorra la lectura ENTERA cuando `argv`/el entorno
-    ya traen una pista directa de proyecto (`_tiene_pista_directa`): en ese caso los
-    órdenes 1/2 de `resolver()` (transcript_path/cwd de stdin) no hacen falta, así
-    que no hay motivo para tocar stdin — ni para pagar el tope de `leer_stdin()`, ni
-    para arriesgarse a dejar el hilo lector colgado para siempre si stdin es una
-    tubería abierta que nunca manda EOF (medido 6-sep: ese hilo colgado trababa el
-    siguiente `import` que tocara hilos, aunque `leer_stdin()` ya hubiera devuelto
-    {} — ver su docstring). Devuelve {} sin leer en ese caso; si no hay pista
-    directa, delega en `leer_stdin()` como siempre.
+    """Como `leer_stdin()`, pero se ahorra la lectura ENTERA cuando `argv`/el entorno ya
+    traen una pista directa de proyecto (`_tiene_pista_directa`): los órdenes 1/2 de
+    `resolver()` no hacen falta, así que no hay motivo para tocar stdin ni para
+    arriesgarse al hilo lector colgado que puede dejar `leer_stdin()` (ver su
+    docstring). Devuelve {} sin leer en ese caso; si no hay pista directa, delega en
+    `leer_stdin()` como siempre.
 
-    La llama `resolver()` cuando no le pasan `stdin_json`, y también los guiones con
-    gancho que necesitan leer el JSON de stdin ELLOS MISMOS para sacar otros campos
-    además de `proj`/`mem` (`session_id`, `cwd`…: `continuidad.py`, `vigia.py`)."""
+    La llama `resolver()` cuando no le pasan `stdin_json`, y los guiones con gancho que
+    necesitan leer el JSON de stdin ellos mismos para otros campos además de
+    `proj`/`mem` (`session_id`, `cwd`…: `continuidad.py`, `vigia.py`)."""
     if argv is None:
         argv = sys.argv[1:]
     if _tiene_pista_directa(argv):
@@ -129,14 +121,11 @@ def leer_stdin_si_hace_falta(argv=None, tope_s=None):
 
 class Presupuesto:
     """Reloj de cuenta atrás COMPARTIDO entre varias llamadas de red de una misma
-    invocación de un gancho (--arranque, --despertar). Antes cada guion
-    (`exterocepcion.py`, `noticias.py`) aplicaba su propio timeout por llamada sin
-    memoria de las anteriores: con la red en agujero negro (paquetes descartados —
-    wifi caída, portal cautivo, cortafuegos — cada conexión consume su timeout
-    entero en vez de fallar rápido) el total crecía con el NÚMERO de llamadas
-    (ipinfo + portada + hasta 8 temas), no con un tope fijo. Medido 6-sep: 38-78 s,
-    por encima del timeout de 60 s del propio gancho SessionStart — se perdía el
-    JSON entero de `additionalContext`.
+    invocación de un gancho (--arranque, --despertar): con la red en agujero negro
+    (wifi caída, portal cautivo, cortafuegos) cada conexión puede consumir su timeout
+    entero, y sin presupuesto compartido el total crece con el NÚMERO de llamadas
+    (ipinfo + portada + hasta 8 temas), no con un tope fijo — puede superar el timeout
+    de 60 s del propio gancho SessionStart y perder el JSON de `additionalContext`.
 
     `restante(tope)`: segundos que quedan, capados por `tope`; si ya no queda nada,
     lanza `TimeoutError` SIN que quien llama intente la red — así, agotado el
@@ -161,20 +150,19 @@ def _normalizar_estilo_posix_de_windows(cwd):
     (`/cygdrive/c/Proyectos/Mi App`) nombra la MISMA carpeta que su forma Windows
     (`C:\\Proyectos\\Mi App`) — pero saneado TAL CUAL da una carpeta de proyecto
     DISTINTA de la que usa el propio gancho de Claude Code (que manda `cwd` en forma
-    Windows). Medido 6-sep: todas las `skills/*/SKILL.md` mandan `--proyecto
-    "$(pwd)"`, y en la Bash que trae la herramienta Bash en Windows, `pwd` devuelve
-    `/c/Users/...`, no `C:\\Users\\...` — con las dos carpetas resultantes creadas a
-    la vez, la orden documentada lee y escribe en una memoria fantasma vacía. Se
-    traduce ANTES de sanear para que las dos formas resuelvan la MISMA carpeta.
+    Windows): la Bash que trae la herramienta Bash en Windows hace que `pwd` devuelva
+    `/c/Users/...`, no `C:\\Users\\...`, y con las dos formas creando carpetas
+    distintas, una orden con `--proyecto "$(pwd)"` lee y escribe en una memoria
+    fantasma vacía. Se traduce ANTES de sanear para que las dos formas resuelvan la
+    MISMA carpeta.
 
-    SOLO en Windows (`os.name == 'nt'`): medido 6-sep, aplicar esta traducción en
-    CUALQUIER sistema trasladaba el mismo fallo a Linux/macOS — una máquina Unix con
-    un punto de montaje real de una sola letra bajo `/` (`/n`, `/e`, `/d`, habituales
-    en granjas y NFS) saneaba distinto según pasara por aquí o no: `/n/repo` daría
-    `N--repo` en vez de `-n-repo`, dos carpetas de memoria para el mismo proyecto —
-    exactamente el fallo que esta función existe para cerrar, pero en la otra
-    dirección. En Windows nadie tiene un directorio raíz `/n` de verdad; en Unix sí
-    puede tenerlo, así que ahí esta traducción no debe tocar nada."""
+    SOLO en Windows (`os.name == 'nt'`): aplicar esta traducción en cualquier sistema
+    trasladaría el mismo fallo a Linux/macOS al revés — una máquina Unix con un punto
+    de montaje real de una sola letra bajo `/` (`/n`, `/e`, `/d`, habituales en NFS)
+    sanearía distinto según pasara por aquí o no (`/n/repo` daría `N--repo` en vez de
+    `-n-repo`), dos carpetas de memoria para el mismo proyecto. En Windows nadie tiene
+    un directorio raíz `/n` de verdad; en Unix sí puede tenerlo, así que ahí esta
+    traducción no debe tocar nada."""
     if os.name != 'nt':
         return cwd
     m = re.match(r'^/cygdrive/([A-Za-z])(/.*)?$', cwd)  # Cygwin: /cygdrive/c/resto
@@ -258,22 +246,19 @@ def es_transcript(x):
     (empieza por '--'), ni un directorio, ni una cadena cualquiera cuelan: tiene que
     EXISTIR COMO FICHERO y terminar en `.jsonl`. Lo usan `exterocepcion.py`,
     `modelo.py` y `noticias.py` en su `__main__` antes de meter un positional en
-    `stdin_json['transcript_path']` para `resolver()`.
-
-    Medido el 6-sep sobre la versión viva: sin esta comprobación, `--proyecto`
-    (la bandera, tomada como si fuera el propio positional) resolvía `proj` como
-    `dirname(abspath('--proyecto'))` = el cwd; y un directorio como `.` resolvía
-    `proj` como su padre — los dos casos crean `memory/` en el sitio equivocado en
-    vez de caer a `--proyecto <valor>` o `ABYSS_PROYECTO` como toca."""
+    `stdin_json['transcript_path']` para `resolver()` — sin esta comprobación, una
+    bandera como `--proyecto` o un directorio como `.` colarían como transcript_path
+    y crearían `memory/` en el sitio equivocado en vez de caer a `--proyecto <valor>`
+    o `ABYSS_PROYECTO` como toca."""
     return bool(x) and isinstance(x, str) and not x.startswith('--') and os.path.isfile(x) and x.endswith('.jsonl')
 
 
 def es_mio(transcript_path, cwd, proj):
     """¿Pertenece este hilo (transcript_path/cwd tal como los manda un gancho) a `proj`?
 
-    Sin adivinar, igual que antes: por la ruta del transcript, o por el `cwd` saneado
-    como lo sanea Claude Code. Si no se puede determinar ninguna de las dos, NO es mío
-    (fail-closed: en cualquier otro proyecto, silencio)."""
+    Sin adivinar: por la ruta del transcript, o por el `cwd` saneado como lo sanea
+    Claude Code. Si no se puede determinar ninguna de las dos, NO es mío (fail-closed:
+    en cualquier otro proyecto, silencio)."""
     if transcript_path and os.path.normcase(os.path.dirname(os.path.abspath(transcript_path))) == \
             os.path.normcase(os.path.abspath(proj)):
         return True

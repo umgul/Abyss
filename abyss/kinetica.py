@@ -1,110 +1,47 @@
 # -*- coding: utf-8 -*-
-"""Kinetica: de UNA foto de un objeto compuesto a un despiece por COMPONENTES REALES (no
-capas de nitidez) que la mano maneja en 3D — sustituye en calidad al despiece 2,5D por
-capas de `volumen.py` (que separaba por nitidez/luminancia y quedaba mal para un objeto
-con piezas de verdad).
+"""Kinetica: de UNA foto de un objeto compuesto a un despiece por COMPONENTES REALES (no capas
+de nitidez, a diferencia del despiece 2,5D de `volumen.py`) que la mano maneja en 3D.
 
 Uso:
     python kinetica.py <imagen> [--regiones f.json] [--fichas f.json] [--salida DIR]
                        [--puerto 8811] [--sin-abrir] [--solo-montar] [--rellenar]
                        [--quitar-fondo | --fondo-tal-cual]
                        [--reconocer [--permitir-nombre-fichero] | --reconocimiento f.json]
+Dos caminos, ninguno inventa qué hay en la foto. `--regiones f.json` (recomendado): lista de
+`{clave, titulo, poligono:[[x,y],...], rumbo:[x,y,z], orden, prioridad}` puesta a mano
+(reconocimiento asistido, no un detector entrenado); `cv2.grabCut` decide el borde de cada
+pieza sembrado desde el polígono, con núcleo/holgura que ESCALAN al lado corto del recuadro
+(18%/6%, mínimo 3/2 px) para no depender del tamaño de la foto. Solapes: gana la `prioridad`
+más alta. Defaults: `titulo`=`clave`, `rumbo`=`[0, 0, 0.3]`, `orden`=posición en la lista,
+`prioridad`=0. Sin `--regiones`: componentes conexos del primer plano (`grabCut` +
+`connectedComponentsWithStats`, hasta `AUTOMATICO_MAX_PIEZAS` mayores que superen el 1% del
+área); se declara automático en `piezas.json` (`procedencia.modo`), sin nombre real y peor que
+con regiones — nunca se finge reconocer el producto; `rumbo` = vector centro-de-foto→
+centroide; `--rellenar` no aplica aquí. `--rellenar` (solo con `--regiones`): píxeles tapados
+por una pieza de más prioridad se reconstruyen con `cv2.inpaint` — INVENTADOS, no fotografiados;
+se cuentan en `relleno_px` y se declaran en `procedencia.relleno`.
+`--salida DIR` (por defecto `<carpeta de la imagen>/<base>_kinetica/`) monta la carpeta que
+espera `abyss/plantillas/kinetica.html` (leída, nunca modificada):
 
-## Dos caminos honestos — nunca se inventa qué hay en la foto
+    piezas/piezas.json     — ancho, alto, original, procedencia, piezas[] con clave/titulo/
+                             orden/caja_px/centro/tam_frac/rumbo/png/area_px/relleno_px
+    piezas/<clave>.png     — cada componente recortado, con canal alfa
+    original.jpg            — copia de la imagen de entrada, recodificada a JPEG si no lo era
+    three.min.js / index.html / gestos_comun.js — vendor, plantilla y vocabulario de la mano
+    fichas.json (opcional) — copia de `--fichas f.json`; sin ella, "sin dato con fuente"
+    mp/                      — MediaPipe Tasks Vision (`vision_bundle.mjs`, `wasm/`, `.task`)
 
-1. **`--regiones f.json`** (recomendado): una lista de
-   `{clave, titulo, poligono:[[x,y],...], rumbo:[x,y,z], orden, prioridad}`, puesta a
-   mano por quien mira la foto (reconocimiento asistido, declarado como tal — no hay
-   aquí ningún detector de objetos entrenado). El BORDE de cada pieza lo decide
-   `cv2.grabCut` sembrado con máscara desde ese polígono (núcleo erosionado = "primer
-   plano seguro", fuera de una holgura = "fondo seguro", el resto = "probable"), nunca
-   el polígono a mano tal cual. Los solapes entre piezas se resuelven por `prioridad`
-   con las MÁSCARAS REALES ya calculadas (la de prioridad más alta se queda los píxeles
-   donde dos piezas se pisan), como el guión de referencia que esta pieza convierte en
-   módulo del paquete. `titulo` por defecto es `clave`; `rumbo` por defecto
-   `[0, 0, 0.3]` (hacia el espectador, sin eje de montaje conocido); `orden` por defecto
-   es la posición en la lista y solo ORDENA las piezas entre sí — nunca se copia tal
-   cual al `piezas.json` de salida: la plantilla lo usa como índice denso 0..N-1 (cuántos
-   dedos aíslan cada pieza), así que el `orden` final es la posición de cada pieza
-   TRAS ordenar (0, 1, 2…), aunque el fichero de regiones numere 1, 2, 3 o deje huecos;
-   `prioridad` por defecto 0.
+`mp/` nunca se inventa: si `abyss/vendor/mp/vision_bundle.mjs` no existe, no se copia nada de
+manos y se imprime el procedimiento exacto (`MENSAJE_MEDIAPIPE`: `python instalar.py --manos`,
+necesita red en otra máquina); se escribe un `vision_bundle.mjs` SUSTITUTO que carga la página
+y solo falla, con mensaje claro, si de verdad se enciende la cámara.
 
-   A diferencia del guión de referencia (constantes de erosión/holgura fijas, medidas
-   sobre UNA foto de 1200×831), aquí el núcleo y la holgura de cada región ESCALAN con
-   el lado corto de su propio recuadro (18% y 6% de ese lado, mínimo 3 y 2 px): así no
-   dependen del tamaño de la foto concreta ni de la región concreta.
-
-2. **Sin `--regiones`**: separación AUTOMÁTICA por componentes conexos del primer plano
-   (`cv2.grabCut` con un rectángulo que dejar un margen del 5% por lado, igual que
-   `volumen.mascara_primer_plano`, + `cv2.connectedComponentsWithStats`, quedándose con
-   los `AUTOMATICO_MAX_PIEZAS` componentes mayores que superen el 1% del área de la
-   foto). Se DICE, por pantalla y en `piezas.json` (`procedencia.modo`), que las piezas
-   son automáticas, que no tienen nombre real (`titulo` lleva "sin nombre real") y que
-   el resultado es peor que con regiones — nunca se finge haber reconocido el producto.
-   El `rumbo` de cada pieza automática es el vector del centro de la foto a su centroide
-   (heurística de dirección "hacia fuera", declarada como tal, no un eje de montaje
-   real). `--rellenar` no aplica aquí (los componentes conexos, por construcción, no se
-   solapan) y se avisa si se pide de todos modos.
-
-`--rellenar` (solo con `--regiones`): los píxeles que una pieza tenía tapados por otra de
-más prioridad se reconstruyen con `cv2.inpaint` (Telea) — son píxeles INVENTADOS, no
-fotografiados; la cuenta está en `relleno_px` de cada pieza y se declara en
-`procedencia.relleno`. Sin `--rellenar`, esos huecos se quedan transparentes.
-
-## La carpeta que se monta
-
-`--salida DIR` (por defecto `<carpeta de la imagen>/<base>_kinetica/`) recibe la carpeta
-COMPLETA que espera `abyss/plantillas/kinetica.html` (leída, nunca modificada por este
-módulo) — las rutas de abajo son las que la plantilla pide de verdad (`fetch`/
-`carg.load` dentro de `kinetica.html`), no una convención propia de este módulo:
-
-    piezas/piezas.json    — ancho, alto, original, procedencia, piezas[] (clave/titulo/
-                            orden/caja_px/centro/tam_frac/rumbo/png/area_px/relleno_px)
-    piezas/<clave>.png    — cada componente recortado, con canal alfa; su ruta relativa
-                            a la raíz servida es la misma que lleva su clave `png`
-    original.jpg           — copia de la imagen de entrada; si no era JPEG, se recodifica
-                            a JPEG (`procedencia.original` lo dice)
-    three.min.js           — copiado de `abyss/vendor/three.min.js`
-    index.html              — `abyss/plantillas/kinetica.html` tal cual, renombrada
-    gestos_comun.js         — el vocabulario de la mano, copia única del paquete
-    fichas.json (opcional) — copia de `--fichas f.json`, si se dio; sin ella, cada
-                            cartel de la página dice "sin dato con fuente" (lo decide la
-                            propia plantilla, no este módulo)
-    mp/                     — MediaPipe Tasks Vision (`vision_bundle.mjs`, `wasm/`,
-                            `hand_landmarker.task`), ver más abajo
-
-### mp/ — MediaPipe, fail-closed pero útil
-
-Este módulo NUNCA inventa `mp/`: si `abyss/vendor/mp/vision_bundle.mjs` no existe en esta
-instalación, no se copia nada de manos y se imprime, EXACTO, el procedimiento para
-conseguirlo (`MENSAJE_MEDIAPIPE`, más abajo — necesita red y Node.js, en una máquina
-aparte; este módulo no descarga nada por su cuenta). En su lugar se escribe un `mp/
-vision_bundle.mjs` SUSTITUTO (código propio de este módulo, unas pocas líneas: dos clases
-que exportan los mismos dos nombres que importa la plantilla y lanzan un error claro en
-cuanto se intentan USAR) para que la página cargue y sirva igual — el aviso de "sin
-manos" aparece EN PANTALLA cuando quien mire pulse "Encender cámara" (la plantilla ya
-captura ese error y lo muestra; no hace falta tocarla). Con `mp/` de verdad presente, se
-copia entera y las manos funcionan.
-
-## Servidor
-
-Sirve, SOLO en `127.0.0.1` (nunca `0.0.0.0`), con `http.server` de la biblioteca
-estándar, con las cabeceras `Cross-Origin-Opener-Policy: same-origin` y
-`Cross-Origin-Embedder-Policy: require-corp` que el `.wasm` de MediaPipe necesita para
-cargar como módulo ES (por eso la plantilla no se puede abrir con `file://`: el
-navegador bloquea el `import` por CORS). Abre el navegador salvo `--sin-abrir`.
-`--solo-montar` deja la carpeta lista y NO sirve nada (ni abre un puerto, ni un
-navegador) — para montarla en una máquina y servirla luego a mano, o para revisarla
-antes de enseñarla.
-
-DEPENDENCIA obligatoria: OpenCV (`cv2`), `numpy` y Pillow. Sin alguna, este guion dice
-EXACTAMENTE qué instalar («sin dato: pip install opencv-python numpy Pillow») y sale con
-código 2, antes de tocar la imagen — nunca instala nada por su cuenta ni deja salir una
-traza cruda.
-
-Guión de fichero a fichero, como `render3d.py`/`volumen.py`/`taller.py`: no llama a
-`rutas.resolver()`, no lee stdin, no escribe en `mem` — se puede importar directamente en
-el proceso de una prueba.
+Servidor SOLO en `127.0.0.1`, con las cabeceras COOP/COEP que el `.wasm` de MediaPipe necesita
+para cargar como módulo ES (por eso no se abre con `file://`: CORS lo bloquea). Abre el
+navegador salvo `--sin-abrir`; `--solo-montar` deja la carpeta lista sin servir nada. Dependencia
+obligatoria: OpenCV (`cv2`), `numpy` y Pillow — sin alguna, dice qué instalar y sale con código 2
+antes de tocar la imagen. Guión de fichero a fichero (como `render3d.py`/`volumen.py`/
+`taller.py`): no llama a `rutas.resolver()`, no lee stdin, no escribe en `mem`.
 """
 import json
 import math
@@ -173,26 +110,10 @@ _STUB_VISION_BUNDLE = (
 # ───────────────────────────────── imagen y máscaras ─────────────────────────────────
 
 def _leer_imagen(ruta):
-    """`(bgr, alfa)`: `bgr` SIEMPRE de 3 canales (lo que ya esperaban grabCut, cvtColor y
-    el resto del módulo — pasarles 4 canales falla: `grabCut` da "image must have CV_8UC3
-    type" y un `reshape(-1, 3)` revienta con ValueError). `alfa` es el canal alfa de la
-    imagen de origen (0-255) o `None` si no traía ninguno o si no encaja.
-
-    La lectura del COLOR se queda como estaba, con IMREAD_COLOR: entrega siempre 8 bits y
-    3 canales, y además APLICA la orientación EXIF. IMREAD_UNCHANGED no hace ninguna de
-    las dos cosas — MEDIDO el 9-sep-2026: con un JPEG de Orientation=6 (una foto de móvil
-    cualquiera) IMREAD_COLOR da 80x60 y IMREAD_UNCHANGED 60x80, o sea la escena entera
-    girada y los polígonos de `--regiones` cayendo sobre píxeles que no son; y un PNG de
-    16 bits sale uint16, que grabCut rechaza. Por eso el alfa se busca en una SEGUNDA
-    lectura y solo se acepta si encaja con el color que ya tenemos: si no encaja, se
-    descarta y el módulo se comporta exactamente como antes de este cambio.
-
-    Por qué importa el alfa: quitarle el fondo a un PNG pone el alfa a cero pero DEJA el
-    RGB intacto debajo. MEDIDO el 9-sep-2026 con una foto de producto con el fondo ya
-    quitado (RGBA 1200x598, 56,9% de píxeles con alfa < 128): tirando el alfa reaparecía
-    la foto original con su fondo — sus cuatro esquinas daban BGR [245,251,253]
-    [242,239,232] [94,119,133] [44,46,46], desviación 82,8 entre ellas, no un color
-    plano. Ver `montar()`, donde este alfa se usa como silueta."""
+    """`(bgr, alfa)`: `bgr` siempre de 3 canales con la orientación EXIF ya aplicada
+    (`IMREAD_COLOR`; `IMREAD_UNCHANGED` no la aplica y puede dar canales/bit-depth que
+    `grabCut` rechaza). `alfa` sale de una segunda lectura, aceptada solo si encaja con
+    `bgr` — la silueta real si el fondo ya se quitó de antemano; ver `montar()`."""
     ruta = os.path.abspath(ruta)
     if not os.path.isfile(ruta):
         raise FileNotFoundError(f'no existe: {ruta}')
@@ -279,11 +200,10 @@ def _recorte_de_mascara(img_bgr, fg):
 
 
 def _rellenar_ocultos(img_bgr, crudas, finales, regiones):
-    """Píxeles que la máscara CRUDA de una región tenía y la FINAL (tras resolver
-    solapes) perdió: son los que una pieza de más prioridad tapaba. Con `--rellenar`, se
-    reconstruyen con `cv2.inpaint` (Telea) — INVENTADOS, no fotografiados. Devuelve
-    `(imagen_por_clave_rellenada, relleno_px_por_clave)`; una región sin hueco (<50 px)
-    no se toca."""
+    """Píxeles que la máscara CRUDA de una región tenía y la FINAL (tras resolver solapes)
+    perdió —tapados por una pieza de más prioridad—: con `--rellenar` se reconstruyen con
+    `cv2.inpaint` (Telea), INVENTADOS, no fotografiados. Devuelve
+    `(imagen_por_clave_rellenada, relleno_px_por_clave)`; un hueco <50 px no se toca."""
     rellenos_img = {}
     conteo = {r['clave']: 0 for r in regiones}
     base = img_bgr.copy()
@@ -326,15 +246,9 @@ def _leer_regiones(ruta):
 
 def _fondo_liso(img, tolerancia=16, minimo_frac=0.25):
     """(máscara del objeto, descripción) si la foto tiene fondo de UN solo color; si no,
-    (None, motivo).
-
-    Cuando la foto viene con el fondo quitado —y una foto de producto casi siempre puede
-    venir así, ver `fondo.py`— la silueta del objeto no hay que estimarla: se mide
-    restando el color del fondo. Eso cambia mucho el resultado, porque entonces cada píxel
-    del objeto acaba en ALGUNA pieza y no queda nada que reconstruir. MEDIDO el 8-sep con
-    la misma foto en sus dos versiones: con fondo, el relleno inventado del cuerpo era de
-    78.947 píxeles; sin fondo, 55.
-    """
+    (None, motivo). Si la foto ya trae el fondo quitado (ver `fondo.py`), la silueta se
+    mide restando el color de fondo en vez de estimarse: cada píxel del objeto cae en
+    ALGUNA pieza y no queda nada que reconstruir."""
     alto, ancho = img.shape[:2]
     c = min(40, alto // 4, ancho // 4)
     esq = np.concatenate([img[:c, :c].reshape(-1, 3), img[:c, -c:].reshape(-1, 3),
@@ -427,21 +341,16 @@ def _separar_manual(img, regiones, rellenar, avisar, obj_conocido=None):
 
 
 # ───────────────────────────── reconocer el producto, o no ───────────────────────────────
-# Regla dura por defecto: el enlace oficial de una pieza SOLO puede salir de lo que se lee
-# EN LA FOTO. El título de `fichas.json` lo escribe una persona; apoyarse en él para
-# ofrecer un enlace sería presentar como reconocimiento lo que fue un dato dictado. Si no
-# se lee nada, no hay enlace, y se dice por qué — MEDIDO el 8-sep con una foto de un
-# teléfono con dos accesorios: el OCR de Windows estaba disponible y aun así leyó 0
-# líneas en las tres piezas, incluso recortando los logotipos y ampliándolos 8 veces.
+# Regla dura por defecto: el enlace oficial de una pieza SOLO puede salir de lo que se lee EN
+# LA FOTO. El título de `fichas.json` lo escribe una persona; apoyarse en él sería presentar
+# como reconocimiento un dato dictado. Si no se lee nada, no hay enlace, y se dice por qué.
 #
-# 9-sep: un logotipo puede ser un DIBUJO (un anillo, un escudo) que ningún OCR lee, sin
-# que la marca sea ningún misterio para quien nombró el fichero al guardarlo. Por eso
-# existe `permitir_nombre_fichero` (opt-in en `montar()`/`--permitir-nombre-fichero` en la
-# CLI, APAGADO por defecto): con él encendido, si la foto no dio marca se mira TAMBIÉN el
-# nombre del fichero — pero eso no es leer la foto y nunca se disfraza de tal. Ese camino
-# guarda como='nombre_fichero' y el por_que dice, sin adornos, que la marca (y el modelo,
-# si lo hay) vinieron del NOMBRE DEL FICHERO. Sin marca conocida tampoco en el nombre,
-# sigue sin haber enlace: nunca se adivina nada. Ver `_reconocer_por_nombre`.
+# Un logotipo puede ser un DIBUJO que ningún OCR lee, sin que la marca sea un misterio para
+# quien nombró el fichero. Por eso existe `permitir_nombre_fichero` (opt-in en `montar()`/
+# `--permitir-nombre-fichero`, APAGADO por defecto): con él, si la foto no dio marca se mira
+# TAMBIÉN el nombre del fichero — pero eso no es leer la foto y nunca se disfraza de tal; ese
+# camino guarda como='nombre_fichero' y `por_que` dice que la marca vino del NOMBRE DEL
+# FICHERO. Sin marca conocida tampoco ahí, sigue sin haber enlace. Ver `_reconocer_por_nombre`.
 MARCAS = {
     # marca legible -> sitio oficial. Se amplía a mano; una marca que no esté aquí se
     # registra igualmente como "texto leído" pero sin enlace.
@@ -462,11 +371,7 @@ def _reconocer_por_nombre(ruta_imagen):
     del nombre lo trae) salen del NOMBRE DEL FICHERO, nunca de la foto — un dato DICTADO
     por quien lo guardó, no un reconocimiento, y así lo dice siempre `por_que`. Solo se
     llama desde `_reconocer` cuando `permitir_nombre_fichero=True` (opt-in). Si el nombre
-    no trae ninguna marca de `MARCAS`, no hay enlace y se dice por qué: nunca se adivina.
-
-    MEDIDO (scratch, no en la suite): 'audi a5.png' -> marca='audi', modelo='a5';
-    'AUDI_A5_Sportback.png' -> marca='audi', modelo='a5 sportback'; un nombre sin ninguna
-    marca de MARCAS, o sin letras/dígitos, vuelve con url=None y marca=None."""
+    no trae ninguna marca de `MARCAS`, no hay enlace y se dice por qué: nunca se adivina."""
     nombre = os.path.basename(ruta_imagen)
     base = os.path.splitext(nombre)[0]
     normalizado = re.sub(r'[^a-z0-9]+', ' ', base.lower()).strip()
@@ -497,13 +402,11 @@ def _reconocer_por_nombre(ruta_imagen):
 
 
 def _con_respaldo_de_nombre(sin_enlace, ruta_imagen, permitir_nombre_fichero):
-    """Se llama en cada punto de `_reconocer` donde la FOTO no dio enlace. Con
-    `permitir_nombre_fichero` apagado (el valor por defecto) o sin `ruta_imagen`, devuelve
-    `sin_enlace` tal cual: comportamiento IDÉNTICO al de antes de esta función. Encendido,
-    si el nombre del fichero sí trae una marca de `MARCAS` ese resultado sustituye al de
-    la foto (como='nombre_fichero'); si tampoco hay nada en el nombre, se devuelve el
-    resultado de la foto con una frase más en `por_que` que deja constancia de que el
-    nombre también se miró y no tenía nada — nunca se calla ese intento."""
+    """Se llama en cada punto de `_reconocer` donde la foto no dio enlace. Con
+    `permitir_nombre_fichero` apagado (por defecto) o sin `ruta_imagen`, devuelve
+    `sin_enlace` tal cual; encendido, una marca en el nombre del fichero sustituye al
+    resultado de la foto, y si tampoco hay nada en el nombre se añade una frase a
+    `por_que` dejando constancia de que también se miró."""
     if not permitir_nombre_fichero or not ruta_imagen:
         return sin_enlace
     por_nombre = _reconocer_por_nombre(ruta_imagen)
@@ -515,12 +418,10 @@ def _con_respaldo_de_nombre(sin_enlace, ruta_imagen, permitir_nombre_fichero):
 
 
 def _reconocer(piezas, img, avisar, ruta_imagen=None, permitir_nombre_fichero=False):
-    """{'como', 'texto_leido', 'url', 'por_que'} — nunca inventa un enlace.
-
-    `ruta_imagen` y `permitir_nombre_fichero` solo alimentan el respaldo por nombre de
-    fichero (ver `_reconocer_por_nombre`/`_con_respaldo_de_nombre`): con
-    `permitir_nombre_fichero=False` (el valor por defecto) esta función se comporta
-    EXACTAMENTE como antes, solo con lo que lee el OCR en la foto."""
+    """{'como', 'texto_leido', 'url', 'por_que'} — nunca inventa un enlace. `ruta_imagen`
+    y `permitir_nombre_fichero` solo alimentan el respaldo por nombre de fichero (ver
+    `_reconocer_por_nombre`/`_con_respaldo_de_nombre`); con `permitir_nombre_fichero=False`
+    (el valor por defecto), solo cuenta lo que lee el OCR en la foto."""
     try:
         import importlib.util as _u
         _e = _u.spec_from_file_location('lectura_visual', os.path.join(CODE, 'lectura_visual.py'))
@@ -568,13 +469,10 @@ def _reconocer(piezas, img, avisar, ruta_imagen=None, permitir_nombre_fichero=Fa
                          'estilizados no son texto para un OCR: sin texto no hay '
                          'reconocimiento, y sin reconocimiento no hay enlace')},
             ruta_imagen, permitir_nombre_fichero)
-    # Límite de palabra, el mismo que usa `_reconocer_por_nombre`. Con la comparación de
-    # subcadena cruda que había antes, una pieza que solo lleva impreso "AUDIO" devolvía
-    # como='ocr' y el sitio oficial de Audi, afirmando que se había leído la marca EN LA
-    # FOTO — que es exactamente el fraude que esta sección existe para impedir. MEDIDO el
-    # 9-sep-2026 con el OCR de Windows sobre piezas sintéticas: AUDIO, SAUDI y AUDITORIO
-    # devolvían las tres el enlace de audi.com. Hasta hoy no saltaba porque ninguna de las
-    # ocho marcas que había era subcadena de una palabra corriente; 'audi' sí lo es.
+    # Límite de palabra, el mismo que usa `_reconocer_por_nombre`: una subcadena cruda
+    # dejaría que una pieza con solo "AUDIO" impreso devolviera como='ocr' y el sitio
+    # oficial de Audi, afirmando una lectura que nunca ocurrió — el fraude que esta
+    # sección existe para impedir.
     junto = re.sub(r'[^a-z0-9]+', ' ', ' '.join(x['texto'] for x in leido).lower())
     for marca, url in MARCAS.items():
         if re.search(r'(?:^|\s)%s(?:\s|$)' % re.escape(marca), junto):
@@ -590,17 +488,14 @@ def _reconocer(piezas, img, avisar, ruta_imagen=None, permitir_nombre_fichero=Fa
 
 
 def _leer_reconocimiento(ruta):
-    """Reconocimiento hecho por quien MIRA la foto (el asistente), leído de un fichero.
+    """Reconocimiento hecho por quien mira la foto (el asistente), leído de un fichero.
 
-    Formato: {"visto": ["texto o marca que se ve, y dónde"], "marca": "vivo",
-              "modelo": null, "url": "https://...", "confianza": "alta|media|baja"}
-    Reglas que se comprueban aquí y no son negociables:
-      - sin `visto` no se acepta nada: una afirmación sin evidencia no es reconocimiento;
-      - si `modelo` es null, la url no puede apuntar a una página de producto concreta:
-        se guarda igual pero se anota que el modelo NO se leyó;
-      - lo que se guarda incluye SIEMPRE quién lo dijo, para que nadie lo confunda luego
-        con una medida.
-    """
+    Formato: {"visto": ["texto o marca que se ve, y dónde"], "marca": "vivo", "modelo":
+    null, "url": "https://...", "confianza": "alta|media|baja"}. Reglas no negociables:
+    sin `visto` no se acepta nada (una afirmación sin evidencia no es reconocimiento); si
+    `modelo` es null la url no puede apuntar a una página de producto concreto, y se anota
+    que no se leyó; lo que se guarda incluye SIEMPRE quién lo dijo, para no confundirlo
+    con una medida."""
     with open(ruta, encoding='utf-8') as fh:
         d = json.load(fh)
     visto = [str(v) for v in (d.get('visto') or []) if str(v).strip()]
@@ -747,25 +642,13 @@ def montar(ruta_imagen, regiones_json=None, fichas_json=None, salida=None, relle
     ruta_imagen_dada = ruta_imagen
 
     # ── el fondo se quita SOLO cuando estorba, y sin que haya que pedirlo ────────
-    # Ya se medía si las esquinas son de un solo color, se avisaba de que sin fondo el
-    # resultado es mejor… y ahí se quedaba: había que volver a lanzarlo con la bandera. El
-    # que decide era el usuario con un dato que el programa ya tenía. Ahora, si el fondo NO
-    # es liso y hay un motor disponible, se quita él y lo dice.
-    # MEDIDO el 9-sep-2026 con la misma foto de producto en dos versiones: sobre el blanco
-    # de estudio con el que vino, las esquinas dan desviación baja y esto NO se dispara (la
-    # foto se usa tal cual); con la misma foto pegada en un degradado, desviación 101,6 y se
-    # quita solo (motor U^2-Net p, el objeto ocupa el 36,2% del cuadro).
-    # Se puede desactivar con `--fondo-tal-cual` para quien quiera la foto como vino.
-    # Antes de adivinar nada: si la imagen YA trae canal alfa útil, esa máscara ES la
-    # silueta y no hace falta estimar nada ni con `_fondo_liso` ni con `fondo.quitar()`.
-    # MEDIDO 9-sep-2026 con una foto de producto con el fondo ya quitado (RGBA
-    # 1200x598, 56,9% de píxeles con alfa < 128, que es el corte que usa este código): `_leer_imagen` con IMREAD_COLOR tiraba ese alfa, y bajo los píxeles
-    # transparentes quedaba la foto ORIGINAL con fondo (cuatro esquinas BGR
-    # [245,251,253] [242,239,232] [94,119,133] [44,46,46], desviación 82,8 entre ellas —
-    # no un color plano). Sobre ese RGB "resucitado", `_fondo_liso` medía esa misma
-    # desviación 82,8 > su umbral 6 y decidía que el fondo NO era liso, disparando
-    # `fondo.quitar()`: un motor de recorte ADIVINANDO la silueta de un objeto que ya la
-    # traía exacta y gratis en su alfa.
+    # Si el fondo no es liso y hay un motor disponible, se quita solo y se avisa; se puede
+    # desactivar con `--fondo-tal-cual` para quien quiera la foto como vino.
+    #
+    # Si la imagen YA trae canal alfa útil (entre 2% y 98% de píxeles transparentes: fuera
+    # de ese rango es ruido o una imagen sin recortar), esa máscara ES la silueta exacta y
+    # no hace falta estimar nada con `_fondo_liso` ni `fondo.quitar()` — reusarla evita que
+    # un motor de recorte adivine la silueta de un objeto que ya la trae gratis en su alfa.
     nota_fondo = 'la foto se usa tal cual: no se le quitó el fondo'
     por_su_cuenta = False
     obj_de_alfa = None
@@ -877,12 +760,10 @@ def montar(ruta_imagen, regiones_json=None, fichas_json=None, salida=None, relle
     ruta_original_destino = os.path.join(destino, nombre_original)
     if alfa is not None and not dejar_fondo:
         # `img` es SIEMPRE de 3 canales (ver `_leer_imagen`), así que escribirlo tal cual
-        # cuando la entrada traía alfa resucita lo que hubiera debajo de los píxeles
-        # transparentes (MEDIDO: la foto original con su fondo). Se
-        # compone sobre blanco en su lugar — mismo criterio que ya usa
-        # `fondo.quitar(..., sobre='blanco')` en este mismo paquete (fondo.py) — y se
-        # sigue guardando como JPEG: la plantilla (`carg.load('original.jpg', ...)`) no
-        # cambia ni una letra.
+        # cuando la entrada traía alfa resucitaría lo que hubiera bajo los píxeles
+        # transparentes. Se compone sobre blanco en su lugar — mismo criterio que ya usa
+        # `fondo.quitar(..., sobre='blanco')` (fondo.py) — y se sigue guardando como JPEG:
+        # la plantilla (`carg.load('original.jpg', ...)`) no cambia ni una letra.
         _mez = (alfa.astype(np.float32) / 255.0)[:, :, None]
         _compuesta = (img.astype(np.float32) * _mez + 255.0 * (1 - _mez)).astype(np.uint8)
         if not cv2.imwrite(ruta_original_destino, _compuesta):
@@ -965,17 +846,10 @@ def _elegir_manejador(directorio):
             super().end_headers()
 
         def do_POST(self):
-            """Un solo verbo: abrir el sitio oficial FUERA de esta ventana.
-
-            En una ventana de aplicacion no hay barra ni boton de atras, asi que navegar
-            a la web se llevaba la escena por delante y no habia forma comoda de volver.
-            `window.open` desde un gesto lo bloquea el navegador (MEDIDO el 8-sep en este
-            mismo navegador: devuelve null fuera de un clic), asi que la pestaña la abre
-            el sistema, que no tiene esa limitacion, y la escena se queda intacta.
-
-            No se acepta ninguna URL de fuera: la unica que se abre es la que este escrita
-            en `reconocimiento.url` del `piezas.json` de ESTA escena. El cuerpo de la
-            peticion no se lee siquiera. Lo que no reconocio el montaje no existe aqui."""
+            """Un solo verbo: abrir el sitio oficial FUERA de esta ventana — `window.open`
+            desde un gesto lo bloquea el navegador, asi que lo abre el sistema y la escena
+            sigue viva detras. No se acepta ninguna URL ajena: solo la que ya este escrita
+            en `reconocimiento.url` del `piezas.json` de ESTA escena; el cuerpo no se lee."""
             if self.path.split('?')[0] != '/abrir-enlace':
                 self.send_error(404, 'aqui no se escribe nada')
                 return

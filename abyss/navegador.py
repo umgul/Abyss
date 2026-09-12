@@ -56,14 +56,11 @@ CANDIDATOS = [
 
 
 def carpeta_de_perfiles():
-    """Dónde vive el perfil propio. FUERA del paquete, y hay un motivo medido.
-
-    Estaba dentro (`<paquete>/mem/navegador/`) y un perfil de Chromium no es un fichero de
-    ajustes: arrastra la caché, las cookies y las listas de bloqueo del navegador. Medido el
-    8-sep-2026 en la máquina de desarrollo: tres perfiles ocupaban **782 MB** dentro del
-    repositorio —el 96 % de sus 817 MB— y hacían que la propia auditoría del paquete
-    (`auditar.py`) sacara 3.082 hallazgos falsos de red, con dominios de una lista de
-    filtros que el paquete no llama jamás. Un paquete no guarda eso dentro de sí mismo.
+    """Dónde vive el perfil propio: FUERA del paquete. Un perfil de Chromium no es un
+    fichero de ajustes: arrastra caché, cookies y listas de bloqueo del navegador —
+    guardarlo dentro del repositorio lo infla con datos que no son código y hace que la
+    propia auditoría del paquete (`auditar.py`) saque hallazgos falsos de red, con
+    dominios de listas de filtros que el paquete no llama jamás.
 
     Se manda a la carpeta de caché del sistema, que es lo que el sistema operativo tiene
     para esto y lo que las herramientas de limpieza ya saben vaciar. `ABYSS_PERFIL_NAVEGADOR`

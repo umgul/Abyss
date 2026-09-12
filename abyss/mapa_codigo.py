@@ -4,50 +4,25 @@
     python mapa_codigo.py <carpeta> [--salida fichero] [--json]
     python mapa_codigo.py --buscar <nombre>
 
-Recorre todos los `.py` de `<carpeta>` (excluye `.git`, `venv`, `.venv`,
-`node_modules`, `__pycache__`, `site-packages`, a cualquier profundidad) y, por
-fichero, saca con `ast.parse` (nunca ejecuta el código: solo se analiza el árbol
-sintáctico):
+Recorre todos los `.py` de `<carpeta>` (excluye `.git`, `venv`, `.venv`, `node_modules`,
+`__pycache__`, `site-packages`) y, con `ast.parse` (nunca ejecuta el código), saca por
+fichero: docstring y líneas totales; imports con su texto reconstruido; clases de nivel
+de módulo con sus métodos (línea, firma reconstruida, decoradores, docstring); funciones
+de nivel de módulo. Un fichero con error de sintaxis se lista como `(no parsea: <error>)`
+sin tumbar el resto del recorrido; clases anidadas dentro de otra clase no se recorren.
 
-- módulo: primera línea del docstring y líneas totales del fichero.
-- imports (`import`/`from ... import`, a cualquier nivel de anidamiento):
-  línea(s) y el texto reconstruido (`import os`, `from re import findall as buscar`).
-- clases de nivel de módulo: línea inicio-fin, bases, docstring; sus métodos
-  (línea inicio-fin, firma con argumentos reconstruida desde el propio `ast`,
-  decoradores, primera línea del docstring).
-- funciones de nivel de módulo: igual que un método, sin clase por delante.
+Salida por defecto: texto greppable en `mem/mapas/<nombre de la carpeta>.txt`, una línea
+por símbolo (`ruta:línea_ini-línea_fin  Clase.metodo(args)  — docstring`). `--salida
+<fichero>` cambia el destino; `--json` escribe además la estructura completa por
+fichero. `--buscar <nombre>` busca esa subcadena en el ÚLTIMO mapa `.txt` escrito (por
+fecha de modificación), sin volver a analizar nada.
 
-Un fichero con error de sintaxis se lista como `<ruta>  (no parsea: <error>)` y
-NO tumba el resto del recorrido — cada fichero se analiza en su propio `try`.
-Clases anidadas dentro de otra clase no se recorren (caso raro; documentado, no
-oculto): solo los métodos de primer nivel de cada clase.
+Mide siempre líneas de código frente a líneas del propio mapa — cuánto se lee de menos
+si se consulta el mapa en vez del código fuente; no mide si el mapa basta para ENTENDER
+el código.
 
-Salida por defecto: texto greppable en `mem/mapas/<nombre de la carpeta>.txt`,
-una línea por símbolo:
-
-    ruta:línea_ini-línea_fin  Clase.metodo(args)  — primera línea del docstring
-
-`--salida <fichero>` escribe el texto ahí en vez de en `mem/mapas/`. `--json`
-escribe ADEMÁS un `.json` (mismo nombre base) con la estructura completa por
-fichero (para quien quiera procesarlo, no solo grepearlo). `--buscar <nombre>`
-busca `<nombre>` como subcadena en el ÚLTIMO mapa `.txt` escrito (por fecha de
-modificación dentro de `mem/mapas/`), sin volver a analizar nada.
-
-Medida (se imprime siempre, sin adjetivos): líneas de código analizadas frente a
-líneas que ocupa el propio mapa — la proporción dice cuánto se lee de menos si se
-consulta el mapa en vez del código fuente para ubicar un símbolo; no mide si el
-mapa basta para ENTENDER el código, eso no está medido aquí.
-
-Sin gancho: se invoca a mano. Nada sale de la máquina — ninguna llamada de red,
-ningún fichero fuera de `<carpeta>` se lee más que para listar `.py`.
-
-Diseño para las pruebas (igual que `cuerpo.py`/`lector_pdf.py`): `analizar_fichero`,
-`construir_mapa` y `escribir_mapa` son funciones normales que reciben rutas como
-argumento; nada se resuelve ni se lee de stdin al importar el módulo, todo eso
-vive dentro de `if __name__ == '__main__':`.
-
-Carpeta de datos: NUNCA `dirname(__file__)`; la resuelve `rutas.resolver()` (§1
-de ESPECIFICACION.md), solo dentro de `__main__`.
+Sin gancho ni red. Carpeta de datos: nunca `dirname(__file__)`; la resuelve
+`rutas.resolver()` (§1 de ESPECIFICACION.md), solo dentro de `__main__`.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -83,11 +58,9 @@ def _primera_linea(doc):
 
 
 def _firma(node):
-    """Firma reconstruida (`a, b=1, *args, **kwargs`) a partir del propio `ast`,
-    sin tocar el cuerpo real de la función: se clona con un cuerpo mínimo
-    (`pass`) y se pide a `ast.unparse` la cabecera, de la que se recorta lo que
-    va entre paréntesis. Si algo falla (versión de Python sin `ast.unparse`,
-    nodo atípico), se degrada a `'...'` en vez de reventar el recorrido entero."""
+    """Firma reconstruida (`a, b=1, *args, **kwargs`) desde el propio `ast`: clona el nodo
+    con un cuerpo mínimo (`pass`) y pide a `ast.unparse` la cabecera. Si algo falla (Python
+    sin `ast.unparse`, nodo atípico), se degrada a `'...'` en vez de reventar el recorrido."""
     try:
         cls = ast.AsyncFunctionDef if isinstance(node, ast.AsyncFunctionDef) else ast.FunctionDef
         copia = cls(name=node.name, args=node.args, body=[ast.Pass()],

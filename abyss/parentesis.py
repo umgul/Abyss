@@ -1,42 +1,28 @@
-"""Paréntesis: lo que el usuario pide que no entre en memoria.
+"""Paréntesis: lo que el usuario pide que no entre en memoria (§8 de `ESPECIFICACION.md`).
 
-Petición del usuario (6-sep 18:26): cuando dice «esto no lo metas en tu memoria»,
-«esto es un paréntesis» o «elimina todo el rato que hemos hablado de X», el
-asistente necesita una herramienta honesta para cumplirlo — no un «vale, lo
-olvido» de boquilla mientras `continuidad.py` sigue copiando la sesión entera.
-Es el §8 de `ESPECIFICACION.md`.
+Cuando dice «esto no lo metas en tu memoria», «esto es un paréntesis» o «elimina todo el
+rato que hemos hablado de X», hace falta una herramienta honesta para cumplirlo — no un
+«vale, lo olvido» de boquilla mientras `continuidad.py` sigue copiando la sesión entera.
 
-Dos mecanismos, DISTINTOS y no confundibles:
+Tres mecanismos, distintos y no confundibles:
 
-  1. Un TRAMO por sesión, marcado con `--abrir`/`--cerrar`, que vive en
-     `mem/parentesis.json`. No borra nada del transcript: hace que lo de dentro
-     del tramo (por marca de tiempo `timestamp` de cada línea) deje de ENTRAR en
-     lo que este paquete vuelve a leer — `continuidad.guardar()` copia la sesión
-     a `mem/sesiones/` saltando esas líneas, y `frases_usuario()` (de donde salen
-     las bolsas de palabras y los relojes) hace lo mismo. La sala de los relojes
-     y las bolsas heredan el filtro sin tocarlas, porque las dos se construyen a
-     partir de `frases_usuario()`. El vigía (`vigia.py`, `leer_turno()`) también
-     salta las líneas de un tramo, con el mismo criterio (fallo "engaña" del
-     revisor 7-sep: no lo hacía, y podía guardar fragmentos literales de una
-     respuesta dicha dentro de un tramo en `confabulaciones.jsonl`).
-  2. Un CORTE del fichero de verdad, con `--recortar`/`--recortar-tramo`: reescribe
-     el `.jsonl` LOCAL que usa la propia app de Claude Code para reconstruir el
-     hilo (deja `.antes` con el original). Solo tiene sentido con el hilo YA
-     cerrado (si sigue vivo, la app puede volver a escribir encima).
-  Y un tercero, más bruto: `--omitir-sesion` reutiliza el `.omitir` que ya tenía
-  `continuidad.py` (`mem/sesiones/.omitir`): la sesión entera nunca se copia, ni
-  aunque la cierre otro hilo distinto haciendo la cosecha.
+  1. Un TRAMO por sesión (`--abrir`/`--cerrar`, en `mem/parentesis.json`). No borra nada
+     del transcript: lo de dentro del tramo (por `timestamp` de cada línea) deja de
+     ENTRAR en lo que este paquete vuelve a leer — `continuidad.guardar()`,
+     `frases_usuario()` (bolsas y relojes) y `vigia.leer_turno()` saltan esas líneas con
+     el mismo criterio.
+  2. Un CORTE del `.jsonl` LOCAL (`--recortar`/`--recortar-tramo`): reescribe el fichero
+     que usa la app de Claude Code para reconstruir el hilo (deja `.antes` con el
+     original). Solo tiene sentido con el hilo YA cerrado.
+  3. `--omitir-sesion`, más bruto: reutiliza `mem/sesiones/.omitir` de `continuidad.py`
+     — la sesión entera nunca se copia.
 
-Lo que esto NO puede prometer (dicho aquí y en el README, no solo en la cabeza):
-lo que ya se mandó a la API de Anthropic dentro del propio turno YA VIAJÓ — esto
-no lo puede deshacer, ninguna herramienta local puede. Lo que gobierna es la
-memoria LOCAL de este paquete y lo que el propio asistente vuelve a leer en
-hilos futuros (sesiones/, bolsas, relojes, sala de relojes). Si el usuario quiere
-borrar lo ya enviado, eso es un asunto de retención de datos con Anthropic, no
-de este fichero.
+Límite declarado (aquí y en el README): lo que ya se mandó a la API de Anthropic dentro
+del propio turno YA VIAJÓ; ninguna herramienta local lo deshace. Esto solo gobierna la
+memoria LOCAL (sesiones/, bolsas, relojes) y lo que se vuelve a leer en hilos futuros; lo
+ya enviado es un asunto de retención de datos con Anthropic, no de este fichero.
 
-Uso (SIN gancho — el asistente lo llama él mismo por Bash cuando el usuario lo
-pide, nunca dispara solo):
+Uso (sin gancho: se invoca por Bash cuando el usuario lo pide, nunca dispara solo):
 
     python parentesis.py --abrir [motivo] [--sesion <id>]
     python parentesis.py --cerrar [--sesion <id>]
@@ -44,28 +30,18 @@ pide, nunca dispara solo):
     python parentesis.py --recortar <transcript.jsonl> "<último mensaje del usuario que se conserva>"
     python parentesis.py --recortar-tramo <transcript.jsonl> <inicio_iso> <fin_iso>
 
-`--sesion <id>` es una bandera QUE NO PIDE la especificación tal cual pero hace
-falta para saber de qué sesión se habla: `--abrir`/`--cerrar` no llegan por un
-gancho (ahí sí vendría `session_id` en el JSON de stdin), así que sin `--sesion`
-explícito ni `session_id` por stdin (por si alguna vez SÍ llega así) se recurre a
-una HEURÍSTICA, dicha como tal: el hilo con el latido más reciente en
-`mem/.vivo/` (lo escribe `continuidad.latir()` en cada `UserPromptSubmit`) — justo
-antes de que el asistente llame aquí, ESE prompt ya disparó el latido de este
-mismo hilo, así que su marca de tiempo es la más fresca. Con varios hilos
-mandando prompts a la vez de verdad (no el caso normal) podría acertar el hilo
-equivocado; por eso `--sesion` explícito siempre gana si se da. Sin ningún latido
-vivo y sin `--sesion`, se rehúsa (código 1) en vez de adivinar.
+Sin `--sesion` explícito ni `session_id` por stdin, se usa una HEURÍSTICA: el hilo con el
+latido más reciente en `mem/.vivo/` (lo escribe `continuidad.latir()` en cada
+`UserPromptSubmit`); `--sesion` explícito siempre gana si se da, y sin ningún latido vivo
+se rehúsa (código 1) en vez de adivinar. `--recortar`/`--recortar-tramo` se niegan (código
+1) si el hilo sigue vivo (`mem/.vivo/<id>.json` con latido de menos de 2 minutos: la app
+podría estar a punto de escribir sobre ese mismo `.jsonl`); `--recortar` exige que el
+mensaje coincida EXACTO (tras normalizar espacios) con uno real del usuario en ese
+transcript.
 
-`--recortar`/`--recortar-tramo` se niegan (código 1, no tocan nada) si el hilo
-sigue vivo: `mem/.vivo/<id>.json` con latido de menos de 2 minutos — la app puede
-estar a punto de volver a escribir sobre ese mismo `.jsonl`, y un recorte a mitad
-de escritura deja el fichero roto. `--recortar` exige que el mensaje dado
-coincida EXACTO (tras normalizar espacios) con algún mensaje real del usuario en
-ese transcript (no un fragmento): si no lo encuentra, no toca nada y lo dice.
-
-El código vive donde lo instale `rutas.CODE`; los datos (`parentesis.json`, y el
-`.omitir` que ya vivía en `mem/sesiones/`) viven en `mem`, resuelto por
-`rutas.resolver()` — nunca `dirname(__file__)` (§1 de ESPECIFICACION.md).
+El código vive donde lo instale `rutas.CODE`; los datos (`parentesis.json`, el `.omitir`
+de `mem/sesiones/`) viven en `mem`, resuelto por `rutas.resolver()` — nunca
+`dirname(__file__)` (§1 de ESPECIFICACION.md).
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -82,11 +58,10 @@ except ImportError:
     import rutas
 
 CODE = rutas.CODE
-# leer_stdin_si_hace_falta: esta pieza no necesita ningún otro campo del JSON de
-# un gancho más que, como mucho, `session_id` (§ heurística de arriba) — y eso solo
-# como ÚLTIMO recurso antes de la heurística del latido. Invocado a mano con
-# `--proyecto`/`ABYSS_PROYECTO` (el caso normal, "sin gancho"), no hace falta tocar
-# stdin en absoluto.
+# leer_stdin_si_hace_falta: esta pieza no necesita del JSON de un gancho más que, como
+# mucho, `session_id` — y solo como último recurso antes de la heurística del latido.
+# Invocado a mano con `--proyecto`/`ABYSS_PROYECTO` (el caso normal, sin gancho), no hace
+# falta tocar stdin en absoluto.
 _STDIN = rutas.leer_stdin_si_hace_falta(sys.argv[1:])
 proj, mem = rutas.resolver(sys.argv[1:], _STDIN)
 os.environ['ABYSS_PROYECTO'] = proj
@@ -124,17 +99,12 @@ def _parse(ts):
 
 
 def en_parentesis(sid, ts):
-    """¿Cae la marca de tiempo `ts` (de una línea del transcript) dentro de algún
-    tramo de paréntesis de `sid`? Un tramo sin cerrar (`--abrir` sin `--cerrar`
-    todavía: `fin` es `None`) se trata como abierto hasta AHORA MISMO — así, si la
-    sesión se cierra a mitad de un paréntesis que el usuario nunca llegó a
-    cerrar explícitamente, nada de lo posterior al `--abrir` se escapa igual.
-
-    Fail-open declarado (no fail-closed) ante datos que no se pueden interpretar:
-    una línea SIN `timestamp`, o un `inicio` de tramo corrupto, no se oculta —
-    ocultar por defecto cualquier línea sin marca de tiempo escondería mensajes
-    que no tienen nada que ver con ningún paréntesis real. Un `fin` corrupto sí
-    oculta (mejor de más que de menos, ahí ya sabemos que el tramo existe)."""
+    """¿Cae `ts` dentro de algún tramo de paréntesis de `sid`? Un tramo sin `--cerrar`
+    (`fin` es `None`) se trata como abierto hasta ahora: nada posterior al `--abrir` se
+    escapa aunque la sesión se cierre a mitad. Fail-open ante datos ilegibles: una línea
+    sin `timestamp` o un `inicio` corrupto no se oculta (ocultar por defecto escondería
+    mensajes ajenos al paréntesis); un `fin` corrupto sí oculta (ahí ya se sabe que el
+    tramo existe)."""
     if not ts:
         return False
     try:
@@ -243,11 +213,10 @@ def _resolver_sid(explicito):
 # ---------- --recortar / --recortar-tramo: el transcript LOCAL de verdad ----------
 
 def _esta_vivo(sid):
-    """¿Hay un latido de este hilo (`mem/.vivo/<sid>.json`, lo escribe
-    `continuidad.latir()`) de menos de `TOPE_VIVO_S`? Sin fichero de latido se
-    considera MUERTO — fail-open aquí a propósito: negar un recorte legítimo
-    porque el gancho de continuidad nunca llegó a escribir el latido (proyecto sin
-    ese módulo instalado, por ejemplo) sería peor que el riesgo contrario."""
+    """¿Hay un latido de este hilo (`mem/.vivo/<sid>.json`, de `continuidad.latir()`) de
+    menos de `TOPE_VIVO_S`? Sin fichero de latido se considera MUERTO — fail-open a
+    propósito: negar un recorte legítimo porque el gancho de continuidad nunca escribió
+    el latido sería peor que el riesgo contrario."""
     p = os.path.join(VIVO, sid + '.json')
     try:
         with open(p, encoding='utf-8') as fh:
@@ -275,13 +244,10 @@ def _contenido_real_usuario(d):
 
 def recortar(ruta_jsonl, ultimo_mensaje):
     """Conserva de `ruta_jsonl` todo hasta la ÚLTIMA vez que el usuario escribió
-    (tras normalizar espacios) exactamente `ultimo_mensaje`, INCLUIDA la respuesta
-    completa a ese mensaje (todo lo que hay hasta el siguiente turno real del
-    usuario, o el final del fichero si no hay ninguno detrás). Dos negativas
-    fail-closed: si el hilo sigue vivo, o si ese mensaje no aparece tal cual, no se
-    toca nada. `<ruta_jsonl>.antes` guarda el original — solo se crea la PRIMERA
-    vez (una segunda llamada no pisa el original con un recorte intermedio).
-    Devuelve (ok: bool, mensaje: str)."""
+    `ultimo_mensaje` exacto, incluida la respuesta completa a ese mensaje. Fail-closed:
+    si el hilo sigue vivo, o si ese mensaje no aparece tal cual, no toca nada.
+    `<ruta_jsonl>.antes` guarda el original, solo en la primera llamada. Devuelve
+    (ok: bool, mensaje: str)."""
     if not (os.path.isfile(ruta_jsonl) and ruta_jsonl.endswith('.jsonl')):
         return False, f'--recortar necesita un transcript .jsonl real (no comprimido), no «{ruta_jsonl}»'
     sid = _sid_de_jsonl(ruta_jsonl)

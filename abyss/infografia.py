@@ -35,12 +35,11 @@ Límite declarado: no hay reescalado de las etiquetas del eje de categorías si 
 largas — con muchas categorías se solapan; toca acortarlas en los datos de entrada o pedir un
 `--ancho` mayor. Este guion no elige "el mejor" tipo de gráfico por ti; el tipo lo dices tú.
 
-Qué sale de la máquina: NADA. No hay red, no hay `mem`: esta pieza no resuelve un proyecto de
-Claude Code (`rutas.py`) porque no necesita guardar ni leer datos propios — solo transforma
-el fichero que le des en el SVG que le pidas, y escribe ese único fichero de salida.
+Qué sale de la máquina: nada. Sin red, sin `mem` (no resuelve un proyecto de Claude Code):
+solo transforma el fichero de entrada en el SVG de salida.
 
-El SVG no se convierte a PNG aquí (no hay librería de rasterizado en la biblioteca estándar):
-se abre tal cual en cualquier navegador, o se incrusta en una página con `<img src="...svg">`.
+El SVG no se convierte a PNG aquí (no hay rasterizado en la biblioteca estándar): se abre
+tal cual en un navegador, o se incrusta con `<img src="...svg">`.
 """
 import csv
 import json
@@ -387,14 +386,10 @@ def generar_svg(filas, columnas, opts):
         ([columnas[1]] if len(columnas) > 1 else [])
     if not x_col or not y_cols:
         raise ValueError('faltan columnas: pásalas con --x/--y, o usa un CSV/JSON con al menos 2 columnas')
-    # `--x`/`--y` con un nombre que no existe se tragaba en silencio (fallo "roza"
-    # medido 7-sep): `r.get(col)` sobre una fila sin esa clave da `None`, así que
-    # un `--x noexiste` dibujaba un SVG mudo (barras y valores sin etiqueta de
-    # categoría), código 0, y un `--y noexiste` sí fallaba pero con un motivo
-    # engañoso ("no es numérica en alguna fila") en vez de decir que la columna
-    # sencillamente no existe. Contra ESPECIFICACION.md §3: "cualquier argumento
-    # que no encaje ... sale con código 1 y un mensaje claro, nunca se traga en
-    # silencio" — validar ANTES de dibujar, con las columnas reales en el mensaje.
+    # `--x`/`--y` con un nombre de columna que no existe debe fallar con un mensaje
+    # claro (ESPECIFICACION.md §3: ningún argumento que no encaje se traga en
+    # silencio) — se valida ANTES de dibujar, con las columnas reales del fichero en
+    # el mensaje, en vez de dejar que `r.get(col)` calle el error con `None`.
     for c in [x_col] + y_cols:
         if c not in columnas:
             raise ValueError(f'no existe la columna "{c}"; las columnas de este fichero '
@@ -450,12 +445,10 @@ def _cli(argv):
         print(f'--tipo es obligatorio y debe ser uno de: {", ".join(TIPOS)}')
         return 1
 
-    # --ancho/--alto ya se validaron como números arriba, pero un cero o un
-    # negativo (o un positivo que los márgenes se comen entero) pasaban sin
-    # avisar y dejaban un SVG con width/height negativos que ningún navegador
-    # dibuja (ESPECIFICACION.md §3: nunca tragarse en silencio un argumento
-    # que no encaja). El mínimo sale de los propios márgenes del módulo, no
-    # de un número decretado: por debajo de ellos no queda lienzo que dibujar.
+    # Un --ancho/--alto por debajo de los márgenes del módulo no deja lienzo que
+    # dibujar (SVG con width/height negativos que ningún navegador dibuja):
+    # ESPECIFICACION.md §3 exige código 1 y un mensaje claro, nunca tragárselo en
+    # silencio. El mínimo sale de los propios márgenes, no de un número decretado.
     m_min = _margenes(opts)
     minimo_ancho = m_min['izq'] + m_min['der']
     if opts['ancho'] <= minimo_ancho:

@@ -12,59 +12,33 @@ Uso:
     python ojo.py prompt3d <imagen> [--salida f.txt] [--escena f.json]
     python ojo.py gestos [--camara 0] [--puerto 8799] [--escena f.json] [--holograma] [--vocabulario f.json]
 
-Ocho verbos, un solo punto de entrada. Este guion NO repite ninguna lógica de
-visión propia: salvo `mirar` ("lo de hoy" — un fotograma suelto, sin cambios
-desde antes de esta tanda), cada verbo DELEGA entero en el módulo que de
-verdad lo implementa y ya tiene su propia batería de pruebas:
+Ocho verbos, un solo punto de entrada. Salvo `mirar`, cada verbo delega
+entero en el módulo que lo implementa (mismo argv, mensaje y código de salida):
 
   - `texto` / `fotocopia` / `tarjeta` / `manual` → `lectura_visual._cli()`
-    (OCR por el motor de Windows o `tesseract`; enderezar/umbralizar un
-    documento fotografiado o escaneado; extraer una tarjeta a `.vcf`; ordenar
-    varias fotos de un manual en markdown).
-  - `despiece` / `prompt3d` → `volumen._cli()` (despiece por capas 2,5D
-    con GrabCut + nitidez/luminancia; o un prompt de diseño 3D con lo medido
-    de la foto — paleta, proporción, horizonte, formas).
-  - `gestos` → `gestos._cli()` (MediaPipe + vocabulario PROPIO del
-    paquete; sirve el estado por HTTP SOLO en `127.0.0.1`).
+    (OCR; enderezar/umbralizar un documento fotografiado o escaneado;
+    extraer una tarjeta a `.vcf`; ordenar fotos de un manual en markdown).
+  - `despiece` / `prompt3d` → `volumen._cli()` (despiece por capas 2,5D con
+    GrabCut; o un prompt de diseño 3D con lo medido de la foto).
+  - `gestos` → `gestos._cli()` (MediaPipe con vocabulario propio; sirve el
+    estado por HTTP SOLO en `127.0.0.1`).
 
-Cada módulo delegado declara sus propias dependencias opcionales y su propio
-límite; este guion no los repite ni los debilita — falla EXACTAMENTE como
-falla el módulo delegado (mismo mensaje, mismo código de salida), porque le
-pasa el mismo argv que recibiría si se invocara directo
-(`python <modulo>.py <verbo> <resto...>`). El import de cada módulo delegado
-es PEREZOSO, dentro de la rama del verbo que lo necesita: `volumen.py` exige
-`numpy`/`cv2` a nivel de módulo y sale con código 2 si faltan — un `mirar` (o
-un `--help`) no debe pagar ese precio ni reventar por una dependencia que ese
-verbo concreto no usa.
+El import de cada módulo delegado es PEREZOSO: `volumen.py` exige
+`numpy`/`cv2` a nivel de módulo, y un `mirar` o un `--help` no debe pagar ese precio.
 
-`mirar` sigue siendo lo de hoy, sin tocar: abre la cámara indicada (por
-defecto la 0), descarta los primeros fotogramas (la exposición tarda en
-ajustarse) y guarda uno como `.jpg`, apuntado en `mem/ojo.log`. DEPENDENCIA
-declarada: OpenCV (`cv2`) es OPCIONAL — sin ella, «sin cv2: no hay ojo» y sale
-con código 1; no es biblioteca estándar, lo instala quien quiera este verbo
-(nunca este guion: regla dura de todo el paquete — nada se instala con pip
-desde dentro).
+`mirar` no delega: abre la cámara indicada (por defecto la 0), descarta
+los primeros fotogramas mientras ajusta la exposición, y guarda uno como
+`.jpg` en `mem/ojo.log`. OpenCV (`cv2`) es OPCIONAL — sin ella, «sin cv2: no
+hay ojo» (código 1); no la instala este guion (nada se instala con pip).
 
 NINGÚN verbo se dispara desde un gancho: la cámara (`mirar`, `fotocopia
---camara`, `gestos`) solo se enciende cuando este guion se invoca A MANO, con
-el consentimiento del turno actual — no hay preferencia guardada ni patrón de
-mensaje que la encienda sola. Una cámara que se enciende sola no es un ojo,
-es vigilancia.
+--camara`, `gestos`) solo se enciende al invocarse este guion A MANO.
 
-Carpeta de datos: NUNCA `dirname(__file__)`; se resuelve con `rutas.resolver()`
-(§1 de ESPECIFICACION.md), UNA sola vez, aquí, antes de mirar el verbo. Como
-este guion se invoca siempre a mano (nunca hay stdin de un gancho), la pista
-normal es `--proyecto <cwd>` o la variable `ABYSS_PROYECTO`; si ninguna
-resuelve, `rutas.resolver()` avisa claro por stderr y sale (fail-closed: sin
-proyecto no hay dónde guardar nada). Tras resolver, `proj` se deja en
-`os.environ['ABYSS_PROYECTO']` (mismo patrón que `vigia.py`) para que el
-módulo delegado — que resuelve su propio `mem` por su cuenta, con la MISMA
-`rutas.resolver()` — no tenga que repetir `--proyecto` en su propio argv ni
-releer un stdin ya vacío. `despiece`/`prompt3d`/`gestos` no tocan `mem` en
-absoluto (son guiones de fichero a fichero o de servidor HTTP efímero, como
-ya declaran sus propios docstrings): resolver `proj`/`mem` aquí no les afecta
-en nada, solo asegura que `mirar`/`texto`/`fotocopia`/`tarjeta`/`manual`
-tengan dónde escribir su registro.
+Carpeta de datos: nunca `dirname(__file__)`; se resuelve con
+`rutas.resolver()` (§1 de ESPECIFICACION.md) por `--proyecto <cwd>` o
+`ABYSS_PROYECTO`; sin ninguna, sale con aviso claro por stderr (fail-closed).
+Tras resolver, `proj` queda en `os.environ['ABYSS_PROYECTO']` para que el
+módulo delegado no repita `--proyecto` ni relea un stdin ya vacío.
 """
 import importlib
 import os
@@ -76,12 +50,9 @@ import rutas  # noqa: E402
 
 VERBOS = ('mirar', 'texto', 'fotocopia', 'tarjeta', 'manual', 'despiece', 'prompt3d', 'gestos')
 
-# Verbo -> módulo que lo implementa de verdad. `mirar` y `gestos` no están aquí
-# a propósito: `mirar` no delega (ver docstring), y `gestos._cli()` no lleva el
-# nombre del verbo como primer argumento (solo banderas), a diferencia de estos
-# cuatro y de `despiece`/`prompt3d` (que SÍ llevan su verbo delante, igual que
-# si se invocara `python lectura_visual.py <verbo> ...` / `python volumen.py
-# <verbo> ...` directamente).
+# Verbo -> módulo que lo implementa. `mirar` no delega (ver docstring del
+# módulo); `gestos._cli()` no lleva el verbo como primer argumento (solo
+# banderas), a diferencia de estos cuatro y de `despiece`/`prompt3d`.
 _DELEGA = {
     'texto': 'lectura_visual', 'fotocopia': 'lectura_visual',
     'tarjeta': 'lectura_visual', 'manual': 'lectura_visual',
@@ -100,8 +71,8 @@ def _sin_proyecto(argv):
 
 
 def _cli_mirar(resto, mem):
-    """Verbo `mirar`: idéntico al `ojo.py` de antes de esta tanda (ver docstring
-    del módulo) — la única pieza de este guion que NO delega en otro módulo."""
+    """Verbo `mirar`: la única pieza de este guion que NO delega en otro
+    módulo (ver docstring del módulo)."""
     salida = resto[0] if len(resto) > 0 else os.path.join(mem, f'ojo_{time.strftime("%Y%m%d_%H%M%S")}.jpg')
     if len(resto) > 1:
         try:

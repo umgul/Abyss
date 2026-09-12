@@ -12,38 +12,30 @@ Uso:
 Motor de OCR, en este orden fijo, nunca se instala nada:
   1. El de Windows por WinRT (`Windows.Media.Ocr`, vía `abyss/ocr_win.ps1`): viene YA
      instalado en cualquier Windows con el paquete de idioma del perfil puesto — no
-     hace falta `pip install` nada. Medido el 7-sep-2026 en la máquina de desarrollo:
-     imagen sintética de 900×420, 6 líneas, con acentos y `correo@ejemplo.es`/
-     `Tel. +34 600 123 456` intactos, en 443 ms, idioma `es-ES` (el del perfil).
-  2. `tesseract`, si está en el PATH, como segunda vía (en la máquina de desarrollo,
-     medido, NO está en el PATH). Su salida TSV (`-c tessedit_create_tsv=1`) da
-     posición y tamaño por palabra, agrupadas aquí por línea, así `tarjeta`/`manual`
-     funcionan igual con cualquiera de los dos motores.
+     hace falta `pip install` nada.
+  2. `tesseract`, si está en el PATH, como segunda vía. Su salida TSV
+     (`-c tessedit_create_tsv=1`) da posición y tamaño por palabra, agrupadas aquí
+     por línea, así `tarjeta`/`manual` funcionan igual con cualquiera de los dos motores.
   Sin Windows (o sin el paquete de idioma de Windows) y sin `tesseract` en PATH:
   «sin dato: no hay motor OCR» y código 2. Nunca se instala nada (ni `pip`, ni
   `winget`): si falta, el mensaje dice qué instalar y decide quien lo lea.
 
 `texto`: imprime las líneas en el orden que da el motor (de arriba abajo). Con
 `--portapapeles`, además YA COPIADO: en Windows por `Set-Clipboard` de PowerShell
-(medido disponible junto a `clip.exe` — se prefiere
-`Set-Clipboard` porque recibe el texto ya como objeto Unicode; `clip.exe` decodifica
-su entrada con la code page de la consola y desfigura acentos/`ñ` si esa code page
-no es UTF-8, el caso normal de `cmd.exe`); en macOS por `pbcopy`; en Linux por
-`xclip -selection clipboard` si está instalado. Sin ningún instrumento: lo dice,
-no revienta la orden por eso.
+(se prefiere sobre `clip.exe` porque recibe el texto ya como objeto Unicode;
+`clip.exe` decodifica su entrada con la code page de la consola y desfigura
+acentos/`ñ` si esa code page no es UTF-8, el caso normal de `cmd.exe`); en macOS
+por `pbcopy`; en Linux por `xclip -selection clipboard` si está instalado. Sin
+ningún instrumento: lo dice, no revienta la orden por eso.
 
-`fotocopia`: **CORRECCIÓN DEL AUTOR (7-sep-2026 19:15), manda sobre cualquier
-versión anterior de este módulo**: el escáner es el SOFTWARE, no un aparato.
-
-La vía NORMAL es una FOTO — un fichero ya existente o un fotograma de la webcam
+`fotocopia`: el efecto de escáner es el procesado de SOFTWARE sobre una FOTO, no
+un aparato. La vía NORMAL es un fichero ya existente o un fotograma de la webcam
 (`--camara [índice]`, por defecto cámara 0; mismo `cv2.VideoCapture` con
 `CAP_DSHOW` en Windows que `ojo.py`/`gestos.py`) — se da UNA de las dos, nunca
-las dos a la vez ni ninguna (error de uso, código 1: este guion no da por
-hecho que quien lo usa tiene un fichero a mano en vez de cámara, ni al revés).
-Sobre esa foto: endereza el papel (contorno CUADRILÁTERO de mayor área con
-`cv2` — bordes de Canny + `findContours` + `approxPolyDP` — y, si cubre al
-menos una quinta parte de la imagen, `getPerspectiveTransform`/
-`warpPerspective` para dejarlo plano y recortado a sus 4 esquinas). **Sin
+las dos a la vez ni ninguna (error de uso, código 1). Sobre esa foto: endereza el
+papel (contorno CUADRILÁTERO de mayor área con `cv2` — bordes de Canny +
+`findContours` + `approxPolyDP` — y, si cubre al menos una quinta parte de la
+imagen, `getPerspectiveTransform`/`warpPerspective` para dejarlo plano). **Sin
 cuadrilátero claro** (declarado, nunca fingido): no recorta nada — endereza
 por el ángulo dominante de los bordes (`HoughLines`) y lo dice por stdout y en
 el JSON de salida (`"recortado": false`). Corrige iluminación con un fondo
@@ -65,26 +57,22 @@ en UN solo PDF multipágina. Con `n` > 1 la salida tiene que terminar en
 inventa un formato para forzarlo).
 
 `--escaner`: un escáner WIA, SI EXISTE en la máquina, es una fuente OPCIONAL
-MÁS — **nunca el camino**. Se intenta ANTES que la vía normal (medido el
-7-sep-2026: «HP DeskJet 3700 series» responde como dispositivo WIA tipo 1 —
-escáner — en esta máquina): si responde, se usa su hoja y no se toca ni el
-fichero ni la cámara que también se hayan dado. **Si no hay escáner
-disponible, NO es un error**: se imprime «sin escáner: uso la cámara o un
-fichero» y se sigue por la vía normal ya indicada (`<imagen>` o `--camara`),
-tal cual si `--escaner` no se hubiera puesto. Por eso `--escaner` nunca basta
-por sí solo: la vía normal (fichero o cámara) es obligatoria siempre, la
-acabe usando o no. **Este camino no se ejerce contra hardware real en la
-batería de pruebas del paquete**: solo se prueba que detecta la
-ausencia sin reventar y cae a la vía normal sin error.
+MÁS — **nunca el camino**. Se intenta ANTES que la vía normal: si responde, se
+usa su hoja y no se toca ni el fichero ni la cámara que también se hayan
+dado. **Si no hay escáner disponible, NO es un error**: se imprime «sin
+escáner: uso la cámara o un fichero» y se sigue por la vía normal ya indicada
+(`<imagen>` o `--camara`), tal cual si `--escaner` no se hubiera puesto. Por
+eso `--escaner` nunca basta por sí solo: la vía normal (fichero o cámara) es
+obligatoria siempre, la acabe usando o no.
 
 Sin `--salida`: si la entrada es un fichero, `<carpeta_de_la_imagen>/
 <base>_fotocopia.png`; si viene de `--escaner` o `--camara`, un fichero en
 `mem` con fecha y hora (`.pdf` si hay más de una página, si no `.png`), como
-`ojo.py`. La prueba de la suite usa una foto SINTÉTICA de un folio torcido
-(escrita una vez con Pillow, nunca una cámara ni un escáner reales); el
-camino `--camara` se prueba con `ABYSS_LECTURA_VISUAL_SIN_CAMARA` forzando
-"sin cámara" (mismo patrón que `--escaner`/WIA con
-`ABYSS_LECTURA_VISUAL_SIN_WIA`) — la suite nunca abre una webcam de verdad.
+`ojo.py`. LÍMITE de esta plataforma: ni la cámara ni el escáner WIA se ejercen
+contra hardware real en la batería de pruebas del paquete — fotos sintéticas
+con Pillow, y `ABYSS_LECTURA_VISUAL_SIN_CAMARA`/`ABYSS_LECTURA_VISUAL_SIN_WIA`
+fuerzan la ausencia; solo se prueba que cada camino la detecta sin reventar y
+cae a la vía normal sin error.
 
 `tarjeta`: OCR + extracción por patrones sobre las LÍNEAS que da el motor (nunca
 sobre la imagen entera de una vez): teléfono (dígitos suficientes tras quitar
@@ -163,12 +151,9 @@ class SinMotorOCR(RuntimeError):
 
 def _powershell_json(args, timeout):
     """Lanza `powershell.exe` con `args` y devuelve el dict de la ÚLTIMA línea no
-    vacía de su stdout (siempre JSON — ver `ocr_win.ps1`), o `None` si ni
-    siquiera se pudo ejecutar, se agotó el tiempo, o la salida no era JSON
-    legible. `None` NUNCA distingue "el motor dijo que no" (eso es un dict con
-    `ok: false`) de "no sé lo que ha pasado" — quien llama trata ambos como
-    "no disponible" y sigue a la siguiente vía, igual que un `None` de
-    `huella._powershell()`."""
+    vacía de su stdout (JSON, ver `ocr_win.ps1`), o `None` si falló, se agotó el
+    tiempo o la salida no era JSON legible — quien llama trata `None` igual que
+    un `ok: false` y sigue a la siguiente vía (mismo patrón que `huella._powershell()`)."""
     try:
         r = subprocess.run(['powershell', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass'] + args,
                             capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
@@ -219,9 +204,8 @@ def motor_winrt_disponible(idioma=None):
 def _lineas_normalizadas(x):
     """Como `huella._normalizar_lista()`: `ConvertTo-Json` da un objeto suelto
     (no una lista de un elemento) cuando la colección de origen tiene
-    EXACTAMENTE una fila, y `null`/ausente con cero — aquí, además, `ocr_win.ps1`
-    ya envuelve con `@(...)` antes de emitir (ver su comentario), así que este
-    caso no debería darse desde ahí; se deja por si acaso llega de otra vía."""
+    EXACTAMENTE una fila, y `null`/ausente con cero. `ocr_win.ps1` ya envuelve
+    con `@(...)` antes de emitir, pero esto cubre igual cualquier otra vía."""
     if not x:
         return []
     if isinstance(x, dict):
@@ -244,9 +228,7 @@ def _ocr_tesseract(ruta_tess, ruta_abs, idioma=None, timeout=30):
     """Segunda vía: TSV de `tesseract` (`left/top/width/height` por
     PALABRA) agrupado por línea (`block_num`,`par_num`,`line_num`) para dar el
     mismo formato de línea+caja que `ocr_win.ps1` — así `tarjeta`/`manual`
-    funcionan igual con cualquiera de los dos motores. No medido en esta
-    máquina (`tesseract` no está en el PATH): la
-    prueba de este camino se salta con motivo si no lo encuentra."""
+    funcionan igual con cualquiera de los dos motores."""
     args = [ruta_tess, ruta_abs, 'stdout', '--psm', '3']
     if idioma:
         args += ['-l', idioma]
@@ -295,19 +277,11 @@ def _ocr_tesseract(ruta_tess, ruta_abs, idioma=None, timeout=30):
 # ───────────────────────────── API pública de OCR ─────────────────────────────
 
 def leer(ruta_imagen, idioma=None, avisar=print):
-    """OCR de una imagen. Devuelve `{"motor": "winrt"|"tesseract", "lineas": [...],
-    "angulo": .. , "ms": ..}` donde cada línea es `{"texto","x","y","ancho","alto"}`
-    (caja en píxeles; `x`/`y`/`ancho`/`alto` a 0 si el motor no la da). Nunca
-    inventa texto ni posición: lo que no mide, no aparece.
-
-    Orden (ver docstring del módulo): WinRT primero si esta máquina es
-    Windows y el motor existe para el idioma pedido; si no, `tesseract` si está
-    en el PATH; si ninguno, `SinMotorOCR` ("sin dato: no hay motor OCR").
-
-    Un fallo de WinRT sobre ESTA imagen en concreto (fichero ilegible, motor que
-    lanzó una excepción procesándola) es distinto de "no hay motor": se
-    propaga tal cual (no se enmascara como "sin motor" ni se cae a `tesseract`,
-    que probablemente tropezaría con lo mismo)."""
+    """OCR de una imagen (orden de motores: ver docstring del módulo). Devuelve
+    `{"motor": "winrt"|"tesseract", "lineas": [...], "angulo": .., "ms": ..}`,
+    cada línea `{"texto","x","y","ancho","alto"}` (0 si el motor no da caja);
+    nunca inventa texto ni posición. Un fallo de WinRT SOBRE ESTA imagen se
+    propaga tal cual: no se enmascara como "sin motor" ni cae a `tesseract`."""
     ruta_abs = os.path.abspath(ruta_imagen)
     if not os.path.isfile(ruta_abs):
         raise FileNotFoundError(f'no existe: {ruta_abs}')
@@ -408,10 +382,9 @@ def _rotar(img, angulo_grados):
 
 def _enderezar_documento(img_bgr, avisar=print):
     """(imagen_bgr, recortado: bool). Busca el contorno cuadrilátero de mayor
-    área que cubra al menos 1/5 de la imagen (bordes de Canny dilatados,
-    `findContours` + `approxPolyDP` a 4 esquinas convexas) y aplica una
-    transformación de perspectiva. Sin ninguno así: NO recorta (declarado)
-    — solo endereza por el ángulo dominante de los bordes."""
+    área que cubra al menos 1/5 de la imagen (Canny dilatado, `findContours` +
+    `approxPolyDP` a 4 esquinas convexas) y aplica perspectiva. Sin ninguno
+    así: NO recorta (declarado) — solo endereza por el ángulo dominante."""
     gris = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     borroso = cv2.GaussianBlur(gris, (5, 5), 0)
     bordes = cv2.Canny(borroso, 50, 150)
@@ -466,10 +439,8 @@ def _corregir_iluminacion_color(img_bgr):
 def _procesar_documento(img_bgr, modo='color', avisar=print):
     """(imagen_np, recortado: bool). El núcleo de `fotocopia` (enderezar +
     corregir iluminación) sobre una imagen YA CARGADA en memoria — lo
-    comparten `fotocopiar()` (lee de disco) y la vía `--camara`/`--paginas`
-    (lee fotogramas de la webcam), para no duplicar la lógica entre "vino de
-    fichero" y "vino de cámara". `modo`: color/gris/umbral (ver docstring del
-    módulo)."""
+    comparten `fotocopiar()` (disco) y la vía `--camara`/`--paginas` (webcam).
+    `modo`: color/gris/umbral (ver docstring del módulo)."""
     plano, recortado = _enderezar_documento(img_bgr, avisar=avisar)
     if modo == 'gris':
         return _corregir_iluminacion_gris(plano), recortado
@@ -494,12 +465,10 @@ def _guardar_imagen(imagen_np, ruta_salida):
 
 def _guardar_paginas(paginas_np, ruta_salida):
     """Guarda 1 o más imágenes ya procesadas (arrays de `_procesar_documento`)
-    en `ruta_salida`. Con una sola página, igual que `_guardar_imagen` (PNG o
-    PDF según la extensión). Con varias (`--paginas` > 1, solo vía `--camara`):
-    EXIGE que `ruta_salida` termine en `.pdf` — un PNG no admite varias
-    páginas y este guion no inventa un formato para forzarlo (`ValueError`,
-    que la CLI convierte en un mensaje de uso) — y las escribe como un único
-    PDF multipágina con Pillow (`save_all=True, append_images=...`)."""
+    en `ruta_salida`. Con una sola página: igual que `_guardar_imagen` (PNG o
+    PDF según la extensión). Con varias (`--paginas` > 1): EXIGE que
+    `ruta_salida` termine en `.pdf` (`ValueError` si no — un PNG no admite
+    varias páginas) y las escribe como un único PDF multipágina con Pillow."""
     if len(paginas_np) <= 1:
         _guardar_imagen(paginas_np[0], ruta_salida)
         return
@@ -516,11 +485,10 @@ def _guardar_paginas(paginas_np, ruta_salida):
 
 
 def fotocopiar(ruta_imagen, modo='color', avisar=print):
-    """(imagen_np, recortado: bool) a partir de un FICHERO en disco (para la
-    vía `--camara`, que ya trae la imagen en memoria, ver
-    `_procesar_documento` directamente). `modo`: color/gris/umbral (ver
-    docstring del módulo). No escribe nada — quien llama decide la ruta de
-    salida."""
+    """(imagen_np, recortado: bool) a partir de un FICHERO en disco (la vía
+    `--camara` ya trae la imagen en memoria: usa `_procesar_documento`
+    directamente). `modo`: color/gris/umbral (ver docstring del módulo). No
+    escribe nada — quien llama decide la ruta de salida."""
     img = cv2.imread(ruta_imagen)
     if img is None:
         raise RuntimeError(f'no se pudo leer como imagen: {ruta_imagen}')
@@ -542,25 +510,19 @@ def _abrir_camara(indice):
 
 def _sin_camara_forzada():
     """`ABYSS_LECTURA_VISUAL_SIN_CAMARA` fuerza "sin cámara" SIN tocar
-    `cv2.VideoCapture` en absoluto — para que la suite pueda probar el
-    cableado de `--camara`/`--paginas` sin encender nunca una webcam de
-    verdad (regla dura del encargo: la cámara solo se abre cuando de verdad
-    hace falta), mismo patrón que `ABYSS_LECTURA_VISUAL_SIN_WIA`."""
+    `cv2.VideoCapture`: la suite prueba el cableado de `--camara`/`--paginas`
+    sin encender nunca una webcam de verdad (regla dura: la cámara solo se
+    abre cuando de verdad hace falta), mismo patrón que `..._SIN_WIA`."""
     return bool(os.environ.get('ABYSS_LECTURA_VISUAL_SIN_CAMARA'))
 
 
 def capturar_camara(indice=0, n=1, avisar=print, pausa=2.0):
     """Captura `n` fotogramas EN SECUENCIA de la cámara `indice` (uno solo si
-    `n` es 1: el uso normal de `--camara`), con una pausa de `pausa` segundos
-    entre cada uno para recolocar la hoja siguiente (solo importa con `n` > 1,
-    `--paginas`). Devuelve `{"ok": True, "fotogramas": [np.ndarray, ...]}` o
-    `{"ok": False, "motivo": "sin dato: ..."}` — nunca lanza, igual que
-    `escanear_wia()`. Antes de cada fotograma se descartan varias lecturas (la
-    cámara suele dar los primeros fotogramas oscuros mientras ajusta la
-    exposición), como `ojo.py`.
-
-    Ver `_sin_camara_forzada()`: con esa variable puesta, la suite NUNCA llega
-    a `cv2.VideoCapture` — se responde "sin dato" directamente."""
+    `n` es 1; con `n` > 1, pausa de `pausa` segundos entre cada uno para
+    recolocar la hoja, `--paginas`), descartando las primeras lecturas de cada
+    uno (vienen oscuras mientras ajusta la exposición). Devuelve `{"ok": True,
+    "fotogramas": [...]}` o `{"ok": False, "motivo": "sin dato: ..."}` — nunca
+    lanza (ver `_sin_camara_forzada()`)."""
     if _sin_camara_forzada():
         return {'ok': False, 'motivo': f'sin dato: cámara {indice} no disponible (forzado para pruebas)'}
     if not _CV2_OK:
@@ -595,11 +557,9 @@ def _ps_str(v):
 
 
 # WIA: `@($dm.DeviceInfos) | Where-Object {...}` con EXACTAMENTE un resultado da
-# el objeto COM suelto, no un array de un elemento — el mismo aplanado de
-# pipeline que documenta `huella._normalizar_lista()` (medido 7-sep sobre esta
-# misma máquina, con el único escáner que tiene conectado: `$infos.Count` salía
-# vacío). Se envuelve TODO el resultado del pipeline en un `@()` exterior, no
-# solo la colección de partida, para que sobreviva a esa reducción.
+# el objeto COM suelto, no un array de un elemento — mismo aplanado de pipeline
+# que documenta `huella._normalizar_lista()`. Se envuelve TODO el resultado en
+# un `@()` exterior, no solo la colección de partida, para que sobreviva a esa reducción.
 _PS_ESCANER = r'''
 $ErrorActionPreference = "Stop"
 function Emitir($o) { Write-Output ($o | ConvertTo-Json -Compress -Depth 4) }
@@ -633,18 +593,10 @@ exit 0
 
 
 def escanear_wia(ruta_salida, timeout=60):
-    """Adquiere una hoja del escáner WIA tipo 1 (medido: «HP DeskJet 3700
-    series») y la guarda en `ruta_salida`. Devuelve
-    el dict `{"ok":true,"ruta":...,"dispositivo":...}` o `{"ok":false,"motivo":...}`
-    (nunca lanza: quien llama decide qué hacer según `ok` — en `fotocopia`,
-    caer a la vía normal sin tratarlo como error, ver docstring del módulo).
-
-    `ABYSS_LECTURA_VISUAL_SIN_WIA` fuerza la rama "sin escáner" SIN tocar WIA en
-    absoluto (ni siquiera para preguntar si hay uno): existe para poder probar
-    el camino "sin dato" sin depender de qué tenga enchufado la máquina que
-    corre la suite, y sobre todo para que la suite NUNCA accione un escáner de
-    verdad (ese camino no se ejerce contra hardware real) — mismo patrón
-    que `ABYSS_RENDER3D_NAVEGADOR`."""
+    """Adquiere una hoja del escáner WIA tipo 1 y la guarda en `ruta_salida`.
+    Devuelve `{"ok":true,"ruta":...,"dispositivo":...}` o `{"ok":false,"motivo":...}`
+    (nunca lanza: quien llama decide, ver docstring del módulo).
+    `ABYSS_LECTURA_VISUAL_SIN_WIA` fuerza la rama "sin escáner" sin tocar WIA."""
     if os.environ.get('ABYSS_LECTURA_VISUAL_SIN_WIA'):
         return {'ok': False, 'motivo': 'sin dato: no hay escáner WIA conectado'}
     script = _PS_ESCANER.replace('__RUTA__', _ps_str(os.path.abspath(ruta_salida)))
@@ -735,10 +687,9 @@ def _escapar_vcard(v):
 
 def vcard_de(datos):
     """vCard 3.0 (RFC 2426) a partir del dict de `tarjeta()`. Un campo vacío en
-    `datos` no aparece como línea en el `.vcf` (ninguna línea `TEL:` vacía) — no
-    hay valor inventado que poner. `N` no separa nombre y apellido (el OCR no
-    los distingue): el nombre completo va en el hueco de "nombre" de pila,
-    declarado, no fingido como un apellido correcto."""
+    `datos` no aparece como línea en el `.vcf` — no hay valor inventado que
+    poner. `N` no separa nombre y apellido (el OCR no los distingue): el
+    nombre completo va en el hueco de "nombre" de pila, declarado."""
     nombre = datos.get('nombre') or ''
     lineas = ['BEGIN:VCARD', 'VERSION:3.0']
     lineas.append(f'N:;{_escapar_vcard(nombre)};;;')
@@ -823,10 +774,9 @@ def _detectar_pagina(lineas_texto):
 
 def _unir_guiones_de_corte(lineas_texto):
     """Junta una palabra partida por un guion de corte a final de línea
-    («informa-» + «ción...» → «información...»): solo cuando la línea acaba en
-    un guion pegado a una letra (nunca un guion suelto, ni un rango «10-20»).
-    Se pega SIN espacio a la línea siguiente entera (a veces el OCR ya trae ahí
-    el resto de una frase distinta, y no hay forma de saberlo sin adivinar)."""
+    («informa-» + «ción...» → «información...»): solo si la línea acaba en un
+    guion pegado a una letra (nunca uno suelto, ni un rango «10-20»). Se pega
+    SIN espacio a la línea siguiente entera, sin adivinar si es otra frase."""
     out = []
     pendiente = ''
     for t in lineas_texto:

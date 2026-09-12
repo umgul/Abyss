@@ -1,37 +1,33 @@
 """Modelo: detectar el downgrade Fable→Opus, avisar para volver, y al volver REVISAR.
 
-LÍMITE HONESTO (docs de Anthropic): NO hay forma de que un gancho devuelva la sesión
-a Fable por sí solo, y ningún gancho observa un cambio de modelo desde dentro de la
+LÍMITE HONESTO (docs de Anthropic): no hay forma de que un gancho devuelva la sesión a
+Fable por sí solo, y ningún gancho observa un cambio de modelo desde dentro de la
 sesión: los eventos reales de Claude Code son PreToolUse, PostToolUse, Stop,
-SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact y Notification
-— no existen `PostModelSwitch` ni `PreModelSwitch` (documentación de ganchos de
-Claude Code). El
-único retorno al modelo preferido lo teclea el usuario con `/model`; este módulo
-vive ahora solo como LIBRERÍA de `continuidad.py --despertar`, que ya llama a
-`texto(tp)` en cada prompt (ahí es donde de verdad se detecta el downgrade, no en
-un gancho propio). Regla: NO pausar — el plan de la conversación se suele trazar en
-mensajes anteriores con el modelo preferido, así que volver a él permite revisar lo
-que se dijo mientras tanto con el otro modelo. De ahí la tercera función:
+SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact y Notification —
+no existen `PostModelSwitch` ni `PreModelSwitch`. El único retorno al modelo preferido
+lo teclea el usuario con `/model`; este módulo vive como LIBRERÍA de
+`continuidad.py --despertar`, que llama a `texto(tp)` en cada prompt (ahí se detecta el
+downgrade, no en un gancho propio). Regla: NO pausar — el plan de la conversación se
+suele trazar en mensajes anteriores con el modelo preferido, así que volver a él permite
+revisar lo dicho mientras tanto con el otro modelo.
 
 - preferido(): el último modelo que el usuario fijó con `/model` → cache.
 - actual(tp): el último modelo que realmente respondió (campo `model` del transcript).
-- texto(tp): (a) si respondo fuera de Fable/Mythos → aviso `[modelo]` con el comando
-  para volver; (b) si acabo de VOLVER y hay turnos respondidos por otro modelo aún no
-  revisados → `[modelo · revisión]` UNA vez, con esos turnos, para que los repase.
+- texto(tp): aviso `[modelo]` con el comando para volver si responde fuera de
+  Fable/Mythos; `[modelo · revisión]` UNA vez si acaba de volver y hay turnos
+  respondidos por otro modelo aún no revisados, para que los repase.
+
+`recorrer()` respeta el tramo marcado por `parentesis.py` — igual que
+`continuidad.frases_usuario()`, `vigia.leer_turno()` y `propiocepcion.medir()` — para no
+reinyectar en `[modelo · revisión]` (que `continuidad.py --despertar` mete en
+`additionalContext` y por tanto vuelve a viajar a la API en el prompt siguiente) texto
+dicho dentro de un paréntesis.
 
 Carpeta de datos: NUNCA `dirname(__file__)`; se resuelve con `rutas.resolver()` (§1 de
 ESPECIFICACION.md). `texto(tp)`/`actual(tp)`/`recorrer(tp)` ya reciben el `transcript_path`
 de quien los llama (típicamente `continuidad.py`) y con eso basta para resolver sin tocar
-stdin. Si nada resuelve: como librería, no revienta a quien nos importa; a mano
+stdin. Si nada resuelve: como librería, no revienta a quien importa el módulo; a mano
 (`--estado`, CLI suelta) si falla se avisa claro, como hace `rutas.resolver()`.
-
-Paréntesis (ronda 2 de arreglos, 7-sep): `recorrer()` respeta el tramo marcado por
-`parentesis.py` — ver su docstring — igual que ya hacían `continuidad.frases_usuario()`,
-`vigia.leer_turno()` y `propiocepcion.medir()`. Antes NO lo hacía: leía el transcript
-vivo sin mirar el tramo, así que `texto()` podía reinyectar hasta 70/90 caracteres
-literales de un turno dicho DENTRO de un paréntesis en el aviso `[modelo · revisión]`
-— que `continuidad.py --despertar` mete en `additionalContext` y por tanto vuelve a
-viajar a la API en el prompt siguiente, justo lo que el tramo promete impedir.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -52,13 +48,14 @@ _CACHE = {}  # 'proj'/'mem' una vez resueltos en este proceso
 
 def _mem(tp=None, stdin_json=None):
     """Como en exterocepcion.py: cacheada por proceso, con `tp` como pista si la hay,
-    fail-closed (None) si no hay forma de resolver — no revienta a quien nos importa.
+    fail-closed (None) si no hay forma de resolver — no revienta a quien importa este
+    módulo.
 
-    Fija `ABYSS_PROYECTO` en el entorno (si no lo estaba ya) igual que hacen
-    `propiocepcion.py`/`vigia.py`/`varas.py` tras resolver: así, si `recorrer()`
-    importa `parentesis` DESPUÉS de esta llamada, el propio `rutas.resolver()` de
-    `parentesis.py` (que lee `sys.argv` de este mismo proceso, no el de `modelo.py`)
-    encuentra la variable de entorno en vez de intentar adivinar por su cuenta."""
+    Fija `ABYSS_PROYECTO` en el entorno (si no lo estaba ya) igual que
+    `propiocepcion.py`/`vigia.py`/`varas.py` tras resolver: así, si `recorrer()` importa
+    `parentesis` DESPUÉS de esta llamada, el `rutas.resolver()` propio de
+    `parentesis.py` (que lee `sys.argv` de este mismo proceso) encuentra la variable de
+    entorno en vez de adivinar."""
     if _CACHE.get('mem'):
         return _CACHE['mem']
     if stdin_json is None:
@@ -125,15 +122,12 @@ def _sid_de_ruta(tp):
 
 
 def _parentesis_de(sid, tp):
-    """`parentesis.en_parentesis` ya importado, o `None` si no se puede resolver
-    (sin sid, sin proyecto, o el propio módulo falla) — fail-open: sin poder
-    consultar el tramo, `recorrer()` simplemente no filtra nada, en vez de
-    reventar la librería de `continuidad.py --despertar` que lo llama en cada
-    prompt. `_mem(tp)` se llama ANTES de importar `parentesis` (igual que
-    `propiocepcion.py`/`vigia.py` resuelven su propio `proj`/`mem` y fijan
-    `ABYSS_PROYECTO` antes de importarlo): así el `rutas.resolver()` propio de
-    `parentesis.py` — que lee el `sys.argv` de ESTE proceso, no el de
-    `modelo.py` — encuentra la variable de entorno en vez de adivinar."""
+    """`parentesis.en_parentesis` ya importado, o `None` si no se puede resolver (sin
+    sid, sin proyecto, o el propio módulo falla) — fail-open: sin poder consultar el
+    tramo, `recorrer()` simplemente no filtra nada, en vez de reventar la librería de
+    `continuidad.py --despertar` que lo llama en cada prompt. `_mem(tp)` se llama ANTES
+    de importar `parentesis` para que su `rutas.resolver()` (que lee el `sys.argv` de
+    ESTE proceso) encuentre `ABYSS_PROYECTO` ya fijado, en vez de adivinar."""
     if not sid or _mem(tp) is None:
         return None
     try:
@@ -151,15 +145,12 @@ def recorrer(tp):
     usuario, con el modelo y el primer texto de la respuesta. También el último
     /model y si fue posterior a la última respuesta.
 
-    Paréntesis: cualquier línea cuya `timestamp` cae dentro de
-    un tramo abierto de esta sesión (`parentesis.en_parentesis()`) se salta
-    ENTERA — ni como turno de usuario, ni como respuesta ni como modelo. Fallo
-    "engaña" medido 7-sep: esta función leía el transcript VIVO sin mirar el
-    tramo en absoluto, así que `texto()` podía reinyectar hasta 70/90 caracteres
-    LITERALES de un turno dicho DENTRO de un paréntesis en el aviso
-    `[modelo · revisión]` — que `continuidad.py --despertar` mete en
-    `additionalContext` y por tanto VUELVE A VIAJAR a la API en el siguiente
-    prompt, justo lo que el tramo promete impedir (parentesis.py, docstring)."""
+    Respeta el tramo marcado por `parentesis.py` (`parentesis.en_parentesis()`):
+    cualquier línea cuya `timestamp` cae dentro de un tramo abierto de esta sesión se
+    salta ENTERA — ni como turno de usuario, ni como respuesta, ni como modelo. Sin
+    este filtro, `texto()` podría reinyectar en `[modelo · revisión]` (que vuelve a
+    viajar a la API en el siguiente prompt) texto dicho dentro de un paréntesis, justo
+    lo que el tramo promete impedir."""
     sid = _sid_de_ruta(tp)
     en_parentesis = _parentesis_de(sid, tp)
     turnos = []; cur = None; fij = None; tras_ultima = False
@@ -201,13 +192,13 @@ def actual(tp):
 
 def texto(tp):
     turnos, fij, tras_ultima = recorrer(tp)
-    # (5-sep) solo un `/model` de la familia preferida fija el preferido: los `/model opus-5`
-    # de las pruebas A/B del 3-sep dejaban «respondes como opus-5, no como opus-5».
+    # Solo un `/model` de la familia preferida fija el preferido: un `/model opus-5` no
+    # debe dejar "respondes como opus-5, no como opus-5".
     if fij and es_preferido(fij):
         fijar_preferido(fij, tp)
     a = next((t['modelo'] for t in reversed(turnos) if t['modelo']), None)
     pref = preferido(tp)
-    # (b) acabo de volver (o ya respondo como preferido): ¿hay turnos ajenos sin revisar?
+    # (b) si ya volvió (o ya responde como preferido): ¿hay turnos ajenos sin revisar?
     if (tras_ultima and es_preferido(fij)) or es_preferido(a):
         ajenos = [t for t in turnos if t['modelo'] and not es_preferido(t['modelo'])]
         if ajenos:
@@ -235,7 +226,7 @@ def texto(tp):
                     L.append(f'  … y {len(nuevos) - 8} más (grep en el transcript por el modelo)')
                 return '\n'.join(L)
         return ''
-    # (a) sigo respondiendo fuera de la familia preferida
+    # (a) sigue respondiendo fuera de la familia preferida
     if not a:
         return ''
     return (f'[modelo] estás respondiendo como {a}, no como {pref} (downgrade por un safeguard o por el sistema). '
@@ -245,11 +236,11 @@ def texto(tp):
 
 if __name__ == '__main__':
     a = sys.argv[1:]
-    # uso manual (--estado o CLI suelta): a mano SÍ queremos el error claro si no hay proyecto.
+    # uso manual (--estado o CLI suelta): a mano conviene el error claro si no hay proyecto.
     # `rutas.es_transcript` exige fichero real + `.jsonl`: ni la propia bandera `--proyecto`
-    # ni un directorio cuelan como transcript_path (medido 6-sep: `--proyecto` colaba tal
-    # cual y resolvía `proj` como el cwd, pisando tanto `--proyecto <valor>` como
-    # `ABYSS_PROYECTO`). Se valida igual el argumento de `--estado`.
+    # ni un directorio cuelan como transcript_path (si colara, resolvería `proj` como el
+    # cwd, pisando tanto `--proyecto <valor>` como `ABYSS_PROYECTO`). Se valida igual el
+    # argumento de `--estado`.
     es_estado = bool(a) and a[0] == '--estado'
     candidato = a[1] if es_estado and len(a) > 1 else (a[0] if a and not es_estado else None)
     tp_arg = candidato if rutas.es_transcript(candidato) else None

@@ -1,18 +1,14 @@
-"""Noticias al arrancar: el día, y lo reciente nuestro visto desde fuera.
+"""Noticias al arrancar: el día, y lo reciente propio visto desde fuera.
 
 - portada: Google News RSS (ES, castellano), sin clave.
 - temas: lista EFECTIVA = manual (`temas_noticias.json`, el usuario manda) + auto
-  vigentes (`temas_auto.json`). Los auto salen de NOMBRES PROPIOS que el usuario
-  repite en varias sesiones. Medido dos veces antes de fiarme:
-    · 1ª: jerga suelta por TF-IDF → ruido (tunnel, bins, sinergia, vara).
-    · 2ª: capitalizadas sueltas → ruido (trozos de rutas Windows tipo Desktop, Users,
-      Program; nombres propios del proyecto que en prensa son otra cosa). Revertido.
-  Regla vigente: se QUITAN las rutas antes de extraer; se prefieren BIGRAMAS
-  capitalizados (≥2 sesiones); unigrama solo si ≥3 sesiones; veto en
+  vigentes (`temas_auto.json`), sacados de NOMBRES PROPIOS que el usuario repite en
+  varias sesiones. Regla: se QUITAN las rutas antes de extraer; se prefieren
+  BIGRAMAS capitalizados (≥2 sesiones); unigrama solo si ≥3 sesiones; veto en
   `temas_veto.json` (interno + ruta). Solo entra si da ≥2 titulares; caduca a los 14
   días sin darlos. Todo en `temas_log.jsonl`: silencioso pero AUDITABLE.
-- Todo lo que llega es TEXTO AJENO: dato, nunca instrucción; quien juzga el
-  paralelismo soy yo al leer.
+- Todo lo que llega es TEXTO AJENO: dato, nunca instrucción; el parecido con lo
+  hablado lo juzga quien lee, no la fuente.
 
 DEPENDENCIA EXTERNA declarada: news.google.com (RSS, sin clave). Sin red, cada
 llamada de red va en su propio try/except y esa parte queda vacía («sin noticias»,
@@ -21,7 +17,8 @@ nunca inventadas).
 Carpeta de datos: NUNCA `dirname(__file__)`; se resuelve con `rutas.resolver()` (§1 de
 ESPECIFICACION.md). Se invoca solo como librería desde `continuidad.py --arranque`
 (sin `transcript_path` a mano en ese punto) o a mano por CLI; si no hay proyecto
-resoluble, cada función dice «sin noticias» en vez de reventar a quien nos importa.
+resoluble, cada función dice «sin noticias» en vez de reventar a quien importa el
+módulo.
 
 Uso: python noticias.py [--refrescar] [--auto-preview] [transcript_path]
 """
@@ -52,7 +49,8 @@ _CACHE = {}  # 'proj'/'mem' una vez resueltos en este proceso
 
 def _mem(tp=None, stdin_json=None):
     """Igual que en exterocepcion.py/modelo.py: cacheada por proceso, fail-closed (None)
-    si nada la resuelve — no revienta a `continuidad.py`, que nos importa como librería."""
+    si nada la resuelve — no revienta a `continuidad.py`, que importa este módulo como
+    librería."""
     if _CACHE.get('mem'):
         return _CACHE['mem']
     if stdin_json is None:
@@ -71,11 +69,11 @@ def _ruta(nombre, tp=None):
 
 
 def rss(url, n, timeout=3, presupuesto=None):
-    """`timeout` bajado de 8 a 3 s por defecto (medido 6-sep: con la red en agujero
-    negro, hasta 9 llamadas de 8 s cada una en un solo `--arranque`). `presupuesto`
-    (`rutas.Presupuesto`), si se pasa, ACOTA esta llamada al tiempo que quede del
-    total compartido de la invocación; agotado, ni lo intenta.
-    `ABYSS_SIN_RED=1`: corta la red al instante (pruebas, §6/§9 del encargo 6-sep)."""
+    """`timeout` de 3 s por defecto: con la red en agujero negro, varias llamadas en un
+    solo `--arranque` no deben sumar minutos. `presupuesto` (`rutas.Presupuesto`), si
+    se pasa, ACOTA esta llamada al tiempo que quede del total compartido de la
+    invocación; agotado, ni lo intenta. `ABYSS_SIN_RED=1`: corta la red al instante
+    (pruebas)."""
     if os.environ.get('ABYSS_SIN_RED') == '1':
         raise RuntimeError('sin red (ABYSS_SIN_RED=1)')
     if presupuesto is not None:
@@ -110,7 +108,7 @@ def nombres_propios_recurrentes(tope=6, tp=None):
         import propiocepcion
     # `continuidad`/`propiocepcion` hacen rutas.resolver() AL IMPORTARSE, que puede
     # abortar con sys.exit(1) si no resuelve proyecto — SystemExit NO hereda de
-    # Exception, así que hay que cazarlo aparte o se cuela hasta quien nos llama.
+    # Exception, así que hay que cazarlo aparte o se cuela hasta quien llama a esta función.
     except (Exception, SystemExit):
         return []
     veto = _veto(tp); bi = Counter(); uni = Counter()
@@ -137,8 +135,8 @@ def autoactualizar_temas(max_validar=3, tp=None, presupuesto=None):
     """Añade candidatos que den ≥2 titulares; caduca los mudos. Silencioso, con log.
 
     `presupuesto`: si se agota a mitad de validar candidatos o de revalidar los ya
-    vigentes, se corta el resto del bucle (§ fallo 6-sep: antes cada llamada de red
-    aquí dentro tenía su propio timeout, sin memoria de las anteriores)."""
+    vigentes, corta el resto del bucle en vez de dejar que cada llamada de red gaste
+    su propio timeout completo."""
     manual = set(t.lower() for t in _load(_ruta('temas_noticias.json', tp), []))
     veto = _veto(tp); auto = _load(_ruta('temas_auto.json', tp), {}); ahora = time.time(); cambios = []
     for t in list(auto):
@@ -147,8 +145,8 @@ def autoactualizar_temas(max_validar=3, tp=None, presupuesto=None):
     cand = [w for w in nombres_propios_recurrentes(tp=tp)
             if w.lower() not in manual and w.lower() not in veto and w not in auto]
     # Relevancia = la misma vara que la sala de relojes: los titulares del tema tienen que
-    # PARECERSE a nuestras charlas por encima del suelo del nulo. «Da 2 titulares» no
-    # discrimina (5ª medición: «Modo Gris» daba titulares de moda).
+    # parecerse a las charlas registradas por encima del suelo del nulo — «da 2 titulares»
+    # no discrimina por sí solo (un nombre de moda también los da).
     try:
         from continuidad import parecidos, BOLSAS as _B
         with open(_B, encoding='utf-8') as fh:
@@ -220,8 +218,8 @@ def recoger(refrescar=False, tp=None, presupuesto=None):
     except Exception:
         portada_ok = False
     # Si la portada ya falló (sin red, o presupuesto agotado), seguir intentando hasta
-    # 8 temas más repetiría el mismo fallo 8 veces (medido 6-sep: era justo lo que
-    # multiplicaba el tiempo total en agujero negro) — se saltan directamente.
+    # 8 temas más repetiría el mismo fallo 8 veces y multiplicaría el tiempo total en
+    # agujero negro — se saltan directamente.
     agotado = presupuesto is not None and presupuesto.agotado()
     if portada_ok and not agotado:
         for t in temas_efectivos(tp=tp)[:8]:
@@ -256,12 +254,11 @@ def texto(refrescar=False, tp=None, presupuesto=None):
 if __name__ == '__main__':
     a = sys.argv[1:]
     # `rutas.es_transcript` exige fichero real + `.jsonl`: excluir solo las banderas
-    # (`not x.startswith('--')`) no bastaba — un directorio como `.` también "existía"
-    # y resolvía `proj` como el padre del cwd (misma familia de bug que exterocepcion,
-    # medida 6-sep).
+    # (`not x.startswith('--')`) no basta — un directorio como `.` también "existe" y
+    # resolvería `proj` como el padre del cwd (misma familia de bug que exterocepcion.py).
     tp_arg = next((x for x in a if rutas.es_transcript(x)), None)
     sj = {'transcript_path': tp_arg} if tp_arg else None
-    # a mano SÍ queremos el error claro de rutas.resolver() si no hay proyecto
+    # a mano conviene el error claro de rutas.resolver() si no hay proyecto
     _CACHE['proj'], _CACHE['mem'] = rutas.resolver(argv=a, stdin_json=sj)
     if '--auto-preview' in a:
         print('candidatos (bigramas ≥2 sesiones, unigramas ≥3, sin rutas, sin veto):', nombres_propios_recurrentes(tp=tp_arg))
