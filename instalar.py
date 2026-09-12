@@ -1733,7 +1733,10 @@ def _construir_command(ejecutable, args):
     — no existe un campo `args` aparte, y `{"command": "<python.exe>", "args":
     [...]}` no lo sabe interpretar Claude Code (ejecutaría `python.exe` pelado,
     sin guion)."""
-    return ' '.join(_quotar(a) for a in ([ejecutable] + list(args)))
+    # Claude Code lanza los ganchos por el shell del usuario; en Windows suele ser Git
+    # Bash, que se come las barras invertidas de un argumento sin comillas
+    # (`C:\Users\...` -> `C:Users...`). Windows acepta barras normales: se escriben así.
+    return ' '.join(_quotar(str(a).replace(chr(92), '/')) for a in ([ejecutable] + list(args)))
 
 
 def _partes(entrada):

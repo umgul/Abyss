@@ -88,9 +88,12 @@ class InstaladorFusionaYRestauraElContenido(unittest.TestCase):
         entradas = [h for g in stop for h in g['hooks']]
         nuestra = next(h for h in entradas if 'vigia.py' in h['command'])
         self.assertNotIn('args', nuestra, 'el esquema real no lleva un campo "args" aparte de "command"')
-        self.assertIn('C:\\Py\\python.exe', nuestra['command'])
+        self.assertIn('C:/Py/python.exe', nuestra['command'])
         self.assertIn('vigia.py', nuestra['command'])
         self.assertIn('--verificar', nuestra['command'])
+        # Git Bash (por donde Claude Code lanza los ganchos en Windows) se come las
+        # barras invertidas sin comillas: la orden escrita no debe llevar ninguna.
+        self.assertNotIn(chr(92), nuestra['command'])
 
     def test_gancho_escrito_sin_statusmessage(self):
         """`statusMessage` no forma parte del esquema de gancho documentado
