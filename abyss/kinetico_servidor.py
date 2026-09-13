@@ -14,8 +14,9 @@ En los dos casos el `destino` se busca en el diccionario de la escena que está 
 es una ruta que llegue de fuera, es una clave que tiene que existir en el `nodos.json` que
 este servidor acaba de escribir. Lo que no esté en la escena no existe, y una ruta con `..`
 dentro no llega a ninguna parte porque nunca se concatena nada; además se comprueba que lo
-resuelto siga colgando de la raíz de la escena. Los dos son POST a propósito: una visita
-suelta, una precarga o un enlace no abren nada.
+resuelto siga colgando de la raíz de la escena. Los dos son POST a propósito: eso evita que
+una visita suelta, una precarga o un enlace los disparen solos. Que no los dispare OTRA WEB
+lo corta `puerta_local.rechazo()`, comprobando `Origin` y `Host` de este mismo servidor.
 
 Lo que este servidor NO hace: no sirve nada fuera de la carpeta de montaje; no ejecuta nada
 (`abrir` le pasa el fichero al sistema, que decide con qué se abre); no recuerda nada entre
@@ -37,6 +38,11 @@ try:                       # la consola de Windows y la salida tienen que hablar
 except ImportError:
     import consola
 consola.preparar()
+
+try:
+    from . import puerta_local
+except ImportError:
+    import puerta_local
 SW_SHOWNORMAL = 1        # que la ventana salga en su tamaño, ni minimizada ni maximizada
 ASFW_ANY = -1            # «cualquier proceso que se lance a continuación puede tomar el primer plano»
 
@@ -129,7 +135,29 @@ def sirve(carpeta, puerto=8890, abrir=True, remontar=None, avisar=print):
                 return None, "fuera de lo que se abrió"
             return destino, None
 
+        def do_GET(self):
+            motivo = puerta_local.rechazo(self)
+            if motivo:
+                puerta_local.descartar_cuerpo(self)
+                self._json({"ok": False, "por_que": motivo}, 403)
+                return
+            super().do_GET()
+
+        def do_HEAD(self):
+            motivo = puerta_local.rechazo(self)
+            if motivo:
+                puerta_local.descartar_cuerpo(self)
+                self._json({"ok": False, "por_que": motivo}, 403)
+                return
+            super().do_HEAD()
+
         def do_POST(self):
+            motivo = puerta_local.rechazo(self)
+            if motivo:
+                puerta_local.descartar_cuerpo(self)
+                self.close_connection = True  # cierra tras el rechazo: no reusar esta conexión
+                self._json({"ok": False, "por_que": motivo}, 403)
+                return
             ruta = urllib.parse.urlparse(self.path).path
             if ruta not in ("/entrar", "/abrir"):
                 self.send_error(404, "aqui no se escribe nada")
@@ -139,6 +167,9 @@ def sirve(carpeta, puerto=8890, abrir=True, remontar=None, avisar=print):
                 self._json({"ok": False, "por_que": err})
                 return
             if ruta == "/abrir":
+                if puerta_local.se_ejecutaria(destino):
+                    self._json({"ok": False, "por_que": "no se abre desde el visor: ejecutaría un programa"})
+                    return
                 if not os.path.isfile(destino):
                     self._json({"ok": False, "por_que": "ya no está ahí"})
                     return

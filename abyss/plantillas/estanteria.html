@@ -1,0 +1,589 @@
+<meta charset="utf-8">
+<title>Estantería kinética</title>
+<style>
+ :root{--tinta:#e8eaed;--flojo:#8d949e;--linea:#22262c;--fondo:#08090b;--caja:#111418;--acento:#7fd1c1}
+ *{box-sizing:border-box}
+ html,body{margin:0;height:100%;background:var(--fondo);color:var(--tinta);overflow:hidden;
+   font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+ #todo{display:flex;height:100%}
+ #izq{width:344px;flex:none;border-right:1px solid var(--linea);display:flex;
+   flex-direction:column;position:relative;isolation:isolate}
+ /* el fondo, si la escena trae uno, va al panel con un velo: detrás del texto, no contra él */
+ #izq::before{content:'';position:absolute;inset:0;z-index:-2;opacity:.55;
+   background:var(--fondo-img, none) center 55%/cover no-repeat}
+ #izq::after{content:'';position:absolute;inset:0;z-index:-1;
+   background:linear-gradient(180deg,#08090bd9 0%,#08090b8c 38%,#08090bd9 100%)}
+ #izq > *{position:relative}
+ #camcaja{position:relative;background:#000;aspect-ratio:4/3;flex:none;display:none}
+ #camcaja.encendida{display:block}
+ #vid{display:none}
+ #esq{width:100%;height:100%;display:block}
+ #ficha{padding:12px 14px;overflow:auto;flex:1}
+ #ficha::-webkit-scrollbar{width:7px} #ficha::-webkit-scrollbar-thumb{background:#2b3138;border-radius:4px}
+ #der{flex:1;position:relative;min-width:0}
+ #lienzo{width:100%;height:100%;display:block}
+ h1{font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin:0;padding:10px 14px;
+   border-bottom:1px solid var(--linea);color:var(--flojo);font-weight:600}
+ #f_titulo{font-size:18px;font-weight:600;line-height:1.25;margin:0 0 2px}
+ #f_autor{color:var(--acento);margin-bottom:10px}
+ #f_datos{color:var(--flojo);font-size:13px;border-bottom:1px solid var(--linea);
+   padding-bottom:9px;margin-bottom:9px}
+ #f_sinopsis{font-size:14px;line-height:1.55}
+ #f_sinopsis.sindato{color:#c9a227}
+ #f_fuente{margin-top:9px;font-size:12.5px;overflow-wrap:anywhere}
+ #f_fuente a{color:var(--flojo)}
+ #f_aviso{margin-top:10px;font-size:12.5px;color:#9aa0a8}
+ #lectura{color:var(--flojo);font-size:13px;border-top:1px solid var(--linea);
+   margin-top:14px;padding-top:9px}
+ .fila{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+ .fila b{color:var(--acento);font-weight:600;font-variant-numeric:tabular-nums}
+ .sinvara{color:#c9a227 !important}
+ #estado{position:absolute;left:14px;top:12px;color:var(--flojo);font-size:11px}
+ #mandos{position:absolute;right:12px;top:10px;display:flex;gap:8px;z-index:5}
+ button{background:var(--caja);color:var(--tinta);border:1px solid var(--linea);
+   padding:7px 13px;border-radius:5px;cursor:pointer;font:inherit}
+ button:hover{border-color:#39414b}
+ button.grabando{border-color:#e0564f;color:#e0564f}
+ #pie{position:absolute;left:14px;bottom:10px;right:14px;color:#5d646d;font-size:11px}
+ #buscar{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5}
+ #buscar input{background:var(--caja);border:1px solid var(--linea);color:var(--tinta);
+   padding:7px 12px;border-radius:5px;font:inherit;width:320px}
+ #v_hallados{margin-top:5px;text-align:center;color:var(--acento);font-size:12px;
+   text-shadow:0 1px 3px #000}
+ #ar[hidden]{display:none !important}
+ #ar{position:fixed;inset:0;background:#05070a;z-index:40;display:flex;
+   align-items:center;justify-content:center}
+ #ar_marco{position:relative;line-height:0}
+ #ar_marco canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+ #ar_marco canvas:first-child{position:relative}
+ #ar_pie{position:absolute;top:16px;left:0;right:0;text-align:center;color:var(--acento);
+   font-size:13px;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+ #ar_gesto{position:absolute;bottom:36px;left:0;right:0;text-align:center;color:#8d949e;
+   font-size:12px;padding:0 24px}
+ #ar_gesto.sinenlace{color:#c9a227}
+ #ar_nota{position:absolute;bottom:12px;left:0;right:0;text-align:center;color:#4d545c;
+   font-size:11px;padding:0 24px}
+</style>
+<div id="todo">
+ <div id="izq">
+  <h1 id="h_titulo">Estantería</h1>
+  <div id="camcaja"><video id="vid" playsinline></video><canvas id="esq"></canvas></div>
+  <div id="ficha">
+   <p id="f_titulo">—</p>
+   <div id="f_autor"></div>
+   <div id="f_datos"></div>
+   <div id="f_sinopsis"></div>
+   <div id="f_fuente"></div>
+   <div id="f_aviso"></div>
+   <div id="lectura">
+    <div class="fila"><span>manos</span><b id="v_manos">0</b></div>
+    <div class="fila"><span>dedos</span><b id="v_dedos">0</b></div>
+    <div class="fila"><span>empuje x / y</span><b id="v_pel">0.000 / 0.000</b></div>
+    <div class="fila"><span>vara de la escala</span><b id="v_vara">sin vara</b></div>
+    <div class="fila"><span>obra</span><b id="v_obra">—</b></div>
+    <div style="margin-top:9px;color:#6e757e;font-size:11px">
+     <b>mano a los lados</b> recorre la estantería &middot; <b>arriba y abajo</b> cambia de balda
+     &middot; <b>dos manos</b> acercan o alejan &middot; <b>puño</b> abre la obra &middot;
+     <b>dos puños</b> paran en seco.<br><br>
+     Se mueve como el ratón: a tu derecha es a la derecha de la pantalla, sin espejo.
+     Y despacio a propósito.<br><br>
+     Sin cámara: arrastra con el ratón, rueda para acercar, buscador arriba.
+    </div>
+   </div>
+  </div>
+ </div>
+ <div id="der">
+  <canvas id="lienzo"></canvas>
+  <div id="estado">cargando la estantería&hellip;</div>
+  <div id="buscar"><input id="q" placeholder="buscar por título o autor" autocomplete="off">
+   <div id="v_hallados"></div></div>
+  <div id="mandos">
+   <button id="b_camara">Encender cámara</button>
+   <button id="b_rec">Grabar</button>
+   <button id="b_abrir">Abrir</button>
+  </div>
+  <div id="pie"></div>
+ </div>
+</div>
+<div id="ar" hidden>
+  <div id="ar_marco"><canvas id="ar_video"></canvas><canvas id="ar_holo"></canvas></div>
+  <div id="ar_pie"></div>
+  <div id="ar_gesto"></div>
+  <div id="ar_barra" style="position:absolute;bottom:26px;left:50%;transform:translateX(-50%);width:260px;height:5px;background:#1b1f25;border-radius:3px;overflow:hidden"><i id="ar_barra_i" style="display:block;height:100%;background:#7fd1c1;width:0"></i></div>
+  <div id="ar_nota">La portada va anclada a la palma: posición por el centro de la mano,
+   tamaño por el ancho de la palma, giro por su orientación. Es un montaje sobre el vídeo,
+   no una medida del espacio.</div>
+</div>
+<canvas id="mezcla" width="1280" height="720" style="display:none"></canvas>
+<script src="three.min.js"></script>
+<script type="module">
+import {Vara, creaSuavizador, leerMando} from './gestos_comun.js';
+const $ = s => document.querySelector(s);
+
+/* ─── los datos ─────────────────────────────────────────────────────────────── */
+const B = await fetch('nodos.json').then(r => r.json());
+const OBRAS = B.items || [], N = OBRAS.length;
+const REJ = B.rejilla, [CW, CH] = B.casilla_px;
+const ETIQ_AUTOR = B.etiqueta_autor || 'autor';
+const COLS = Math.max(8, Math.min(24, N)), FILAS = Math.max(1, Math.ceil(N / COLS));
+const RADIO = 9.2, PASO_Y = 1.62, ANCHO_L = 0.94, ALTO_L = 1.41;
+document.title = (B.titulo || 'Estantería') + ' · estantería kinética';
+$('#h_titulo').textContent = B.titulo || 'Estantería';
+$('#q').placeholder = 'buscar por título o ' + ETIQ_AUTOR;
+if(B.fondo && B.fondo.fichero === 'fondo.jpg')
+  $('#izq').style.setProperty('--fondo-img', "url('fondo.jpg')");
+
+const ren = new THREE.WebGLRenderer({canvas:$('#lienzo'), antialias:true});
+ren.outputColorSpace = THREE.SRGBColorSpace;
+const esc = new THREE.Scene(); esc.background = new THREE.Color('#08090b');
+esc.fog = new THREE.Fog('#08090b', 12, 30);
+const cam = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+const anaquel = new THREE.Group(); esc.add(anaquel);
+esc.add(new THREE.AmbientLight(0xffffff, 1.0));
+
+const carg = new THREE.TextureLoader();
+const texturas = await Promise.all(Array.from({length:B.atlas}, (_, i) =>
+  new Promise(ok => carg.load('atlas/atlas_' + i + '.jpg', t => {
+    t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = true;
+    t.minFilter = THREE.LinearMipmapLinearFilter; ok(t); }))));
+
+/* Una malla por atlas con todas sus portadas: cada obra son dos triángulos cuyas
+   coordenadas de textura apuntan a su casilla. */
+const sitio = [];
+function colocar(i){
+  const fila = Math.floor(i / COLS), col = i % COLS;
+  const ang = (col / COLS) * Math.PI * 2;
+  return {x: Math.sin(ang) * RADIO, y: (FILAS - 1) / 2 * PASO_Y - fila * PASO_Y,
+          z: -Math.cos(ang) * RADIO, ang};
+}
+const porAtlas = {};
+OBRAS.forEach((L, i) => (porAtlas[L.atlas] = porAtlas[L.atlas] || []).push(i));
+for(const [ia, idxs] of Object.entries(porAtlas)){
+  const pos = [], uv = [], idx = [];
+  idxs.forEach((i, n) => {
+    const s = colocar(i); sitio[i] = s;
+    const c = Math.cos(s.ang), sn = Math.sin(s.ang);
+    const hw = ANCHO_L/2, hh = ALTO_L/2;
+    for(const [dx, dy] of [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]])
+      pos.push(s.x + dx*c, s.y + dy, s.z + dx*sn);
+    const f = Math.floor(OBRAS[i].casilla / REJ), co = OBRAS[i].casilla % REJ;
+    const u0 = co/REJ, u1 = (co+1)/REJ, v0 = 1 - (f+1)/REJ, v1 = 1 - f/REJ;
+    uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+    const b = n*4; idx.push(b,b+1,b+2, b,b+2,b+3);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  anaquel.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({map:texturas[ia], side:THREE.DoubleSide})));
+}
+
+/* la obra elegida: su propia malla, delante y más grande */
+const geoSel = new THREE.PlaneGeometry(ANCHO_L, ALTO_L);
+const matSel = new THREE.MeshBasicMaterial({map:texturas[0], transparent:true});
+const sel = new THREE.Mesh(geoSel, matSel); sel.renderOrder = 5; esc.add(sel);
+const marco = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.PlaneGeometry(ANCHO_L*1.06, ALTO_L*1.06)),
+  new THREE.LineBasicMaterial({color:0x7fd1c1}));
+marco.renderOrder = 6; esc.add(marco);
+function uvDe(i){
+  const L = OBRAS[i], f = Math.floor(L.casilla/REJ), c = L.casilla % REJ;
+  const u0 = c/REJ, u1 = (c+1)/REJ, v0 = 1-(f+1)/REJ, v1 = 1-f/REJ;
+  geoSel.setAttribute('uv', new THREE.Float32BufferAttribute([u0,v1, u1,v1, u0,v0, u1,v0], 2));
+  matSel.map = texturas[L.atlas]; matSel.needsUpdate = true;
+}
+
+/* ─── la ficha ──────────────────────────────────────────────────────────────── */
+let elegido = -1;
+const kb = b => b == null ? 'sin dato' : (b/1e6).toFixed(1) + ' MB';
+const conFuente = L => typeof L.fuente === 'string' && /^https?:\/\//i.test(L.fuente);
+const autorDe = L => L.autor ? L.autor : ETIQ_AUTOR + ' sin dato';
+function muestra(i){
+  if(i === elegido || i < 0 || i >= N) return;
+  elegido = i; uvDe(i);
+  const L = OBRAS[i];
+  $('#f_titulo').textContent = L.titulo || 'sin título';
+  $('#f_autor').textContent = autorDe(L);
+  $('#f_datos').textContent = L.datos || kb(L.bytes);
+  const s = $('#f_sinopsis');
+  s.textContent = L.sinopsis || 'sin dato con fuente';
+  s.classList.toggle('sindato', !conFuente(L));
+  // el enlace se construye con nodos del DOM, nunca pegando texto en innerHTML
+  const ff = $('#f_fuente'); ff.textContent = '';
+  if(conFuente(L)){
+    const a = document.createElement('a');
+    a.href = L.fuente; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = L.fuente;
+    ff.append('fuente: ', a);
+  }
+  $('#f_aviso').textContent = L.aviso_portada || '';
+  $('#v_obra').textContent = (i+1) + ' / ' + N;
+}
+
+/* ─── mando: ratón siempre, mano si hay cámara ──────────────────────────────── */
+let giro = 0, altura = 0, acerca = 0, giroObj = 0, alturaObj = 0, acercaObj = 0;
+const c3 = $('#lienzo');
+let arrastrando = false, ax = 0, ay = 0;
+c3.addEventListener('pointerdown', e => { arrastrando = true; ax = e.clientX; ay = e.clientY; });
+addEventListener('pointerup', () => { arrastrando = false; });
+addEventListener('pointermove', e => {
+  if(!arrastrando) return;
+  giroObj -= (e.clientX - ax) * 0.005; alturaObj += (e.clientY - ay) * 0.012;
+  ax = e.clientX; ay = e.clientY;
+});
+c3.addEventListener('wheel', e => { acercaObj = Math.max(0, Math.min(1, acercaObj - e.deltaY*0.0012)); }, {passive:true});
+/* Buscar: el bucle vuelve a elegir cada fotograma la obra que tiene delante, así que el
+   hallazgo manda hasta que la estantería llega a él. Sin tildes en las dos partes. */
+const sinTildes = s => (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+let coincidencias = [], cual = -1, viaje = null;
+function busca(txt){
+  const t = sinTildes(txt.trim());
+  coincidencias = []; cual = -1;
+  if(t.length < 2){ $('#v_hallados').textContent = ''; return; }
+  OBRAS.forEach((L, i) => {
+    if(sinTildes((L.titulo||'') + ' ' + (L.autor||'')).includes(t)) coincidencias.push(i);
+  });
+  if(!coincidencias.length){ $('#v_hallados').textContent = 'ninguna con ese nombre'; return; }
+  cual = 0; vaAlHallazgo();
+}
+function vaAlHallazgo(){
+  const i = coincidencias[cual];
+  $('#v_hallados').textContent = (cual + 1) + ' de ' + coincidencias.length
+    + (coincidencias.length > 1 ? ' · Intro, la siguiente' : '');
+  irA(i); muestra(i);
+  viaje = i;
+}
+$('#q').addEventListener('input', e => busca(e.target.value));
+$('#q').addEventListener('keydown', e => {
+  if(e.key !== 'Enter' || coincidencias.length < 2) return;
+  e.preventDefault();
+  cual = (cual + (e.shiftKey ? -1 : 1) + coincidencias.length) % coincidencias.length;
+  vaAlHallazgo();
+});
+function irA(i){
+  /* El bucle rota el punto con x' = x·cos g + z·sin g, z' = -x·sin g + z·cos g, y
+     «delante» es x'=0, z'=-r: g = atan2(x, -z). */
+  const s = sitio[i];
+  giroObj = Math.atan2(s.x, -s.z);
+  alturaObj = s.y;
+  while(giroObj - giro >  Math.PI) giroObj -= 2*Math.PI;   // la vuelta más corta
+  while(giroObj - giro < -Math.PI) giroObj += 2*Math.PI;
+}
+/* Abrir sin perder la estantería: `window.open` fuera de un clic lo bloquea el navegador,
+   y salir por la misma pestaña se lleva por delante la cámara y la grabación. Lo abre el
+   servidor, con el programa del sistema, y solo si la obra está en la escena. */
+async function abre(id){
+  try {
+    const r = await fetch('abrir', {method:'POST', headers:{'Content-Type':'application/json'},
+                                    body: JSON.stringify({destino: id})});
+    const j = await r.json();
+    if(j.ok){ $('#estado').textContent = 'abierta con el programa del sistema'; return true; }
+    $('#estado').textContent = 'no se pudo abrir: ' + (j.por_que || 'sin dato');
+  } catch(e) { $('#estado').textContent = 'no se pudo abrir: ' + e.message; }
+  return false;
+}
+$('#b_abrir').onclick = () => { if(elegido >= 0) abre(OBRAS[elegido].id); };
+
+function medir(){
+  const w = c3.clientWidth, h = c3.clientHeight;
+  ren.setSize(w, h, false); ren.setPixelRatio(Math.min(2, devicePixelRatio));
+  cam.aspect = (w>0 && h>0) ? w/h : 16/9; cam.updateProjectionMatrix();
+}
+addEventListener('resize', medir); medir();
+
+$('#pie').textContent = B.pie || '';
+$('#estado').textContent = N + ' obras. Arrastra, o pulsa «Encender cámara».';
+if(N) muestra(0);
+
+/* ─── la mano ────────────────────────────────────────────────────────────────
+   El vocabulario vive en gestos_comun.js, compartido por los visores. MediaPipe se carga
+   al encender la cámara: sin `mp/` la estantería se usa igual con el ratón. */
+const suaviza = creaSuavizador();
+const varaEsc = new Vara();
+const mandoEstado = {malos: 0};
+
+const vid=$('#vid'), esq=$('#esq'), ctx=esq.getContext('2d');
+let detector=null, corriendo=false, ultimoT=-1, ultimasManos=[];
+const CONEX=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+             [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+$('#b_camara').onclick = () => corriendo ? apagaCamara()
+  : arranca().catch(e => { $('#estado').textContent = 'sin cámara: ' + e.message; });
+async function arranca(){
+  let mp;
+  try { mp = await import('./mp/vision_bundle.mjs'); }
+  catch(e) { $('#estado').textContent = 'sin manos: falta mp/ (python instalar.py --manos). El ratón sigue funcionando.'; return; }
+  $('#estado').textContent = 'pidiendo cámara…';
+  vid.srcObject = await navigator.mediaDevices.getUserMedia({video:{width:960,height:720}});
+  await vid.play();
+  esq.width = vid.videoWidth; esq.height = vid.videoHeight;
+  $('#estado').textContent = 'cargando el modelo de manos…';
+  const fs = await mp.FilesetResolver.forVisionTasks('./mp/wasm');
+  detector = await mp.HandLandmarker.createFromOptions(fs, {
+    baseOptions:{modelAssetPath:'./mp/hand_landmarker.task'},
+    numHands:2, runningMode:'VIDEO',
+    minHandDetectionConfidence:0.6, minTrackingConfidence:0.6});
+  corriendo = true;
+  $('#b_camara').textContent = 'Apagar cámara'; $('#camcaja').classList.add('encendida');
+  $('#estado').textContent = 'mueve la mano unos segundos: la sesión se hace su propia vara';
+}
+function apagaCamara(){
+  if(!corriendo) return;
+  corriendo = false;
+  if(vid.srcObject){ vid.srcObject.getTracks().forEach(p => p.stop()); vid.srcObject = null; }
+  ctx.clearRect(0, 0, esq.width, esq.height);
+  $('#b_camara').textContent = 'Encender cámara'; $('#b_camara').disabled = false;
+  $('#camcaja').classList.remove('encendida');
+  $('#estado').textContent = 'cámara apagada · el botón la enciende otra vez';
+  ultimasManos = [];
+}
+function pintaEsqueleto(manos){
+  ctx.save(); ctx.clearRect(0,0,esq.width,esq.height);
+  ctx.translate(esq.width,0); ctx.scale(-1,1); ctx.drawImage(vid,0,0,esq.width,esq.height);
+  ctx.restore();
+  for(const p of manos){
+    ctx.strokeStyle='rgba(127,209,193,.85)'; ctx.lineWidth=2;
+    for(const c of CONEX){ ctx.beginPath();
+      ctx.moveTo((1-p[c[0]].x)*esq.width, p[c[0]].y*esq.height);
+      ctx.lineTo((1-p[c[1]].x)*esq.width, p[c[1]].y*esq.height); ctx.stroke(); }
+    ctx.fillStyle='#e8eaed';
+    for(const q of p){ ctx.beginPath(); ctx.arc((1-q.x)*esq.width, q.y*esq.height, 3, 0, 6.284); ctx.fill(); }
+  }
+}
+
+/* ─── la portada, sobre la mano ─────────────────────────────────────────────── */
+const AR=$('#ar'), arV=$('#ar_video'), arHo=$('#ar_holo'), vctx=arV.getContext('2d');
+let holoAbierto=false, vistoAr=0, avancePunno = 0;
+const renAR = new THREE.WebGLRenderer({canvas:arHo, alpha:true, antialias:true});
+renAR.outputColorSpace = THREE.SRGBColorSpace; renAR.setClearColor(0x000000, 0);
+const escAR = new THREE.Scene();
+const camAR = new THREE.OrthographicCamera(-1,1,1,-1,-20,20);
+const geoAR = new THREE.PlaneGeometry(ANCHO_L, ALTO_L);
+const matAR = new THREE.MeshBasicMaterial({map:texturas[0], transparent:true, side:THREE.DoubleSide});
+const pivAR = new THREE.Group();
+const CAPAS = 6, GRUESO = 0.07;
+for(let k=0;k<CAPAS;k++){
+  const f = 1 - 0.6*(k/(CAPAS-1));
+  const m = new THREE.Mesh(geoAR, matAR.clone());
+  m.material.color = new THREE.Color(f,f,f);
+  m.position.z = -k*(GRUESO/(CAPAS-1)); m.renderOrder = 100-k;
+  pivAR.add(m);
+}
+escAR.add(pivAR);
+let arW=960, arHh=720;
+function medirAR(){
+  const rel = (esq.width && esq.height) ? esq.width/esq.height : 4/3;
+  let w = innerWidth*0.94, h = w/rel;
+  if(h > innerHeight*0.88){ h = innerHeight*0.88; w = h*rel; }
+  arW = Math.round(w); arHh = Math.round(h);
+  const m = $('#ar_marco'); m.style.width = arW+'px'; m.style.height = arHh+'px';
+  const pr = Math.min(2, devicePixelRatio);
+  arV.width = Math.round(arW*pr); arV.height = Math.round(arHh*pr);
+  renAR.setPixelRatio(pr); renAR.setSize(arW, arHh, false);
+  const a = arW/arHh;
+  camAR.left=-a/2; camAR.right=a/2; camAR.top=0.5; camAR.bottom=-0.5; camAR.updateProjectionMatrix();
+}
+addEventListener('resize', () => { if(holoAbierto) medirAR(); });
+function abrirHolo(){
+  if(holoAbierto || elegido < 0) return;
+  holoAbierto = true; AR.hidden = false; vistoAr = 0; medirAR();
+  const L = OBRAS[elegido];
+  for(const m of pivAR.children){ m.material.map = texturas[L.atlas]; m.material.needsUpdate = true; }
+  const f = Math.floor(L.casilla/REJ), c = L.casilla % REJ;
+  const u0=c/REJ, u1=(c+1)/REJ, v0=1-(f+1)/REJ, v1=1-f/REJ;
+  geoAR.setAttribute('uv', new THREE.Float32BufferAttribute([u0,v1, u1,v1, u0,v0, u1,v0], 2));
+  $('#ar_pie').textContent = L.titulo || 'sin título';
+  const g = $('#ar_gesto');
+  g.textContent = 'cierra la mano para abrirla'
+                + (L.datos ? ' (' + L.datos + ')' : '')
+                + (conFuente(L) ? ' · su ficha viene de ' + L.fuente : ' · sin ficha con fuente');
+  g.classList.toggle('sinenlace', !conFuente(L));
+}
+function cerrarHolo(){ holoAbierto=false; AR.hidden=true; }
+addEventListener('keydown', e => { if(e.key === 'Escape') cerrarHolo(); });
+$('#ar_pie').addEventListener('click', cerrarHolo);
+const aEsc = (p,a) => new THREE.Vector3((1-p.x-0.5)*a, 0.5-p.y, -p.z*a);
+const qP=new THREE.Quaternion(), mB=new THREE.Matrix4();
+const vU=new THREE.Vector3(), vV=new THREE.Vector3(), vW=new THREE.Vector3();
+const vT=new THREE.Vector3(), vC=new THREE.Vector3();
+let escS=0, primera=true;
+function pintaHolo(manos){
+  const W=arV.width, H=arV.height;
+  vctx.save(); vctx.clearRect(0,0,W,H);
+  if(esq.width && vid.readyState>=2){ vctx.translate(W,0); vctx.scale(-1,1); vctx.drawImage(vid,0,0,W,H); }
+  else { vctx.fillStyle='#0b0c0e'; vctx.fillRect(0,0,W,H); }
+  vctx.restore();
+  const p = (manos && manos.length) ? manos[0] : null;
+  vistoAr = p ? 1 : Math.max(0, vistoAr-0.016);
+  pivAR.visible = vistoAr > 0.02;
+  if(p){
+    const a = arW/arHh;
+    const P0=aEsc(p[0],a), P5=aEsc(p[5],a), P17=aEsc(p[17],a);
+    vC.copy(P0).add(P5).add(P17).divideScalar(3);
+    const anchoPalma = P5.distanceTo(P17) || 1e-6;
+    vU.copy(P17).sub(P5).normalize();
+    vT.copy(P0).sub(P5);
+    vW.copy(vU).cross(vT).normalize();
+    if(vW.z < 0) vW.negate();
+    vV.copy(vW).cross(vU).normalize();
+    if(vU.x < 0){ vU.negate(); vV.negate(); }   // la imagen de la cámara va espejada
+    mB.makeBasis(vU, vV, vW);
+    qP.setFromRotationMatrix(mB);
+    pivAR.quaternion.identity().slerp(qP, 0.55);
+    const eo = anchoPalma * 2.2 / ANCHO_L;
+    escS = primera ? eo : escS + (eo-escS)*0.25; primera = false;
+    pivAR.scale.setScalar(escS);
+    pivAR.position.copy(vC).addScaledVector(vW, anchoPalma*0.6);
+  }
+  const b = $('#ar_barra_i'); if(b) b.style.width = (avancePunno*100) + '%';
+  for(const m of pivAR.children) m.material.opacity = vistoAr;
+  renAR.render(escAR, camAR);
+}
+
+/* ─── lo que se graba ────────────────────────────────────────────────────────
+   Se compone en un lienzo aparte: la estantería, la cámara en pequeño, la ficha y el aviso
+   al abrir. Lo que se abre vive en otro programa y un lienzo no puede dibujarlo. */
+const mez = $('#mezcla'), mctx = mez.getContext('2d');
+let abriendo = null;          // {titulo, id, hasta}
+function mezclaFotograma(){
+  mctx.fillStyle = '#08090b'; mctx.fillRect(0, 0, 1280, 720);
+  if(c3.width) mctx.drawImage(c3, 300, 0, 980, 720);
+  if(esq.width) mctx.drawImage(esq, 8, 8, 284, 213);
+
+  const L = elegido >= 0 ? OBRAS[elegido] : null;
+  if(L){
+    mctx.fillStyle = '#e8eaed'; mctx.font = '600 17px Segoe UI, sans-serif';
+    mctx.fillText((L.titulo || '').slice(0, 40), 12, 252);
+    mctx.fillStyle = '#7fd1c1'; mctx.font = '13px Segoe UI, sans-serif';
+    mctx.fillText(autorDe(L).slice(0, 40), 12, 274);
+    mctx.fillStyle = '#8d949e'; mctx.font = '12px Segoe UI, sans-serif';
+    mctx.fillText(L.datos || kb(L.bytes), 12, 294);
+    mctx.fillStyle = conFuente(L) ? '#c9ccd1' : '#c9a227';
+    mctx.font = '12px Segoe UI, sans-serif';
+    let y = 318;
+    for(const ln of parteEnLineas(L.sinopsis || 'sin dato con fuente', 276).slice(0, 9)){ mctx.fillText(ln, 12, y); y += 16; }
+    if(conFuente(L)){
+      mctx.fillStyle = '#5d646d'; mctx.font = '10px Segoe UI, sans-serif';
+      mctx.fillText(L.fuente.slice(0, 52), 12, y + 8);
+    }
+  }
+  if(avancePunno > 0.02 && !abriendo){
+    mctx.fillStyle = '#1b1f25'; mctx.fillRect(510, 700, 260, 5);
+    mctx.fillStyle = '#7fd1c1'; mctx.fillRect(510, 700, 260 * avancePunno, 5);
+  }
+  if(abriendo){
+    mctx.fillStyle = 'rgba(8,9,11,.72)'; mctx.fillRect(0, 0, 1280, 720);
+    mctx.textAlign = 'center';
+    mctx.fillStyle = '#7fd1c1'; mctx.font = '600 26px Segoe UI, sans-serif';
+    mctx.fillText('abriendo', 640, 320);
+    mctx.fillStyle = '#e8eaed'; mctx.font = '20px Segoe UI, sans-serif';
+    mctx.fillText(abriendo.titulo.slice(0, 52), 640, 358);
+    mctx.textAlign = 'left';
+  }
+}
+function parteEnLineas(txt, ancho){
+  const pal = String(txt || '').split(' '), out = []; let cur = '';
+  for(const p of pal){
+    const t2 = (cur + ' ' + p).trim();
+    if(mctx.measureText(t2).width <= ancho) cur = t2; else { if(cur) out.push(cur); cur = p; }
+  }
+  if(cur) out.push(cur);
+  return out;
+}
+
+let grabadora = null, trozos = [];
+$('#b_rec').onclick = () => {
+  if(grabadora && grabadora.state === 'recording'){
+    grabadora.stop(); $('#b_rec').textContent = 'Grabar';
+    $('#b_rec').classList.remove('grabando'); return;
+  }
+  trozos = [];
+  grabadora = new MediaRecorder(mez.captureStream(30),
+                {mimeType:'video/webm;codecs=vp9', videoBitsPerSecond: 8000000});
+  grabadora.ondataavailable = e => { if(e.data.size) trozos.push(e.data); };
+  grabadora.onstop = () => {
+    const a = document.createElement('a');
+    a.download = 'estanteria_demo.webm';
+    a.href = URL.createObjectURL(new Blob(trozos, {type:'video/webm'})); a.click();
+  };
+  grabadora.start();
+  $('#b_rec').textContent = 'Parar'; $('#b_rec').classList.add('grabando');
+};
+
+/* ─── el bucle ──────────────────────────────────────────────────────────────── */
+function bucle(t){
+  requestAnimationFrame(bucle);
+  if(corriendo && detector && vid.readyState >= 2 && vid.currentTime !== ultimoT){
+    ultimoT = vid.currentTime;
+    const r = detector.detectForVideo(vid, t);
+    const manos = (r.landmarks||[]).filter(m=>m.length===21).map((m,i)=>suaviza(i,m,t));
+    ultimasManos = manos; pintaEsqueleto(manos);
+    const dt = Math.min(0.05, (t - (bucle.antes||t))/1000); bucle.antes = t;
+    const M = leerMando(manos, t, dt, mandoEstado, varaEsc);
+
+    $('#v_manos').textContent = M.manos;
+    $('#v_dedos').textContent = M.dedos;
+    $('#v_pel').textContent = (M.dx>=0?'+':'') + M.dx.toFixed(3) + ' / '
+                            + (M.dy>=0?'+':'') + M.dy.toFixed(3);
+    const tv = $('#v_vara'); tv.textContent = varaEsc.texto();
+    tv.classList.toggle('sinvara', !varaEsc.hay);
+
+    // a lo ancho recorre la estantería, a lo alto cambia de balda
+    giroObj   += M.dx * 6.0;
+    alturaObj -= M.dy * 7.0;
+    alturaObj = Math.max(-(FILAS-1)/2*PASO_Y, Math.min((FILAS-1)/2*PASO_Y, alturaObj));
+    acercaObj = Math.max(0, Math.min(1, acercaObj + M.zoom));
+
+    // el puño abre; se avisa y se espera, para que el gesto se vea en el vídeo
+    avancePunno = M.avanceAbrir;
+    if(M.abrir && elegido >= 0 && !abriendo){
+      const L = OBRAS[elegido];
+      abriendo = {titulo: L.titulo || 'sin título', id: L.id, hasta: t + 1400};
+    }
+    if(M.parar){ giroObj = giro; alturaObj = altura; acercaObj = acerca; }
+    $('#v_obra').textContent = (elegido+1) + ' / ' + N;
+  }
+
+  giro   += (giroObj - giro) * 0.07;
+  altura += (alturaObj - altura) * 0.07;
+  acerca += (acercaObj - acerca) * 0.10;
+  anaquel.rotation.y = giro;
+
+  // la obra de delante es la elegida: la más cercana al eje de la cámara
+  let mejor = -1, dmin = 1e9;
+  for(let i = 0; i < N; i++){
+    const s = sitio[i];
+    const x = s.x*Math.cos(giro) + s.z*Math.sin(giro);
+    const z = -s.x*Math.sin(giro) + s.z*Math.cos(giro);
+    const d = x*x + (s.y - altura)*(s.y - altura)*1.4 + (z + RADIO)*(z + RADIO);
+    if(d < dmin){ dmin = d; mejor = i; }
+  }
+  if(viaje !== null){
+    const llegado = mejor === viaje
+      || (Math.abs(giroObj - giro) < 0.012 && Math.abs(alturaObj - altura) < 0.03);
+    if(llegado) viaje = null; else muestra(viaje);
+  }
+  if(viaje === null && mejor >= 0) muestra(mejor);
+  const foco = viaje !== null ? viaje : mejor;
+
+  const dist = 7.2 - acerca * 5.4;
+  cam.position.set(0, altura, -RADIO + dist + 0.4);
+  cam.lookAt(0, altura, -RADIO);
+  if(foco >= 0){
+    const s = sitio[foco];
+    const x = s.x*Math.cos(giro) + s.z*Math.sin(giro);
+    const z = -s.x*Math.sin(giro) + s.z*Math.cos(giro);
+    sel.position.set(x, s.y, z + 0.22); marco.position.copy(sel.position);
+    const e = 1 + acerca*0.9; sel.scale.setScalar(e); marco.scale.setScalar(e);
+    sel.visible = marco.visible = true;
+  } else {
+    sel.visible = marco.visible = false;
+  }
+  ren.render(esc, cam);
+  if(holoAbierto) pintaHolo(ultimasManos);
+  mezclaFotograma();
+  if(abriendo && t >= abriendo.hasta){
+    const id = abriendo.id; abriendo = null; cerrarHolo();
+    abre(id);
+  }
+}
+requestAnimationFrame(bucle);
+</script>

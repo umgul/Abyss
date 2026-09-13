@@ -208,9 +208,10 @@ def recoger(refrescar=False, tp=None, presupuesto=None):
     hoy = time.strftime('%Y-%m-%d')
     ruta_cache = _ruta('noticias.json', tp)
     c = _load(ruta_cache, None)
-    if c and not refrescar and c.get('dia') == hoy:
+    # Una caché de hoy solo cuenta si trajo algo: una vacía (sin red, presupuesto
+    # agotado) no debe bloquear el resto del día sin volver a intentarlo.
+    if c and not refrescar and c.get('dia') == hoy and (c.get('portada') or c.get('temas')):
         return c
-    autoactualizar_temas(tp=tp, presupuesto=presupuesto)  # una vez al día, al renovar el cache
     out = {'dia': hoy, 'portada': [], 'temas': {}}
     portada_ok = True
     try:
@@ -221,7 +222,10 @@ def recoger(refrescar=False, tp=None, presupuesto=None):
     # 8 temas más repetiría el mismo fallo 8 veces y multiplicaría el tiempo total en
     # agujero negro — se saltan directamente.
     agotado = presupuesto is not None and presupuesto.agotado()
-    if portada_ok and not agotado:
+    if portada_ok and out['portada'] and not agotado:
+        # aquí y no antes: sin red la caché no se guarda, y recalcular los temas lee todos los
+        # transcripts; así se hace una vez al día, cuando la recogida sí llega a guardarse
+        autoactualizar_temas(tp=tp, presupuesto=presupuesto)
         for t in temas_efectivos(tp=tp)[:8]:
             if presupuesto is not None and presupuesto.agotado():
                 break
@@ -231,7 +235,9 @@ def recoger(refrescar=False, tp=None, presupuesto=None):
                     out['temas'][t] = it
             except Exception:
                 pass
-    if ruta_cache:
+    # Vacía (sin red, presupuesto agotado): no se guarda, para no machacar una
+    # caché buena de hoy y para que el próximo arranque vuelva a intentarlo.
+    if ruta_cache and (out['portada'] or out['temas']):
         with open(ruta_cache, 'w', encoding='utf-8') as fh:
             json.dump(out, fh, ensure_ascii=False, indent=1)
     return out

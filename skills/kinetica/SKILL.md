@@ -22,6 +22,7 @@ description: >
   evidencia. La cámara para manejarlo solo se enciende a petición explícita de
   este turno — nunca por gancho.
 allowed-tools: Bash
+abyss-managed: true
 ---
 
 # kinetica

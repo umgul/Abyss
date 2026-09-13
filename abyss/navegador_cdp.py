@@ -134,6 +134,90 @@ def _puerto_de(perfil, espera=25):
     return None
 
 
+def _cerrar_por_protocolo(puerto, avisar):
+    """Pide `Browser.close` por el websocket del NAVEGADOR entero (lo da `/json/version`,
+    no `/json/list`, que solo ofrece pestañas). Hace falta este paso porque `terminate()`
+    solo alcanza al proceso que lanzó `Popen`, y en Chromium ese proceso puede no ser el
+    navegador real sino un lanzador que ya ha salido: matarlo no cierra nada."""
+    try:
+        info = json.load(urllib.request.urlopen(
+            "http://127.0.0.1:%d/json/version" % puerto, timeout=5))
+        wsurl = info.get("webSocketDebuggerUrl")
+        if not wsurl:
+            return
+        ws = _Ws(wsurl, timeout=5)
+        try:
+            ws.manda({"id": 1, "method": "Browser.close"})
+        finally:
+            ws.cierra()
+    except Exception as e:
+        avisar("  Browser.close por protocolo no llegó: %s %s" % (type(e).__name__, e))
+
+
+def _matar_huerfanos_del_perfil(perfil, avisar):
+    """Último recurso cuando el perfil sigue sin poder borrarse: para, proceso a proceso,
+    lo que todavía lleve la ruta exacta de ESTE perfil en su línea de órdenes. Consulta y
+    parada van en la misma invocación de PowerShell, sin `/T`: un PID que se libera no
+    llega a reciclarse entre la lista y el disparo, y no se sigue ningún árbol de padres
+    (en Windows puede apuntar a un proceso ajeno). Solo en Windows."""
+    if os.name != "nt":
+        return
+    ruta = "'" + perfil.replace("'", "''") + "'"
+    script = ("Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -and "
+              "$_.CommandLine.Contains(%s) } | ForEach-Object { "
+              "Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; $_.ProcessId }" % ruta)
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                           capture_output=True, text=True, timeout=20)
+    except Exception:
+        return
+    parados = [t for t in r.stdout.split() if t.strip().isdigit()]
+    if parados:
+        avisar("  parados por llevar abierto el perfil: %s" % ", ".join(parados))
+
+
+def _borrar_perfil_con_reintentos(perfil, intentos=20, espera=0.25):
+    """`rmtree` puede fallar en silencio si algún proceso todavía tiene abierto un
+    fichero del perfil (el navegador tarda un poco en soltarlos tras cerrarse):
+    reintenta antes de darlo por perdido. Devuelve si el directorio quedó borrado."""
+    for _ in range(intentos):
+        if not os.path.isdir(perfil):
+            return True
+        shutil.rmtree(perfil, ignore_errors=True)
+        if not os.path.isdir(perfil):
+            return True
+        time.sleep(espera)
+    return not os.path.isdir(perfil)
+
+
+def _cerrar_navegador(proc, puerto, perfil, avisar):
+    """Cierra el navegador de `captura()` y borra su perfil temporal. Primero el
+    cierre educado por protocolo (si hubo puerto), después la señal del proceso, y solo
+    si el perfil sigue sin borrarse, el recurso de matar por línea de órdenes."""
+    if proc and puerto:
+        _cerrar_por_protocolo(puerto, avisar)
+        hasta = time.time() + 5
+        while proc.poll() is None and time.time() < hasta:
+            time.sleep(0.2)
+    if proc:
+        try:
+            proc.terminate()
+            proc.wait(timeout=8)
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    if puerto and _borrar_perfil_con_reintentos(perfil):
+        return
+    # sin puerto no hubo protocolo al que pedirle nada (o el borrado normal de arriba
+    # ya ha fallado): el recurso que no depende de ninguno de los dos es matar por
+    # línea de órdenes lo que de verdad tenga abierto este perfil, y reintentar
+    _matar_huerfanos_del_perfil(perfil, avisar)
+    _borrar_perfil_con_reintentos(perfil)
+
+
 def captura(exe, url, ruta_png, ancho, alto, segundos=3.0, avisar=print):
     """Abre `url` en un navegador sin ventana y guarda la foto. Devuelve bytes o None.
 
@@ -144,6 +228,7 @@ def captura(exe, url, ruta_png, ancho, alto, segundos=3.0, avisar=print):
     perfil = tempfile.mkdtemp(prefix="abyss_cdp_")
     proc = None
     ws = None
+    puerto = None
     try:
         proc = subprocess.Popen(
             [exe, "--headless=new", "--remote-debugging-port=0",
@@ -194,12 +279,4 @@ def captura(exe, url, ruta_png, ancho, alto, segundos=3.0, avisar=print):
     finally:
         if ws:
             ws.cierra()
-        if proc:
-            try:
-                proc.terminate(); proc.wait(timeout=8)
-            except Exception:
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
-        shutil.rmtree(perfil, ignore_errors=True)
+        _cerrar_navegador(proc, puerto, perfil, avisar)

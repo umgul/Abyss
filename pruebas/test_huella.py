@@ -169,11 +169,38 @@ class InformeConFotoSimulada(unittest.TestCase):
 
 
 class ResumenStop(unittest.TestCase):
-    """`resumen_stop()` ya NO usa el último snapshot guardado — lo compara con
-    una foto FRESCA (`informe()` sin `foto_actual`), así que aquí `foto()` se
-    monkeypatchea para simular esa foto sin lanzar PowerShell de verdad (fallo
-    "el snapshot rancio hace tautológico cualquier proceso_nuevo": ver
-    docstring de `resumen_stop()`)."""
+    """`resumen_stop()` compara lo registrado con una foto FRESCA; aquí `foto()` se
+    sustituye para no lanzar PowerShell."""
+
+    def _con_proceso_vivo(self, sid, seguro):
+        proj = ay.nuevo_proyecto()
+        mem = str(proj / 'memory')
+        evento = {'ts': 't', 'tipo': 'proceso_nuevo', 'pid': '4242', 'nombre': 'msedge.exe', 'inicio': 'i1'}
+        if seguro is not None:
+            evento['seguro'] = seguro
+        huella.registrar(mem, sid, evento)
+        foto = {'puertos': {}, 'procesos': {'4242': {'nombre': 'msedge.exe', 'inicio': 'i1'}}}
+        with mock.patch.object(huella, 'foto', return_value=(foto, 1)):
+            return huella.resumen_stop(mem, sid)
+
+    def test_proceso_de_este_hilo_da_la_linea_segura(self):
+        txt = self._con_proceso_vivo('sid-seguro', True)
+        self.assertEqual(txt, '[huella] 1 proceso y 0 puerto abiertos por este hilo siguen vivos: --informe')
+
+    def test_proceso_sin_padre_no_se_atribuye_al_hilo(self):
+        self.assertEqual(self._con_proceso_vivo('sid-incierto', False), '')
+
+    def test_limpiar_nunca_mata_un_proceso_de_atribucion_incierta(self):
+        proj = ay.nuevo_proyecto()
+        mem = str(proj / 'memory')
+        sid = 'sid-limpiar-incierto'
+        huella.registrar(mem, sid, {'ts': 't', 'tipo': 'proceso_nuevo', 'pid': '4242', 'nombre': 'svchost.exe',
+                                    'inicio': 'i1', 'seguro': False})
+        foto = {'puertos': {}, 'procesos': {'4242': {'nombre': 'svchost.exe', 'inicio': 'i1'}}}
+        with mock.patch.object(huella, 'foto', return_value=(foto, 1)), \
+                mock.patch.object(huella, '_matar', side_effect=AssertionError('no debía matar')):
+            txt = huella.limpiar(mem, sid, confirmar=True)
+        self.assertIn('no se toca (atribución incierta): pid 4242', txt)
 
     def test_sin_snapshot_calla(self):
         proj = ay.nuevo_proyecto()
@@ -535,11 +562,7 @@ class GanchoHerramientaToolInputNoEsDict(unittest.TestCase):
 
 
 class GanchoFinDePuntaAPuntaConBashReal(unittest.TestCase):
-    """El falsador que faltaba (fallo medido 7-sep): con la cadena REAL
-    arranque -> herramienta (un `Bash` inocuo de verdad, sin mockear `foto()`)
-    -> fin, `--fin` no debe decir nada. Antes de este arreglo, un solo `echo
-    uno` bastaba para que `--fin` avisara de "3 proceso ... siguen vivos" que
-    en ESE MISMO instante `--informe` (foto fresca) ya no veía."""
+    """Con la cadena REAL arranque -> `Bash` inocuo -> fin, `--fin` no dice nada."""
 
     def test_arranque_bash_inocuo_fin_calla(self):
         proj = ay.nuevo_proyecto()
@@ -561,7 +584,7 @@ class GanchoFinDePuntaAPuntaConBashReal(unittest.TestCase):
         r = ay.ejecutar(ay.script('huella.py'), ['--fin'], env, entrada=entrada_fin)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), '',
-                          f'--fin no debe avisar de nada tras un Bash inocuo: {r.stdout!r}')
+                         f'--fin no debe avisar de nada tras un Bash inocuo: {r.stdout!r}')
 
 
 if __name__ == '__main__':

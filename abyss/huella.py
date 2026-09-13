@@ -15,10 +15,11 @@ Tres ganchos, cada uno con el JSON de stdin que espera Claude Code:
     --fin         (Stop)           texto PLANO (no JSON), solo si algo registrado en esta
                                     sesión sigue vivo AHORA MISMO (foto fresca, no el
                                     snapshot guardado); sin nada vivo, silencio total.
-                                    Solo cuentan los procesos que cuelgan del proceso de
-                                    esta sesión; los de atribución incierta (su padre ya
-                                    murió) salen en `--informe`, no aquí. Un proceso que
-                                    cuelga de otro vivo ajeno no se registra.
+                                    Solo cuentan los procesos que cuelgan del de esta
+                                    sesión; los de atribución incierta (su padre ya no
+                                    existe) salen en `--informe` y `--limpiar` nunca los
+                                    mata. Un proceso que cuelga de otro vivo ajeno no se
+                                    registra.
 
 Registro: `mem/huella/<session_id>.jsonl`, una línea JSON por evento (`ts` ISO UTC, `tipo`
 `inicio`|`escrito`|`comando`|`puerto_nuevo`|`proceso_nuevo`, y según el tipo
@@ -343,10 +344,12 @@ def _desciende_de(procesos, pid, raiz):
     while pid and pid not in vistos:
         vistos.add(pid)
         info = procesos.get(pid)
+        if pid == raiz['pid']:
+            # la raíz puede faltar de la tabla: `foto()` quita al padre del propio gancho, y
+            # cuando el gancho lo lanza la raíz misma, la raíz ES ese padre (vivo, verificado)
+            return True if info is None else info.get('inicio') == raiz['inicio']
         if info is None:
             return None
-        if pid == raiz['pid']:
-            return info.get('inicio') == raiz['inicio']
         pid = info.get('padre')
     return False if pid else None
 
@@ -554,7 +557,9 @@ def resumen_stop(mem, sid):
     """`--fin` (Stop): comprueba con una foto FRESCA (el último snapshot es justo la
     foto en la que se detectó cada novedad; compararlo contra ella sería tautológico).
     Solo fotografía si hay algo registrado que comprobar. Los procesos de atribución
-    incierta no cuentan aquí: se ven en `--informe`."""
+    incierta (su padre ya no existe) no cuentan aquí: en Windows eso incluye servicios del
+    sistema cuya cadena de padres está rota, y atribuírselos al hilo sería falso. Se ven en
+    `--informe`."""
     evs = eventos(mem, sid)
     if not any(e.get('tipo') in ('proceso_nuevo', 'puerto_nuevo') for e in evs):
         return ''
@@ -629,6 +634,10 @@ def limpiar(mem, sid, confirmar):
     if not inf['procesos_vivos']:
         L.append('procesos: ninguno vivo que matar')
     for p in inf['procesos_vivos']:
+        if not p.get('seguro', True):
+            # sin padre no se puede afirmar que sea de este hilo: puede ser un servicio del sistema
+            L.append(f"  no se toca (atribución incierta): pid {p['pid']} {p['nombre']}")
+            continue
         if confirmar:
             ok = _matar(p['pid'])
             L.append(f"  proceso {p['pid']} {p['nombre']}: {'matado' if ok else 'no se pudo matar'}")

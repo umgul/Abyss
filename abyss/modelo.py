@@ -106,6 +106,13 @@ def es_preferido(modelo):
     return bool(modelo) and any(f in modelo for f in FAMILIA_OK)
 
 
+def _elegido_a_mano(fij, actual):
+    """`fij` (argumento del último `/model`) puede ser alias ('opus') o id completo
+    ('claude-opus-5'): contenido en cualquier sentido cuenta como el mismo modelo que
+    `actual` — elegido a propósito, no downgrade, aunque quede fuera de FAMILIA_OK."""
+    return bool(fij) and bool(actual) and (fij.lower() in actual.lower() or actual.lower() in fij.lower())
+
+
 def _sid_de_ruta(tp):
     """id de sesión a partir del nombre del transcript — mismo criterio que
     `continuidad._sid_de_ruta()`/`vigia._sid_de_ruta()`/`propiocepcion.medir()`,
@@ -154,6 +161,7 @@ def recorrer(tp):
     sid = _sid_de_ruta(tp)
     en_parentesis = _parentesis_de(sid, tp)
     turnos = []; cur = None; fij = None; tras_ultima = False
+    preferido_tras_fij = False  # volvió la familia preferida después del último /model
     for d in _iter(tp):
         if en_parentesis is not None and en_parentesis(sid, d.get('timestamp')):
             continue
@@ -164,7 +172,7 @@ def recorrer(tp):
                 continue
             mm = RE_CMD.search(c)
             if mm:
-                fij = mm.group(1); tras_ultima = True; continue
+                fij = mm.group(1); tras_ultima = True; preferido_tras_fij = False; continue
             if d.get('isMeta') or c.lstrip().startswith('This session is being continued') or c.lstrip().startswith('<command-name>'):
                 continue
             cur = {'prompt': re.sub(r'\s+', ' ', c.strip())[:70], 'ts': (d.get('timestamp') or '')[11:16], 'modelo': None, 'resp': ''}
@@ -173,17 +181,19 @@ def recorrer(tp):
             mo = m.get('model')
             if mo:
                 tras_ultima = False
+                if fij and es_preferido(mo):
+                    preferido_tras_fij = True
                 if cur is not None:
                     cur['modelo'] = mo
                     if not cur['resp']:
                         for b in (m.get('content') or []):
                             if isinstance(b, dict) and b.get('type') == 'text' and b.get('text', '').strip():
                                 cur['resp'] = re.sub(r'\s+', ' ', b['text'].strip())[:90]; break
-    return turnos, fij, tras_ultima
+    return turnos, fij, tras_ultima, preferido_tras_fij
 
 
 def actual(tp):
-    turnos, _, _ = recorrer(tp)
+    turnos = recorrer(tp)[0]
     for t in reversed(turnos):
         if t['modelo']:
             return t['modelo']
@@ -191,7 +201,7 @@ def actual(tp):
 
 
 def texto(tp):
-    turnos, fij, tras_ultima = recorrer(tp)
+    turnos, fij, tras_ultima, preferido_tras_fij = recorrer(tp)
     # Solo un `/model` de la familia preferida fija el preferido: un `/model opus-5` no
     # debe dejar "respondes como opus-5, no como opus-5".
     if fij and es_preferido(fij):
@@ -228,6 +238,10 @@ def texto(tp):
         return ''
     # (a) sigue respondiendo fuera de la familia preferida
     if not a:
+        return ''
+    # el usuario lo pidió con su último /model, y la familia preferida no ha vuelto a responder
+    # después: si volvió y ahora baja otra vez, eso sí es un downgrade
+    if _elegido_a_mano(fij, a) and not preferido_tras_fij:
         return ''
     return (f'[modelo] estás respondiendo como {a}, no como {pref} (downgrade por un safeguard o por el sistema). '
             f'No puedo volver solo: teclea `/model {pref}` para regresar. Si el mensaje que lo disparó sigue en el hilo, '

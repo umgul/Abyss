@@ -54,6 +54,11 @@ import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 try:
+    from . import puerta_local
+except ImportError:
+    import puerta_local
+
+try:
     import numpy as np
     import cv2
     from PIL import Image
@@ -845,11 +850,43 @@ def _elegir_manejador(directorio):
             self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
             super().end_headers()
 
+        def _json(self, datos, codigo=200):
+            cuerpo = json.dumps(datos, ensure_ascii=False).encode('utf-8')
+            self.send_response(codigo)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Content-Length', str(len(cuerpo)))
+            self.end_headers()
+            self.wfile.write(cuerpo)
+
+        def do_GET(self):
+            motivo = puerta_local.rechazo(self)
+            if motivo:
+                puerta_local.descartar_cuerpo(self)
+                self._json({'ok': False, 'por_que': motivo}, 403)
+                return
+            super().do_GET()
+
+        def do_HEAD(self):
+            motivo = puerta_local.rechazo(self)
+            if motivo:
+                puerta_local.descartar_cuerpo(self)
+                self._json({'ok': False, 'por_que': motivo}, 403)
+                return
+            super().do_HEAD()
+
         def do_POST(self):
             """Un solo verbo: abrir el sitio oficial FUERA de esta ventana — `window.open`
             desde un gesto lo bloquea el navegador, asi que lo abre el sistema y la escena
             sigue viva detras. No se acepta ninguna URL ajena: solo la que ya este escrita
-            en `reconocimiento.url` del `piezas.json` de ESTA escena; el cuerpo no se lee."""
+            en `reconocimiento.url` del `piezas.json` de ESTA escena; el cuerpo no se lee.
+            POST evita que un enlace o una precarga lo disparen solos; que no lo dispare
+            OTRA WEB lo corta `puerta_local.rechazo()` comprobando `Origin`/`Host`."""
+            motivo = puerta_local.rechazo(self)
+            if motivo:
+                puerta_local.descartar_cuerpo(self)
+                self.close_connection = True  # cierra tras el rechazo: no reusar esta conexión
+                self._json({'ok': False, 'por_que': motivo}, 403)
+                return
             if self.path.split('?')[0] != '/abrir-enlace':
                 self.send_error(404, 'aqui no se escribe nada')
                 return
@@ -868,12 +905,7 @@ def _elegir_manejador(directorio):
                     cuerpo = {'ok': True, 'url': url}
                 except Exception as e:
                     cuerpo = {'ok': False, 'por_que': '%s %s' % (type(e).__name__, e)}
-            crudo = json.dumps(cuerpo, ensure_ascii=False).encode('utf-8')
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json; charset=utf-8')
-            self.send_header('Content-Length', str(len(crudo)))
-            self.end_headers()
-            self.wfile.write(crudo)
+            self._json(cuerpo)
 
         def log_message(self, *a):
             pass  # silencio: por stdout solo va el aviso de arranque

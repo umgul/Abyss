@@ -78,5 +78,71 @@ class ParentesisNoViajaAlAvisoDeRevision(unittest.TestCase):
         self.assertNotIn('vale, ya vuelvo a fable', r.stdout)
 
 
+
+
+def _linea_model(arg, ts):
+    """Línea sintética de una línea `user` que en realidad es el comando
+    `/model` tecleado, tal como la casa `modelo.RE_CMD` (a esa regex le basta con que
+    las dos etiquetas aparezcan, sin importar lo que haya entre medias)."""
+    return ay.usuario(f'<command-name>/model</command-name><command-args>{arg}</command-args>', ts)
+
+
+class TextoRespetaLaEleccionExplicitaDeModel(unittest.TestCase):
+    """`texto()` no debe llamar downgrade a un modelo que el usuario eligió a
+    propósito con su último `/model`, aunque quede fuera de FAMILIA_OK (fable/mythos)."""
+
+    def _texto(self, lineas):
+        proj = ay.nuevo_proyecto()
+        tp = proj / 'ses.jsonl'
+        ay.escribir_jsonl(tp, lineas)
+        env = ay.entorno(proj)
+        r = ay.ejecutar(ay.script('modelo.py'), [str(tp)], env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout.strip()
+
+    def test_model_elegido_a_mano_no_es_downgrade(self):
+        salida = self._texto([
+            _linea_model('claude-opus-5', '2026-01-01T10:00:00Z'),
+            ay.usuario('sigamos', '2026-01-01T10:01:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:01:05Z', modelo='claude-opus-5'),
+        ])
+        self.assertEqual(salida, '')
+
+    def test_sin_model_manual_el_downgrade_sigue_avisando(self):
+        salida = self._texto([
+            ay.usuario('sigamos', '2026-01-01T10:01:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:01:05Z', modelo='claude-opus-5'),
+        ])
+        self.assertIn('downgrade', salida)
+
+    def test_model_elegido_no_coincide_con_el_que_responde_avisa(self):
+        salida = self._texto([
+            _linea_model('claude-opus-5', '2026-01-01T10:00:00Z'),
+            ay.usuario('sigamos', '2026-01-01T10:01:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:01:05Z', modelo='claude-sonnet-5'),
+        ])
+        self.assertIn('downgrade', salida)
+
+    def test_alias_del_model_elegido_coincide_con_el_id_completo(self):
+        salida = self._texto([
+            _linea_model('opus', '2026-01-01T10:00:00Z'),
+            ay.usuario('sigamos', '2026-01-01T10:01:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:01:05Z', modelo='claude-opus-5'),
+        ])
+        self.assertEqual(salida, '')
+
+    def test_si_volvio_el_preferido_y_baja_otra_vez_si_es_downgrade(self):
+        salida = self._texto([
+            _linea_model('claude-opus-5', '2026-01-01T10:00:00Z'),
+            ay.usuario('uno', '2026-01-01T10:01:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:01:05Z', modelo='claude-opus-5'),
+            ay.usuario('dos', '2026-01-01T10:02:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:02:05Z', modelo='claude-fable-5-1'),
+            ay.usuario('tres', '2026-01-01T10:03:00Z'),
+            ay.asistente_texto('vale', '2026-01-01T10:03:05Z', modelo='claude-opus-5'),
+        ])
+        self.assertIn('downgrade', salida)
+
+
 if __name__ == '__main__':
     unittest.main()

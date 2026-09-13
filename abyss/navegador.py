@@ -92,10 +92,16 @@ def _ahora_chromium():
 
 
 def conceder_camara(perfil, origen):
-    """Escribe en el perfil el permiso de cámara para `origen` (y solo para él).
+    """Escribe en el perfil el permiso de cámara para `origen` (y solo para él): SOLO
+    la cámara. Las páginas de este paquete no usan micrófono, así que el paquete no
+    debe concederlo sin decirlo.
 
     Se conserva lo que ya hubiera en el fichero: se añade la excepción, no se pisa el
-    resto. `setting: 1` es «permitir» en la tabla de Chromium.
+    resto. `setting: 1` es «permitir» en la tabla de Chromium. Si ese origen ya tenía
+    el micrófono concedido (de una versión anterior de esta misma función), se retira
+    aquí: solo esa excepción, de ese origen — ningún otro origen ni ninguna otra clave
+    de `Preferences` se toca, así que los perfiles viejos se corrigen solos la próxima
+    vez que se abran.
     """
     d = os.path.join(perfil, "Default")
     os.makedirs(d, exist_ok=True)
@@ -109,8 +115,10 @@ def conceder_camara(perfil, origen):
                 .setdefault("content_settings", {})
                 .setdefault("exceptions", {}))
     marca = _ahora_chromium()
-    for clave in ("media_stream_camera", "media_stream_mic"):
-        exc.setdefault(clave, {})[origen + ",*"] = {"last_modified": marca, "setting": 1}
+    exc.setdefault("media_stream_camera", {})[origen + ",*"] = {"last_modified": marca, "setting": 1}
+    # retira SOLO la excepción de micrófono de ESTE origen, si la hubiera; no crea la
+    # clave si no existía, y no toca ninguna excepción de otro origen.
+    exc.get("media_stream_mic", {}).pop(origen + ",*", None)
     with open(ruta, "w", encoding="utf-8") as fh:
         json.dump(prefs, fh)
     return ruta

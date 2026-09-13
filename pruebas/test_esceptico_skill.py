@@ -26,6 +26,21 @@ def _cargar_instalador():
     return mod
 
 
+class TodaSkillQueCopiaElInstaladorLlevaLaMarca(unittest.TestCase):
+    """Sin la marca en el frontmatter, `--desinstalar` no se atreve a borrar la copia y la deja."""
+
+    def test_cada_modulo_skill_tiene_la_marca_en_su_frontmatter(self):
+        inst = _cargar_instalador()
+        for mod in inst.MODULOS:
+            if mod.get('especial') != 'skill':
+                continue
+            carpeta = mod.get('carpeta_skill') or mod['id']
+            ruta = ay.RAIZ / 'skills' / carpeta / 'SKILL.md'
+            bloque = inst._frontmatter_bloque(str(ruta))
+            self.assertTrue(bloque and any(l.strip() == inst.MARCA_SKILL_LINEA for l in bloque.splitlines()),
+                            '%s: falta «%s» en el frontmatter' % (carpeta, inst.MARCA_SKILL_LINEA))
+
+
 class SkillEscepticoExisteYSuFrontmatterParsea(unittest.TestCase):
     def test_el_fichero_fuente_existe_con_nombre_y_marca(self):
         ruta = ay.RAIZ / 'skills' / 'esceptico' / 'SKILL.md'

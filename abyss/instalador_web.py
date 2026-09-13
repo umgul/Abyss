@@ -22,10 +22,10 @@ misma lectura que `instalar._ventana_claves()`, nunca se manda el VALOR de una c
 solo si está puesta o vacía.
 
 Seguridad: el servidor se ata SOLO a `127.0.0.1`, nunca a `0.0.0.0`. Los verbos que
-cambian algo son siempre `POST`; un `GET` solo lee y nunca deja nada instalado. Las
-llamadas mandan `Content-Type: application/json`, que dispara un preflight `OPTIONS`
-que este servidor no responde: una pestaña de otro sitio no puede disparar un POST aquí
-a ciegas.
+cambian algo son siempre `POST`; un `GET` solo lee y nunca deja nada instalado. El
+verbo POST evita que una visita suelta o una precarga disparen algo solas, pero POST
+no frena a OTRA WEB: eso lo corta `puerta_local.rechazo()`, que exige `Origin`/`Host`
+de este mismo servidor al principio de cada verbo.
 """
 import argparse
 import http.server
@@ -46,6 +46,11 @@ try:
     from . import navegador
 except ImportError:
     import navegador
+
+try:
+    from . import puerta_local
+except ImportError:
+    import puerta_local
 
 PKG = os.path.dirname(os.path.abspath(__file__))       # abyss/ (este fichero vive aquí)
 RAIZ = os.path.dirname(PKG)                             # raíz del repo, junto a instalar.py
@@ -237,6 +242,11 @@ class _Manejador(http.server.BaseHTTPRequestHandler):
 
     # ── lectura: nunca instala nada ──────────────────────────────────────
     def do_GET(self):
+        motivo = puerta_local.rechazo(self)
+        if motivo:
+            puerta_local.descartar_cuerpo(self)
+            self._json({'error': motivo}, 403)
+            return
         partes = urllib.parse.urlparse(self.path)
         qs = urllib.parse.parse_qs(partes.query)
         idioma = _idioma_de(qs)
@@ -262,6 +272,12 @@ class _Manejador(http.server.BaseHTTPRequestHandler):
 
     # ── escritura: los cuatro verbos que de verdad cambian algo, + cerrar ──
     def do_POST(self):
+        motivo = puerta_local.rechazo(self)
+        if motivo:
+            puerta_local.descartar_cuerpo(self)
+            self.close_connection = True  # cierra tras el rechazo: no reusar esta conexión
+            self._json({'error': motivo}, 403)
+            return
         partes = urllib.parse.urlparse(self.path)
         cuerpo = self._cuerpo_json()
         idioma = _idioma_de(cuerpo)

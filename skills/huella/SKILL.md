@@ -27,9 +27,10 @@ Con el módulo instalado, tres ganchos registran en
 - **`Stop`**: una línea `[huella] N proceso(s) y M puerto(s) abiertos por este
   hilo siguen vivos: --informe` — solo si de verdad queda algo vivo que cuelgue
   del proceso de esta sesión; si no, silencio total. Un proceso nuevo cuyo padre
-  ya no existe no se puede atribuir con certeza: no cuenta aquí y `--informe` lo
-  lista como «atribución incierta». Uno que cuelga de otro proceso vivo ajeno no
-  es de este hilo y no se registra.
+  ya no existe no se puede atribuir con certeza (en Windows eso incluye servicios
+  del sistema con la cadena de padres rota): no cuenta aquí, `--informe` lo lista
+  como «atribución incierta» y `--limpiar` nunca lo mata. Uno que cuelga de otro
+  proceso vivo ajeno no se registra.
 
 ## Cómo se ejecuta
 

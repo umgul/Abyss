@@ -34,6 +34,15 @@ def _dimensiones_png(ruta):
     return ancho, alto
 
 
+def _perfiles_cdp():
+    """Nombres `abyss_cdp_*` que hay ahora mismo en el temporal de la suite. `conftest.py`
+    redirige TEMP/TMP y `tempfile.tempdir` a una carpeta propia antes de que nada se
+    importe, y el subproceso de `render3d.py` la hereda por variables de entorno: por
+    eso este mismo `tempfile.gettempdir()`, en el proceso de la prueba, es donde
+    `navegador_cdp.captura()` crea (y debe borrar) el perfil temporal del subproceso."""
+    return {n for n in os.listdir(tempfile.gettempdir()) if n.startswith("abyss_cdp_")}
+
+
 def _sin_url_externa(html):
     """Ningún `http(s)://` fuera del ÚNICO caso legítimo: el espacio de nombres XHTML que usa
     `document.createElementNS(...)` dentro del propio three.js embebido (un identificador,
@@ -185,9 +194,12 @@ class PngConNavegador(unittest.TestCase):
         tmp = tempfile.mkdtemp(prefix="abyss_render3d_")
         ruta_html = os.path.join(tmp, "s.html")
         ruta_png = os.path.join(tmp, "s.png")
+        antes = _perfiles_cdp()
         r = ay.ejecutar(ay.script("render3d.py"),
                         [str(ESCENA_PRUEBA), "--html", ruta_html, "--png", ruta_png, "--ancho", "800", "--alto", "500"],
                         dict(os.environ), timeout=60)
+        nuevas = _perfiles_cdp() - antes
+        self.assertFalse(nuevas, f"quedó un perfil temporal de navegador_cdp sin borrar: {nuevas}")
         self.assertEqual(r.returncode, 0, r.stderr)
         datos = _ultima_linea_json(r.stdout)
         self.assertEqual(datos["png"].replace("/", "\\"), os.path.abspath(ruta_png).replace("/", "\\"))
@@ -201,12 +213,16 @@ class PngConNavegador(unittest.TestCase):
         de píxeles."""
         tmp = tempfile.mkdtemp(prefix="abyss_render3d_")
         pngs = {}
+        antes = _perfiles_cdp()
         for explosion in ("0", "1.5"):
             ruta_png = os.path.join(tmp, f"e{explosion}.png")
             r = ay.ejecutar(ay.script("render3d.py"),
                             [str(ESCENA_PRUEBA), "--html", os.path.join(tmp, f"e{explosion}.html"),
                              "--png", ruta_png, "--explosion", explosion, "--ancho", "400", "--alto", "300"],
                             dict(os.environ), timeout=60)
+            nuevas = _perfiles_cdp() - antes
+            self.assertFalse(nuevas,
+                              f"quedó un perfil temporal de navegador_cdp sin borrar tras --explosion {explosion}: {nuevas}")
             self.assertEqual(r.returncode, 0, r.stderr)
             pngs[explosion] = os.path.getsize(ruta_png)
         self.assertNotEqual(pngs["0"], pngs["1.5"], "la vista explosionada debería cambiar el fotograma capturado")

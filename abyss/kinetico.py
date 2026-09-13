@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 """Kinético: cualquier montón de cosas, en tres dimensiones y movido con la mano.
 
-    python kinetico.py arbol <carpeta> [--hondura 2] [--tope 2000] [--puerto 8890]
+    python kinetico.py arbol <carpeta> [--hondura 2] [--tope 2000] [--puerto 8890] [--fondo-escritorio]
     python kinetico.py datos <nodos.json> [--puerto 8890] [--sin-abrir]
-    python kinetico.py <lo que sea> --solo-montar --salida <carpeta>
+    python kinetico.py estanteria <carpeta> [--fichas fichas.json] [--titulo T] [--hondura 3]
+                                  [--fondo imagen | --fondo-escritorio]
+    python kinetico.py <lo que sea> --solo-montar --salida <carpeta> [--sin-manos]
+
+`estanteria` es una colección con portadas (libros, películas, discos, fotos): ver
+`abyss/estanteria.py`.
 
 ## Qué es esto, y qué NO es
 
@@ -524,6 +529,8 @@ def _cli(argv):
     def valor(bandera, defecto=None):
         return resto[resto.index(bandera) + 1] if bandera in resto and resto.index(bandera) + 1 < len(resto) else defecto
 
+    if modo == "estanteria":
+        return _cli_estanteria(resto, valor)
     salida = valor("--salida") or os.path.join(tempfile.gettempdir(), "abyss", "kinetico_montado")
     tope = int(valor("--tope", TOPE))
     hondura = int(valor("--hondura", 2))
@@ -539,7 +546,7 @@ def _cli(argv):
         except (OSError, ValueError) as e:
             datos, err = None, "sin dato: no puedo leer %s (%s)" % (resto[0], e)
     else:
-        print("modo desconocido: %s (arbol | datos)" % modo); return 1
+        print("modo desconocido: %s (arbol | datos | estanteria)" % modo); return 1
     if err:
         print(err); return 2
 
@@ -577,6 +584,41 @@ def _cli(argv):
 
     return sirve(salida, int(valor("--puerto", PUERTO)), abrir="--sin-abrir" not in resto,
                  remontar=(remontar if modo == "arbol" else None))
+
+
+def _cli_estanteria(resto, valor):
+    if not resto or resto[0].startswith("--"):
+        print("uso: kinetico.py estanteria <carpeta> [--fichas fichas.json] [--titulo T] [--fondo imagen]")
+        return 1
+    try:
+        from . import estanteria
+    except ImportError:
+        import estanteria
+    # su propio sitio de montaje: abrir una estantería no pisa el explorador que esté abierto
+    salida = valor("--salida") or os.path.join(tempfile.gettempdir(), "abyss", "kinetico_estanteria")
+    fondo = "escritorio" if "--fondo-escritorio" in resto else valor("--fondo")
+    datos, portadas = estanteria.de_estanteria(resto[0], fichas=valor("--fichas"),
+                                               hondura=int(valor("--hondura", estanteria.HONDURA)),
+                                               titulo=valor("--titulo"),
+                                               fondo=None if fondo == "escritorio" else fondo)
+    if datos is None:
+        print(portadas)
+        return 2
+    if not estanteria.monta(datos, portadas, salida, manos="--sin-manos" not in resto, fondo=fondo):
+        return 2
+    con = sum(1 for it in datos["items"] if it["fuente"])
+    dibujadas = sum(1 for it in datos["items"] if it["aviso_portada"].startswith("portada dibujada"))
+    print("montado: %s (%d obras, %d con ficha con fuente, %d portadas dibujadas, %d atlas)"
+          % (salida, len(datos["items"]), con, dibujadas, datos["atlas"]))
+    for it in datos["items"]:
+        print("  %-60s %s" % (it["id"][:60], it["aviso_portada"]))
+    if "--solo-montar" in resto:
+        return 0
+    try:
+        from kinetico_servidor import sirve
+    except ImportError:
+        from abyss.kinetico_servidor import sirve
+    return sirve(salida, int(valor("--puerto", PUERTO)), abrir="--sin-abrir" not in resto, remontar=None)
 
 
 if __name__ == "__main__":
