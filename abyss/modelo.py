@@ -115,7 +115,7 @@ def _elegido_a_mano(fij, actual):
 
 def _sid_de_ruta(tp):
     """id de sesión a partir del nombre del transcript — mismo criterio que
-    `continuidad._sid_de_ruta()`/`vigia._sid_de_ruta()`/`propiocepcion.medir()`,
+    `vigia._sid_de_ruta()`/`propiocepcion._sid_de()`,
     para poder preguntarle a `parentesis.py` por los tramos de ESTA sesión.
     `None` si `tp` no trae nada de donde sacar un id."""
     if not tp:
@@ -129,12 +129,18 @@ def _sid_de_ruta(tp):
 
 
 def _parentesis_de(sid, tp):
-    """`parentesis.en_parentesis` ya importado, o `None` si no se puede resolver (sin
-    sid, sin proyecto, o el propio módulo falla) — fail-open: sin poder consultar el
-    tramo, `recorrer()` simplemente no filtra nada, en vez de reventar la librería de
-    `continuidad.py --despertar` que lo llama en cada prompt. `_mem(tp)` se llama ANTES
-    de importar `parentesis` para que su `rutas.resolver()` (que lee el `sys.argv` de
-    ESTE proceso) encuentre `ABYSS_PROYECTO` ya fijado, en vez de adivinar."""
+    """Una función `(sid, ts)` con la regla de `parentesis.en_parentesis()` y los tramos
+    de esta sesión ya leídos (una vez por recorrido, no un fichero abierto por línea), o
+    `None` si no se puede resolver (sin sid, sin proyecto, o el propio módulo falla) —
+    fail-open: sin poder consultar el tramo, `recorrer()` simplemente no filtra nada, en
+    vez de reventar la librería de `continuidad.py --despertar` que lo llama en cada
+    prompt. `_mem(tp)` se llama ANTES de importar `parentesis` para que su
+    `rutas.resolver()` (que lee el `sys.argv` de ESTE proceso) encuentre `ABYSS_PROYECTO`
+    ya fijado, en vez de adivinar.
+
+    Los tramos se leen FUERA de ese fail-open: si `parentesis.json` existe pero no se deja
+    leer como tramos, `recorrer()` falla y `--despertar` calla el aviso de ese prompt,
+    antes que reinyectar en `[modelo · revisión]` algo dicho dentro de un paréntesis."""
     if not sid or _mem(tp) is None:
         return None
     try:
@@ -142,9 +148,10 @@ def _parentesis_de(sid, tp):
             from . import parentesis as PZ
         except ImportError:
             import parentesis as PZ
-        return PZ.en_parentesis
     except Exception:
         return None
+    tramos = PZ.tramos(sid)
+    return lambda _sid, ts: PZ.en_tramos(tramos, ts)
 
 
 def recorrer(tp):

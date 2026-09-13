@@ -41,6 +41,11 @@ relojes se construyen a partir de `frases_usuario()`, así que heredan el filtro
 tocarlos aparte. `.omitir` (sesión entera fuera) ya existía aquí antes de
 `parentesis.py`; ahora también se escribe desde `parentesis.py --omitir-sesion`.
 
+Las frases salen de la misma lectura que la medida (`propiocepcion.extraer()`), que se
+recuerda en `mem/.matrioshka/` con la firma del fichero: un arranque solo relee los
+transcripts que cambiaron desde la última vez, y los de las sesiones de `.omitir`, de
+las que no se recuerda nada.
+
 El código vive donde lo instale `rutas.CODE`; los datos (sesiones/, relojes.jsonl,
 bolsas.json, MEMORY.md…) viven en `mem`, resuelto por `rutas.resolver()` — nunca
 `dirname(__file__)` como carpeta de datos (§1).
@@ -132,42 +137,14 @@ def es_mio(transcript_path, cwd=None):
     return rutas.es_mio(transcript_path, cwd, proj)
 
 
-def _sid_de_ruta(path):
-    """id de sesión a partir del nombre de fichero de sesiones/ (.jsonl o
-    .jsonl.gz) — el mismo criterio de `propiocepcion.medir()`, para saber a qué
-    sesión preguntarle a `parentesis.py` sus tramos."""
-    base = os.path.basename(path)
-    if base.endswith('.jsonl.gz'):
-        return base[:-9]
-    if base.endswith('.jsonl'):
-        return base[:-6]
-    return base
-
-
 def frases_usuario(path):
     """Todas las frases del usuario de una sesión (sin meta, sin sidechain, sin lo
     que caiga dentro de un tramo de paréntesis de esa sesión — `parentesis.py`).
-    Lee .jsonl y .jsonl.gz por igual (§2.4)."""
-    sid = _sid_de_ruta(path)
-    out = []
-    with P.abrir_texto(path) as fh:
-        for line in fh:
-            try:
-                d = json.loads(line)
-            except Exception:
-                continue
-            if d.get('type') != 'user' or d.get('isMeta') or d.get('isSidechain'):
-                continue
-            if PZ.en_parentesis(sid, d.get('timestamp')):
-                continue
-            c = (d.get('message') or {}).get('content')
-            if isinstance(c, str) and c.strip():
-                # Los resúmenes de compactación entran como `user` pero NO son del
-                # usuario: contaminaban bolsas, relojes y candidatos a tema.
-                if c.lstrip().startswith('This session is being continued') or c.lstrip().startswith('<command-name>'):
-                    continue
-                out.append(re.sub(r'\s+', ' ', c.strip()))
-    return out
+    Los resúmenes de compactación y los `<command-name>` entran como `user` pero NO son
+    del usuario: contaminaban bolsas, relojes y candidatos a tema, y no cuentan.
+    Lee .jsonl y .jsonl.gz por igual (§2.4). Salen de `propiocepcion.extraer()`: la misma
+    lectura que mide la sesión, recordada con la firma del fichero."""
+    return list(P.extraer(path)['frases'])
 
 
 def relojes_guardados():
@@ -208,26 +185,24 @@ def hacer_reloj(sid, data):
 
 def _omitidas():
     """Sesiones que el usuario pidió NO guardar: un id por línea en sesiones/.omitir.
-    Vale para el cierre propio y para la cosecha de cualquier otro hilo."""
-    try:
-        with open(os.path.join(SES, '.omitir'), encoding='utf-8') as fh:
-            return {l.strip() for l in fh if l.strip()}
-    except Exception:
-        return set()
+    Vale para el cierre propio y para la cosecha de cualquier otro hilo. El mismo
+    lector que usa `propiocepcion` para no recordar nada de ellas."""
+    return P.sesiones_omitidas()
 
 
 def _copiar_saltando_parentesis(src, dst, sid):
-    """Copia `src` a `dst` línea a línea, saltando las que `parentesis.en_parentesis()`
-    diga que caen dentro de un tramo de esta sesión. Una línea que no parsea como
-    JSON se copia tal cual (no se puede mirar su timestamp, y no es asunto de esta
-    función limpiar líneas rotas)."""
+    """Copia `src` a `dst` línea a línea, saltando las que caen dentro de un tramo de
+    esta sesión (la regla de `parentesis.en_parentesis()`, con los tramos leídos una vez).
+    Una línea que no parsea como JSON se copia tal cual (no se puede mirar su timestamp,
+    y no es asunto de esta función limpiar líneas rotas)."""
+    lista = PZ.tramos(sid)
     with open(src, encoding='utf-8', errors='ignore') as fin, open(dst, 'w', encoding='utf-8') as fout:
         for line in fin:
             try:
                 d = json.loads(line)
             except Exception:
                 fout.write(line); continue
-            if PZ.en_parentesis(sid, d.get('timestamp')):
+            if PZ.en_tramos(lista, d.get('timestamp')):
                 continue
             fout.write(line)
 
@@ -322,6 +297,7 @@ def cerrar(sid_actual=None, transcript_path=None):
         for p in glob.glob(os.path.join(proj, '*.jsonl')):
             if os.path.basename(p)[:-6] != sid_actual:
                 guardar(p)
+    P.barrer_munecas()  # fuera lo recordado de sesiones omitidas o que ya no tienen fichero
     data = P.medir_todas([SES])
     hechos = relojes_guardados(); nuevos = 0
     with open(RELOJES, 'a', encoding='utf-8') as fh:
@@ -329,9 +305,9 @@ def cerrar(sid_actual=None, transcript_path=None):
             if sid == sid_actual or not (os.path.exists(os.path.join(SES, sid + '.jsonl'))
                                           or os.path.exists(os.path.join(SES, sid + '.jsonl.gz'))):
                 continue
+            if sid in hechos and hechos[sid].get('turnos') == data[sid]['turnos_usuario']:
+                continue  # sin turnos nuevos: el reloj apuntado sigue valiendo y no se releen sus frases
             r = hacer_reloj(sid, data)
-            if sid in hechos and hechos[sid].get('turnos') == r['turnos']:
-                continue  # sin cambios
             fh.write(json.dumps(r, ensure_ascii=False) + '\n'); nuevos += 1
     hacer_bolsas()
     avisos = []

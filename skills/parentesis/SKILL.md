@@ -24,7 +24,8 @@ Dos mecanismos distintos, y uno más bruto:
    construyen sobre lo mismo. Un tramo abierto y nunca cerrado se trata como
    abierto hasta el cierre de la sesión (nada se escapa por descuido).
 2. **Sesión entera** (`--omitir-sesion`): la sesión completa nunca se copia a
-   `sesiones/`, ni aunque la cierre otro hilo distinto.
+   `sesiones/`, ni aunque la cierre otro hilo distinto, y de ella no se
+   recuerda nada en `.matrioshka/` (se borra la muñeca que hubiera).
 3. **Corte del fichero local** (`--recortar`/`--recortar-tramo`): reescribe de
    verdad el `.jsonl` que usa la propia app de Claude Code para reconstruir el
    hilo, con una copia `.antes` del original. Solo tiene sentido con el hilo
@@ -58,8 +59,9 @@ si se rehúsa (hilo vivo, mensaje no encontrado).
 
 ## Qué sale de la máquina
 
-Nada. Todo local: `memory/parentesis.json`, `memory/sesiones/.omitir`, y el
-propio `.jsonl` que se recorte (con su copia `.antes`).
+Nada. Todo local: `memory/parentesis.json`, `memory/sesiones/.omitir` (y, con
+`--omitir-sesion`, borrar `memory/.matrioshka/<id>.json`), y el propio `.jsonl`
+que se recorte (con su copia `.antes`).
 
 ## Límites honestos
 
@@ -70,7 +72,9 @@ propio `.jsonl` que se recorte (con su copia `.antes`).
 - Quien respeta el tramo (`parentesis.en_parentesis()`), medido y probado:
   `continuidad.guardar()`/`frases_usuario()`, la sala de relojes y las bolsas
   (heredado de `frases_usuario()`), `vigia.leer_turno()` (no lo usa como
-  evidencia ni lo guarda en `confabulaciones.jsonl`), `propiocepcion.medir()`,
+  evidencia ni lo guarda en `confabulaciones.jsonl`), `propiocepcion.extraer()`
+  (medida, frases y lecturas salen de una sola lectura, y la firma de lo que
+  recuerda lleva los tramos: abrir o cerrar uno obliga a releer),
   `varas.py --index` (una lectura de una ficha hecha dentro del tramo no
   cuenta como uso, no le sube el ◆) y `modelo.recorrer()` (un turno respondido
   por otro modelo dentro del tramo no se reinyecta en el aviso

@@ -61,14 +61,6 @@ try:
 except ImportError:
     import propiocepcion as P
 
-# Importado DESPUÉS de fijar ABYSS_PROYECTO (igual que hace `continuidad.py` con
-# este mismo módulo) para que la propia resolución de `parentesis.py` no vuelva a
-# tocar stdin.
-try:
-    from . import parentesis as PZ
-except ImportError:
-    import parentesis as PZ
-
 IDX = os.path.join(mem, 'MEMORY.md')
 SES = os.path.join(mem, 'sesiones')
 LIMITE_LINEA = 200
@@ -104,31 +96,21 @@ for f in fichas:
         t = N('NFC', m.group(1).strip()) + '.md'
         if t in indeg and t != f:
             indeg[t] += 1
-def _ts_de_linea(line):
-    """`timestamp` de una línea de transcript ya candidata, o `None` si no se puede leer
-    como JSON — mismo criterio fail-open que `parentesis.en_parentesis()`: una línea
-    sin marca de tiempo no se oculta, se cuenta igual que siempre."""
-    try:
-        return json.loads(line).get('timestamp')
-    except Exception:
-        return None
 
-
+# Qué fichas leyó cada sesión: de las líneas que nombran `memory` y traen un Read o un
+# `cat ` —y no caen en un paréntesis (ver docstring del módulo)—, `propiocepcion.lecturas()`
+# guarda en NFC los trozos que rodean cada `.md`; una ficha está en la línea si y solo si
+# está en uno de ellos. Salen de la misma lectura que mide la sesión (su muñeca en
+# `.matrioshka/`) o, si no la hay, de un recorrido que no escribe nada.
 reads = {f: set() for f in fichas}
 for sp in glob.glob(os.path.join(proj, '*.jsonl')):
     sid = os.path.basename(sp)[:-6]
-    with open(sp, encoding='utf-8', errors='ignore') as fh:
-        for line in fh:
-            if 'memory' not in line or ('"name":"Read"' not in line and 'cat ' not in line):
-                continue
-            # Paréntesis (ver docstring del módulo): una lectura DENTRO de un tramo
-            # marcado no debe subirle el ◆ a esa ficha en MEMORY.md.
-            if PZ.en_parentesis(sid, _ts_de_linea(line)):
-                continue
-            line = N('NFC', line)
-            for f in fichas:
-                if f in line:
-                    reads[f].add(sid)
+    trozos = P.lecturas(sp)
+    if not trozos:
+        continue
+    for f in fichas:
+        if f in trozos:
+            reads[f].add(sid)
 now = time.time()
 use = {f: indeg[f] + len(reads[f]) for f in fichas}
 age = {f: (now - os.path.getmtime(os.path.join(mem, f))) / 86400 for f in fichas}

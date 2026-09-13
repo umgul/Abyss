@@ -104,14 +104,24 @@ def en_parentesis(sid, ts):
     escapa aunque la sesión se cierre a mitad. Fail-open ante datos ilegibles: una línea
     sin `timestamp` o un `inicio` corrupto no se oculta (ocultar por defecto escondería
     mensajes ajenos al paréntesis); un `fin` corrupto sí oculta (ahí ya se sabe que el
-    tramo existe)."""
-    if not ts:
+    tramo existe).
+
+    Relee `parentesis.json` en cada llamada: para una comprobación suelta. Quien recorre
+    un transcript entero lee `tramos(sid)` una vez y pregunta a `en_tramos()` por cada
+    línea — la misma regla sin abrir un fichero por línea."""
+    return en_tramos(tramos(sid), ts)
+
+
+def en_tramos(lista, ts):
+    """La regla de `en_parentesis()` contra una lista de tramos ya leída (lo que devuelve
+    `tramos(sid)`, como tuplas o como listas)."""
+    if not lista or not ts:
         return False
     try:
         momento = _parse(ts)
     except Exception:
         return False
-    for inicio, fin in tramos(sid):
+    for inicio, fin in lista:
         try:
             ini = _parse(inicio)
         except Exception:
@@ -159,6 +169,23 @@ def cerrar(sid):
 
 # ---------- --omitir-sesion (reusa mem/sesiones/.omitir de continuidad.py) ----------
 
+def _borrar_muneca(sid):
+    """Quita `mem/.matrioshka/<sid>.json`: lo que `propiocepcion.extraer()` recordaba de
+    esta sesión (su medida, sus frases y los trozos de línea que nombran fichas). De una
+    sesión omitida no se vuelve a guardar nada ahí; esto se lleva lo de antes. Devuelve ''
+    si ya no queda, o el aviso que hay que decir si no se pudo borrar (en Windows, por
+    ejemplo, mientras otro proceso la tiene abierta)."""
+    ruta = os.path.join(mem, rutas.MATRIOSHKA, sid + '.json')
+    try:
+        os.remove(ruta)
+    except FileNotFoundError:
+        pass
+    except OSError as e:
+        return (f' · AVISO: no se pudo borrar {rutas.MATRIOSHKA}/{sid}.json ({e.__class__.__name__}); '
+                f'la quitará el barrido del próximo cierre de sesión')
+    return ''
+
+
 def omitir_sesion(sid):
     os.makedirs(SES, exist_ok=True)
     ruta = os.path.join(SES, '.omitir')
@@ -168,10 +195,13 @@ def omitir_sesion(sid):
     except Exception:
         existentes = set()
     if sid in existentes:
-        return f'{sid[:8]} ya estaba en sesiones/.omitir'
+        return f'{sid[:8]} ya estaba en sesiones/.omitir' + _borrar_muneca(sid)
+    # Primero se apunta y luego se borra: una lectura que termine después ya ve la sesión
+    # en `.omitir` y no deja muñeca (ver `propiocepcion._guardar_muneca`).
     with open(ruta, 'a', encoding='utf-8') as fh:
         fh.write(sid + '\n')
-    return f'{sid[:8]} añadida a sesiones/.omitir: ningún hilo (este u otro haciendo la cosecha) la copiará a mem/sesiones/'
+    return (f'{sid[:8]} añadida a sesiones/.omitir: ningún hilo (este u otro haciendo la cosecha) la copiará a mem/sesiones/'
+            + _borrar_muneca(sid))
 
 
 # ---------- heurística de sesión actual (sin gancho, sin session_id) ----------

@@ -95,6 +95,9 @@ def _ficheros_del_repo(raiz):
             ruta = Path(dirpath) / nombre
             if ruta.relative_to(raiz) == ESTE_FICHERO_REL:
                 continue
+            if nombre == '.git':
+                continue  # en un worktree o un submódulo, `.git` es un fichero con la ruta al repo: no se publica
+
             if ruta.suffix in EXTENSIONES or ruta.suffix == '' or ruta.name.endswith('.plantilla'):
                 if not _ignorado(ruta, patrones, raiz):
                     yield ruta

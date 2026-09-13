@@ -156,7 +156,7 @@ DATOS_GENERADOS = (
     os.path.join('sesiones', '.omitir'),  # cuelga de sesiones/, no de mem/ directamente
     'confabulaciones.jsonl', 'lugar.json', 'meteo.json', '.modelo_revisado',
     'modelo_log.jsonl', 'noticias.json', 'temas_auto.json', 'temas_veto.json',
-    'temas_log.jsonl', 'ojo.log', 'propiocepcion.json', 'imagen.log', 'imagenes',
+    'temas_log.jsonl', 'ojo.log', 'propiocepcion.json', '.matrioshka', 'imagen.log', 'imagenes',
     # Telemetría/caché regenerable de las piezas nuevas. NO incluye
     # `parentesis.json` (tramos que el usuario pidió a propósito, no telemetría
     # automática) ni `imagen_config.json` (claves puestas a mano) — mismo criterio
@@ -232,10 +232,12 @@ MODULOS = [
          linea='Mide cada sesión contra mi propia distribución; varas.py pone los ◆ del índice (MEMORY.md).',
          linea_en='Measures each session against its own distribution; varas.py sets the ◆ marks in the '
                   'index (MEMORY.md).',
-         toca='sin gancho propio (varas.py --index lo invoca continuidad --cierre); ficheros mem/propiocepcion.json',
+         toca='sin gancho propio (varas.py --index lo invoca continuidad --cierre); ficheros mem/propiocepcion.json '
+              'y mem/.matrioshka/ (lo que una lectura saca de cada sesión, para no releerla)',
          hooks=[],
          toca_en="no hook of its own (continuidad --cierre invokes varas.py --index); files: "
-                 "mem/propiocepcion.json"),
+                 "mem/propiocepcion.json and mem/.matrioshka/ (what one read takes from each session, so it "
+                 "isn't read again)"),
     dict(id='ojo', script='ojo.py', defecto=True,
          linea='El ojo, con verbos: mirar (webcam), texto/fotocopia/tarjeta/manual (OCR, delega en '
                'lectura_visual.py), despiece/prompt3d (2,5D, delega en volumen.py), gestos (control por '
@@ -353,12 +355,12 @@ MODULOS = [
          linea_en='Marks a stretch or a whole session so it does not enter future memory; can trim the '
                   'local transcript once it is already closed.',
          toca='sin gancho — uso manual (--abrir/--cerrar/--omitir-sesion/--recortar/--recortar-tramo); '
-              'ficheros mem/parentesis.json, mem/sesiones/.omitir',
+              'ficheros mem/parentesis.json, mem/sesiones/.omitir; --omitir-sesion borra mem/.matrioshka/<id>.json',
          hooks=[],
          aviso='no puede deshacer lo que ya viajó a la API dentro de un turno: gobierna la memoria LOCAL de '
                'este paquete (lo que el propio asistente vuelve a leer), no los servidores de Anthropic.',
          toca_en="no hook — manual use (--abrir/--cerrar/--omitir-sesion/--recortar/--recortar-tramo); "
-                 "files mem/parentesis.json, mem/sesiones/.omitir",
+                 "files mem/parentesis.json, mem/sesiones/.omitir; --omitir-sesion deletes mem/.matrioshka/<id>.json",
          aviso_en="it can't undo what already went to the API within a turn: it governs this package's "
                   "LOCAL memory (what the assistant itself reads back), not Anthropic's servers."),
     dict(id='huella', script='huella.py', defecto=False,

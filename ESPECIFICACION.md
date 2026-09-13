@@ -23,7 +23,8 @@ Claude Code). Regla:
 - `mem = proj/memory` (se crea si no existe). `sesiones/`, `relojes.jsonl`, `bolsas.json`,
   `.despertados/`, `.vivo/`, `.omitir`, `confabulaciones.jsonl`, `lugar.json`, `meteo.json`,
   `modelo_*`, `.modelo_revisado/`, `noticias.json`, `temas_*.json`, `temas_log.jsonl`, `ojo.log`,
-  `propiocepcion.json`, `imagen.log`, `imagenes/`, `varas.log` (avisos y fallos de `varas.py
+  `propiocepcion.json`, `.matrioshka/` (lo que `propiocepcion.extraer()` sacó de cada sesión, con la
+  firma del fichero leído), `imagen.log`, `imagenes/`, `varas.log` (avisos y fallos de `varas.py
   --index` que dispara `continuidad.cerrar()`) viven en `mem`. `MEMORY.md` y las fichas también,
   junto con sus copias fechadas `MEMORY.md.abyss-AAAAMMDD-HHMMSS.bak` (una por cada recorte real
   de `varas.py --index --recortar`, nunca en el pase automático).

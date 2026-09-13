@@ -349,9 +349,9 @@ another's.
 | `rutas.py` | Resolves where the code lives and where the data lives for every other script. | None (library everything else imports) | Only creates `memory/` if missing. |
 | `continuidad.py` | Saves every session, measures its clock, opens the room of clocks, and keeps the heartbeat of which threads are still alive. `--comprimir` gzips old sessions. | `SessionStart` (`--arranque`) · `SessionEnd` (`--cierre`) · `UserPromptSubmit` (`--despertar`) | `sesiones/*.jsonl(.gz)` · `relojes.jsonl` · `bolsas.json` · `.despertados/` · `.vivo/` · `sesiones/.omitir` · `varas.log` (warnings and failures from `varas.py --index` after each close) |
 | `vigia.py` | Checks the last reply against the session's real evidence and blocks the turn's closing once if it finds unsourced numbers, paths, or quotes. | `Stop` (`--verificar`) | `confabulaciones.jsonl` |
-| `propiocepcion.py` | Measures each session from its transcript and gives its percentile against everything measured so far. | None of its own — library used by `continuidad.py` and `varas.py`; also a standalone CLI | `propiocepcion.json` |
+| `propiocepcion.py` | Measures each session from its transcript and gives its percentile against everything measured so far. A single read per file takes the numbers, the phrases that word bags and clocks use, and the file reads that `varas.py` counts, and it is remembered with the file's signature so the file isn't read again while it doesn't change. | None of its own — library used by `continuidad.py` and `varas.py`; also a standalone CLI | `propiocepcion.json` · `.matrioshka/` (one record per session with what that read took; nothing from sessions in `sesiones/.omitir`) |
 | `varas.py` | Recomputes each file's ◆/◆◆/◆◆◆ weight by quantiles of citations + reads, and rewrites those glyphs in the index. If `MEMORY.md` exceeds 24 KB it only **warns** on stdout; actual trimming is manual, via `varas.py --index --recortar` (it saves a dated copy first); it never deletes a whole line. | None of its own — called by `continuidad.py` after each close; also a standalone CLI | Rewrites `MEMORY.md` · `MEMORY.md.abyss-YYYYMMDD-HHMMSS.bak` (one per actual trim) |
-| `parentesis.py` | Marks a stretch or a whole session to keep out of future memory; trims the local transcript already closed (`--recortar`/`--recortar-tramo`, with a `.antes` copy). | None — manual use | `parentesis.json` · `sesiones/.omitir` (reused) |
+| `parentesis.py` | Marks a stretch or a whole session to keep out of future memory; trims the local transcript already closed (`--recortar`/`--recortar-tramo`, with a `.antes` copy). | None — manual use | `parentesis.json` · `sesiones/.omitir` (reused) · with `--omitir-sesion`, deletes `.matrioshka/<id>.json` |
 | `exterocepcion.py` | Location (by IP and by what's said), weather at that location, and the entry channel of the last message. | None of its own — library used by `continuidad.py` | `lugar.json` · `meteo.json` |
 | `modelo.py` | Detects replies coming from a model other than the preferred one and flags turns to review on return. | None of its own — there is no «PostModelSwitch»/«PreModelSwitch» event in Claude Code; library used by `continuidad.py --despertar` | `modelo_preferido.json` · `.modelo_revisado/` |
 | `noticias.py` | Front page and topic headlines on startup; self-curated automatic topics. | None of its own — library used by `continuidad.py --arranque` | `noticias.json` · `temas_auto.json` · `temas_log.jsonl` · `temas_noticias.json` (hand-editable) · `temas_veto.json` |
@@ -474,6 +474,12 @@ another's.
 - `sesiones/` stores the **entire** transcript of every session, locally,
   unencrypted. It's the source for everything else and grows without bound
   except for `--comprimir` (which only gzips, never deletes).
+- `.matrioshka/` keeps, per session, what one read took from its transcript
+  —the numbers, the user's phrases, and the line fragments that name a memory
+  file— so it isn't read again at every start: it's the user's text, local and
+  unencrypted, like `sesiones/`. It keeps nothing from a session listed in
+  `sesiones/.omitir`, and deleting the whole folder changes no result: it only
+  forces a re-read.
 - The watchdog blocks at most once per turn; if it keeps confabulating after
   the first block, it lets it through and only logs it as a "repeat offender."
 - Below 8 measured sessions there's no measure at all: `propiocepcion.py`,

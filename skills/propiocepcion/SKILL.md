@@ -25,6 +25,14 @@ caché leídos, usos de `WebSearch`/`WebFetch`, y un proxy tosco de "correccione
 sesión dada, su percentil contra todas las sesiones medidas hasta ese momento en
 cada una de esas claves.
 
+Cada fichero se lee una sola vez: de esa lectura salen la medida, las frases del
+usuario que usan las bolsas y los relojes de `continuidad.py`, y las lecturas de
+fichas que cuenta `varas.py`. Lo sacado se recuerda en `memory/.matrioshka/<id>.json`
+con la firma del fichero (tamaño, fecha de modificación, tramos de paréntesis y
+huella del código); mientras la firma no cambie, esa lectura no se repite. De las
+sesiones de `memory/sesiones/.omitir` no se guarda nada, así que esas se leen enteras
+cada vez.
+
 ## Cómo se ejecuta
 
 ```
@@ -46,7 +54,7 @@ corpus suficiente.
 ## Qué sale de la máquina
 
 Nada. Todo local: solo lee transcripts de `memory/sesiones/` (y del proyecto) y
-escribe `propiocepcion.json`.
+escribe `propiocepcion.json` y `.matrioshka/`.
 
 ## Límites honestos
 
@@ -55,6 +63,12 @@ escribe `propiocepcion.json`.
   formuladas de otra manera. Se declara como proxy, no como verdad.
 - "Fichas escritas" solo ve `Write`/`cat >>` hacia rutas con `memory` en el
   nombre: un guardado por otra vía no deja huella aquí.
+- `.matrioshka/` guarda las frases del usuario de cada sesión, en local y sin
+  cifrar como `sesiones/`; de una sesión en `sesiones/.omitir` no guarda nada.
+  Borrarla no cambia ningún resultado, solo obliga a releer. Límite de la firma:
+  un transcript reescrito con el mismo tamaño dentro del mismo instante de
+  modificación se tomaría por el mismo (quienes escriben estos ficheros siempre
+  cambian el tamaño o los tramos).
 - No mide nada subjetivo — no hay campo "cansancio" ni "ánimo"; si el usuario
   pregunta eso, la respuesta correcta es remitir a los números de esta medida y
   decir que no hay instrumento para lo demás.

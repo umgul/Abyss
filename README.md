@@ -339,9 +339,9 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 | `rutas.py` | Resuelve dónde viven el código y los datos para todos los demás guiones. | Ninguno (librería que importan todos) | Solo crea `memory/` si no existe. |
 | `continuidad.py` | Guarda cada sesión, mide su reloj, abre la sala de los relojes y lleva el latido de qué hilos siguen vivos. `--comprimir` gzipea sesiones viejas. | `SessionStart` (`--arranque`) · `SessionEnd` (`--cierre`) · `UserPromptSubmit` (`--despertar`) | `sesiones/*.jsonl(.gz)` · `relojes.jsonl` · `bolsas.json` · `.despertados/` · `.vivo/` · `sesiones/.omitir` · `varas.log` (avisos y fallos de `varas.py --index` tras cada cierre) |
 | `vigia.py` | Contrasta la última respuesta contra la evidencia real de la sesión y bloquea el cierre del turno una vez si encuentra números, rutas o citas sin fuente. | `Stop` (`--verificar`) | `confabulaciones.jsonl` |
-| `propiocepcion.py` | Mide cada sesión desde su transcript y da su percentil contra todas las medidas. | Ninguno propio — librería de `continuidad.py` y `varas.py`; también CLI a mano | `propiocepcion.json` |
+| `propiocepcion.py` | Mide cada sesión desde su transcript y da su percentil contra todas las medidas. Una sola lectura por fichero saca la medida, las frases que usan bolsas y relojes y las lecturas de fichas que cuenta `varas.py`, y se recuerda con la firma del fichero para no releerlo mientras no cambie. | Ninguno propio — librería de `continuidad.py` y `varas.py`; también CLI a mano | `propiocepcion.json` · `.matrioshka/` (una muñeca por sesión con lo que sacó esa lectura; nada de las sesiones de `sesiones/.omitir`) |
 | `varas.py` | Recalcula el peso ◆/◆◆/◆◆◆ de cada ficha por cuantiles de citas + lecturas, y reescribe esos glifos en el índice. Si `MEMORY.md` supera 24 KB solo **avisa** por stdout; el recorte real es a mano con `varas.py --index --recortar` (deja antes una copia fechada); nunca borra una línea entera. | Ninguno propio — lo llama `continuidad.py` tras cada cierre; también CLI a mano | Reescribe `MEMORY.md` · `MEMORY.md.abyss-AAAAMMDD-HHMMSS.bak` (una por cada recorte real) |
-| `parentesis.py` | Marca un tramo o una sesión entera para que no entre en memoria futura; recorta el transcript local ya cerrado (`--recortar`/`--recortar-tramo`, con copia `.antes`). | Ninguno — uso manual | `parentesis.json` · `sesiones/.omitir` (reutilizado) |
+| `parentesis.py` | Marca un tramo o una sesión entera para que no entre en memoria futura; recorta el transcript local ya cerrado (`--recortar`/`--recortar-tramo`, con copia `.antes`). | Ninguno — uso manual | `parentesis.json` · `sesiones/.omitir` (reutilizado) · con `--omitir-sesion`, borra `.matrioshka/<id>.json` |
 | `exterocepcion.py` | Lugar (por IP y por lo dicho), meteo del lugar, y canal de entrada del último mensaje. | Ninguno propio — librería de `continuidad.py` | `lugar.json` · `meteo.json` |
 | `modelo.py` | Detecta si se responde fuera del modelo preferido y marca los turnos a revisar al volver. | Ninguno propio — no existe un evento «PostModelSwitch»/«PreModelSwitch» en Claude Code; librería de `continuidad.py --despertar` | `modelo_preferido.json` · `.modelo_revisado/` |
 | `noticias.py` | Portada y titulares por tema al arrancar; temas automáticos autocurados. | Ninguno propio — librería de `continuidad.py --arranque` | `noticias.json` · `temas_auto.json` · `temas_log.jsonl` · `temas_noticias.json` (editable a mano) · `temas_veto.json` |
@@ -465,6 +465,12 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 - `sesiones/` guarda el transcript **entero** de cada sesión, en local, sin
   cifrar. Es la fuente de todo lo demás y crece sin límite salvo
   `--comprimir` (que solo gzipea, no borra).
+- `.matrioshka/` guarda, por sesión, lo que una lectura sacó de su transcript
+  —la medida, las frases del usuario y los trozos de línea que nombran una
+  ficha— para no releerlo en cada arranque: es texto del usuario, en local y
+  sin cifrar, como `sesiones/`. De una sesión en `sesiones/.omitir` no guarda
+  nada, y borrar la carpeta entera no cambia ningún resultado: solo obliga a
+  releer.
 - El vigía bloquea como mucho una vez por turno; si insiste tras el primer
   bloqueo, lo deja pasar y solo lo apunta como "reincidente".
 - Con menos de 8 sesiones medidas no hay vara: `propiocepcion.py`, `varas.py`

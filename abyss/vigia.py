@@ -153,7 +153,7 @@ def _texto_bloque(b):
 
 def _sid_de_ruta(path):
     """id de sesión a partir del nombre de fichero (.jsonl o .jsonl.gz) — mismo
-    criterio que `continuidad._sid_de_ruta()`/`propiocepcion.medir()`, para
+    criterio que `modelo._sid_de_ruta()`/`propiocepcion._sid_de()`, para
     poder preguntarle a `parentesis.py` por los tramos de ESTA sesión cuando
     quien llama a `leer_turno()` no trae `sid` a mano (p. ej. `--probar`)."""
     base = os.path.basename(path)
@@ -172,6 +172,7 @@ def leer_turno(path, todas=False, sid=None):
     fichero (`_sid_de_ruta()`)."""
     sid = sid or _sid_de_ruta(path)
     evid = []; asst = []
+    tramos = PZ.tramos(sid)  # una vez por lectura, no un parentesis.json abierto por línea
     with P.abrir_texto(path) as fh:  # .jsonl y .jsonl.gz por igual (§2.4)
         for line in fh:
             try:
@@ -180,7 +181,7 @@ def leer_turno(path, todas=False, sid=None):
                 continue
             if d.get('isSidechain'):
                 continue
-            if PZ.en_parentesis(sid, d.get('timestamp')):
+            if PZ.en_tramos(tramos, d.get('timestamp')):
                 continue
             t = d.get('type'); m = d.get('message') or {}
             if t == 'user':

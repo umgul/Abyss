@@ -44,6 +44,10 @@ import threading
 
 CODE = os.path.dirname(os.path.abspath(__file__))
 CLAUDE_PROJECTS = os.path.join(os.path.expanduser('~'), '.claude', 'projects')
+# Carpeta de `mem` donde `propiocepcion.extraer()` recuerda lo que sacó de cada sesión.
+# Se nombra aquí porque la tocan dos módulos: propiocepcion la escribe y parentesis
+# (`--omitir-sesion`) borra la de la sesión que el usuario pide no guardar.
+MATRIOSHKA = '.matrioshka'
 
 
 def leer_stdin(tope_s=None):
