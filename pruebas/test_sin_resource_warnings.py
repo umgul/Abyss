@@ -4,7 +4,6 @@
 import sys
 import os
 import json
-import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import unittest
 import ayudas as ay
@@ -58,14 +57,18 @@ class ContinuidadCierreSinFicherosSinCerrar(unittest.TestCase):
 
 class ModeloEstadoSinFicherosSinCerrar(unittest.TestCase):
     def test_estado_no_deja_resource_warning(self):
+        """Con transcript: lectura con marcapáginas, estado guardado y marca de revisión escrita."""
         proj = ay.nuevo_proyecto()
-        mem = proj / 'memory'
-        mem.mkdir(parents=True, exist_ok=True)
-        (mem / 'modelo_preferido.json').write_text(
-            json.dumps({'modelo': 'claude-fable-5-1', 'ts': time.time()}), encoding='utf-8')
+        tp = proj / 'ses.jsonl'
+        ay.escribir_jsonl(tp, [
+            ay.usuario('uno', '2026-01-01T10:01:00Z'),
+            ay.asistente_fallback('a', '2026-01-01T10:01:05Z', de='claude-fable-5-1', a='claude-opus-4-8'),
+            ay.model_elegido('claude-fable-5-1', '2026-01-01T10:01:30Z'),
+        ])
         env = _entorno_con_avisos(proj)
-        r = ay.ejecutar(ay.script('modelo.py'), ['--estado'], env)
+        r = ay.ejecutar(ay.script('modelo.py'), ['--estado', str(tp)], env)
         self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn('[modelo · revisión]', r.stdout)
         self.assertNotIn('ResourceWarning', r.stderr, r.stderr)
 
 

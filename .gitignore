@@ -2,7 +2,7 @@
 # Esto es solo una red de seguridad por si alguna vez aparece un memory/ aquí
 # dentro (p. ej. una prueba mal apuntada) — nunca debería llevar nada real.
 # Ojo: NO listar aquí los nombres sueltos de plantillas/*.json (imagen_config.json,
-# modelo_preferido.json, temas_noticias.json) — esos SÍ van en el repo, son las
+# temas_noticias.json) — esos SÍ van en el repo, son las
 # semillas que instalar.py copia a memory/ la primera vez.
 /memory/
 **/memory/

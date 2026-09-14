@@ -43,7 +43,7 @@ class ModeloBanderaNoEsTranscript(unittest.TestCase):
         env = ay.entorno(proj)
         r = ay.ejecutar(ay.script('modelo.py'), ['--estado', str(proj)], env)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn('preferido:', r.stdout)
+        self.assertIn('actual:', r.stdout)
 
 
 class NoticiasDirectorioNoEsTranscript(unittest.TestCase):

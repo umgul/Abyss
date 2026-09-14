@@ -52,8 +52,9 @@ mapa.
   percentil contra las demás.
 - [`varas`](skills/varas/SKILL.md) — recalcula el peso de uso ◆/◆◆/◆◆◆ de cada
   ficha de `MEMORY.md` por cuantiles de citas y lecturas.
-- [`modelo`](skills/modelo/SKILL.md) — detecta si se está respondiendo fuera
-  del modelo preferido y marca los turnos a revisar al volver.
+- [`modelo`](skills/modelo/SKILL.md) — avisa de un downgrade automático (un
+  safeguard, o una sesión que arranca por debajo del modelo del hilo) y marca
+  los turnos a revisar al salir de él; bajar a mano con `/model` se permite.
 - [`parentesis`](skills/parentesis/SKILL.md) — marca un tramo (o una sesión
   entera) para que no entre en memoria futura, y recorta el transcript local
   ya cerrado si el usuario lo pide.
@@ -180,8 +181,8 @@ por su cuenta (ver "Dónde viven los datos" más abajo).
 /plugin install abyss@abyss
 ```
 
-(la ruta del repositorio es la prevista para su publicación; ajústala si
-`umgul/Abyss` cambia). Esto instala solo los *skills* de `skills/`. El plugin
+(`umgul/Abyss` es el repositorio público del paquete en GitHub). Esto instala
+solo los *skills* de `skills/`. El plugin
 no declara ningún gancho: Claude Code cargaría por sí solo un
 `hooks/hooks.json` al instalarlo, y este paquete no lo lleva a propósito, para
 que nada corra en cada sesión, en cada mensaje o tras cada herramienta sin que
@@ -197,8 +198,8 @@ así que funciona en cualquier proyecto sin configurar rutas.
 
 Lo que el plugin tampoco trae, porque necesita datos que solo puede dar una
 persona: el módulo **telegram** (pide un token de bot y un chat id) y el
-sembrado de plantillas de configuración (`modelo_preferido.json`,
-`temas_noticias.json`, `imagen_config.json`). Para eso está `instalar.py`.
+sembrado de plantillas de configuración (`temas_noticias.json`,
+`imagen_config.json`). Para eso está `instalar.py`.
 
 ### Con `instalar.py`
 
@@ -241,10 +242,11 @@ los marcadores `<TELEGRAM_BOT_TOKEN>` y `<CHAT_ID>`; el instalador pide esos
 dos valores (por consola o `--telegram-token`/`--telegram-chat`) y escribe la
 copia rellena **fuera del repo**, en `memory/`, nunca en el código instalado.
 
-Tres módulos vienen **apagados por defecto** (hay que marcarlos a propósito):
-**permisos** (dar a Abyss permiso `Edit` sobre `settings.json`), **huella**
-(su gancho `PostToolUse` corre tras cada herramienta, con el coste que eso
-implica — ver su skill) y **taller** (deja lista la configuración de un
+Cuatro módulos vienen **apagados por defecto** (hay que marcarlos a
+propósito): **permisos** (dar a Abyss permiso `Edit` sobre `settings.json`),
+**huella** (su gancho `PostToolUse` corre tras cada herramienta, con el coste
+que eso implica — ver su skill), **telegram** (pide el token y el chat id de
+arriba) y **taller** (deja lista la configuración de un
 servidor local de imagen, pero no instala `diffusers`/`torch` ni lo arranca:
 eso pesa GB y minutos, y es una decisión que toma quien lo instala, no el
 instalador por su cuenta). El resto de módulos — incluido **preferencias**
@@ -338,12 +340,13 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 |---|---|---|---|
 | `rutas.py` | Resuelve dónde viven el código y los datos para todos los demás guiones. | Ninguno (librería que importan todos) | Solo crea `memory/` si no existe. |
 | `continuidad.py` | Guarda cada sesión, mide su reloj, abre la sala de los relojes y lleva el latido de qué hilos siguen vivos. `--comprimir` gzipea sesiones viejas. | `SessionStart` (`--arranque`) · `SessionEnd` (`--cierre`) · `UserPromptSubmit` (`--despertar`) | `sesiones/*.jsonl(.gz)` · `relojes.jsonl` · `bolsas.json` · `.despertados/` · `.vivo/` · `sesiones/.omitir` · `varas.log` (avisos y fallos de `varas.py --index` tras cada cierre) |
-| `vigia.py` | Contrasta la última respuesta contra la evidencia real de la sesión y bloquea el cierre del turno una vez si encuentra números, rutas o citas sin fuente. | `Stop` (`--verificar`) | `confabulaciones.jsonl` |
+| `vigia.py` | Contrasta la última respuesta contra la evidencia real de la sesión y bloquea el cierre del turno una vez si encuentra números, rutas o citas sin fuente. La evidencia crece desde su marcapáginas: en cada Stop solo se leen las líneas nuevas. | `Stop` (`--verificar`) | `confabulaciones.jsonl` · `.marcapaginas/<id>/` |
+| `marcapaginas.py` | Guarda hasta dónde leyó cada lector (vigía, modelo) el transcript de cada sesión viva, con la firma de lo leído, para seguir desde ahí; si algo no casa, se relee desde el principio. | Ninguno — librería de `vigia.py` y `modelo.py` | `.marcapaginas/<id>/` (se borra al cerrar la sesión; ver «Límites honestos») |
 | `propiocepcion.py` | Mide cada sesión desde su transcript y da su percentil contra todas las medidas. Una sola lectura por fichero saca la medida, las frases que usan bolsas y relojes y las lecturas de fichas que cuenta `varas.py`, y se recuerda con la firma del fichero para no releerlo mientras no cambie. | Ninguno propio — librería de `continuidad.py` y `varas.py`; también CLI a mano | `propiocepcion.json` · `.matrioshka/` (una muñeca por sesión con lo que sacó esa lectura; nada de las sesiones de `sesiones/.omitir`) |
 | `varas.py` | Recalcula el peso ◆/◆◆/◆◆◆ de cada ficha por cuantiles de citas + lecturas, y reescribe esos glifos en el índice. Si `MEMORY.md` supera 24 KB solo **avisa** por stdout; el recorte real es a mano con `varas.py --index --recortar` (deja antes una copia fechada); nunca borra una línea entera. | Ninguno propio — lo llama `continuidad.py` tras cada cierre; también CLI a mano | Reescribe `MEMORY.md` · `MEMORY.md.abyss-AAAAMMDD-HHMMSS.bak` (una por cada recorte real) |
-| `parentesis.py` | Marca un tramo o una sesión entera para que no entre en memoria futura; recorta el transcript local ya cerrado (`--recortar`/`--recortar-tramo`, con copia `.antes`). | Ninguno — uso manual | `parentesis.json` · `sesiones/.omitir` (reutilizado) · con `--omitir-sesion`, borra `.matrioshka/<id>.json` |
+| `parentesis.py` | Marca un tramo o una sesión entera para que no entre en memoria futura; recorta el transcript local ya cerrado (`--recortar`/`--recortar-tramo`, con copia `.antes`). | Ninguno — uso manual | `parentesis.json` · `sesiones/.omitir` (reutilizado) · con `--omitir-sesion` y los recortes, borra `.matrioshka/<id>.json` y `.marcapaginas/<id>/` |
 | `exterocepcion.py` | Lugar (por IP y por lo dicho), meteo del lugar, y canal de entrada del último mensaje. | Ninguno propio — librería de `continuidad.py` | `lugar.json` · `meteo.json` |
-| `modelo.py` | Detecta si se responde fuera del modelo preferido y marca los turnos a revisar al volver. | Ninguno propio — no existe un evento «PostModelSwitch»/«PreModelSwitch» en Claude Code; librería de `continuidad.py --despertar` | `modelo_preferido.json` · `.modelo_revisado/` |
+| `modelo.py` | Avisa de un downgrade automático —un safeguard que pasa la sesión a un modelo de reserva, o una sesión que arranca por debajo del modelo que llevaba el hilo— con el comando para volver, y al salir de él lista una vez lo respondido durante la bajada. Bajar a mano con `/model` se permite; un cambio sin rastro en el transcript no avisa. | Ninguno propio — librería de `continuidad.py --despertar` | `.marcapaginas/<id>/modelo.json` · `.modelo_revisado/` |
 | `noticias.py` | Portada y titulares por tema al arrancar; temas automáticos autocurados. | Ninguno propio — librería de `continuidad.py --arranque` | `noticias.json` · `temas_auto.json` · `temas_log.jsonl` · `temas_noticias.json` (editable a mano) · `temas_veto.json` |
 | `ojo.py` | Ocho verbos, un solo punto de entrada, ninguno por gancho: `mirar` (un fotograma de la webcam, autónomo) y, delegando enteros en su módulo, `texto`/`fotocopia`/`tarjeta`/`manual` (→ `lectura_visual.py`), `despiece`/`prompt3d` (→ `volumen.py`) y `gestos` (→ `gestos.py`). | Ninguno — nunca por gancho | `ojo.log` (verbos `mirar`/`texto`/`fotocopia`/`tarjeta`/`manual`) + el fichero que pida cada verbo; `despiece`/`prompt3d`/`gestos` no tocan `memory/` |
 | `lectura_visual.py` | OCR de una imagen por el motor de Windows (WinRT, sin instalar nada) o `tesseract` (segunda vía, PATH): `texto` (texto plano, opcionalmente al portapapeles), `fotocopia` (endereza/corrige iluminación una foto o un fotograma de cámara, PNG o PDF de varias páginas — el escáner WIA es una fuente OPCIONAL más, nunca el camino), `tarjeta` (patrones + heurística de posición → `.vcf` y `.png`), `manual` (ordena varias fotos, sin resumir). Usado por `ojo.py`. | Ninguno | `lectura_visual.log`; el fichero de salida que pida cada verbo (junto a la entrada, o en `memory/` si viene de `--camara`/`--escaner`) |
@@ -471,6 +474,16 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
   sin cifrar, como `sesiones/`. De una sesión en `sesiones/.omitir` no guarda
   nada, y borrar la carpeta entera no cambia ningún resultado: solo obliga a
   releer.
+- `.marcapaginas/` guarda la evidencia que usa el vigía (texto del usuario y
+  de las herramientas, ya derivado) y lo que `modelo.py` sabe del hilo (con los
+  turnos respondidos durante un downgrade automático), para no releer el
+  transcript en cada turno: en local y sin cifrar, como `sesiones/`. La carpeta
+  de una sesión se borra al cerrarla (`SessionEnd`); si no llega a cerrarse, la
+  barre cualquier arranque, cierre o lectura posterior del mismo proyecto cuando
+  lleva 6 horas sin tocar o queda fuera de las 4 más recientes. Si nadie vuelve a
+  abrir ese proyecto, se queda. De una sesión omitida no guarda nada (y esa se
+  sigue leyendo entera), y `--omitir-sesion` y los recortes de `parentesis.py`
+  la borran.
 - El vigía bloquea como mucho una vez por turno; si insiste tras el primer
   bloqueo, lo deja pasar y solo lo apunta como "reincidente".
 - Con menos de 8 sesiones medidas no hay vara: `propiocepcion.py`, `varas.py`
@@ -482,9 +495,11 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
 - La sala de los relojes compara bolsas de palabras (TF-IDF), no ideas: puede
   despertar una sesión por vocabulario compartido sin que el tema sea
   realmente el mismo, y al revés.
-- No hay vuelta automática al modelo preferido: `modelo.py` solo detecta y
+- No hay vuelta automática al modelo de antes: `modelo.py` solo detecta y
   avisa; el regreso lo teclea la persona con `/model`, porque ninguna API
-  expone hoy una forma de hacerlo desde un gancho.
+  expone hoy una forma de hacerlo desde un gancho. Y solo avisa con rastro en
+  el transcript: un cambio de modelo sin `/model`, sin fallback y sin marca de
+  sesión no avisa, porque nada dice si fue a mano.
 - El lugar por IP puede equivocarse de ciudad (VPN, redes móviles) y solo se
   refresca al arrancar una sesión; "lo dicho" depende de que el mensaje use
   una fórmula reconocida, no cualquier forma de decir dónde se está.

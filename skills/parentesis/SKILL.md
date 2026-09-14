@@ -25,11 +25,14 @@ Dos mecanismos distintos, y uno más bruto:
    abierto hasta el cierre de la sesión (nada se escapa por descuido).
 2. **Sesión entera** (`--omitir-sesion`): la sesión completa nunca se copia a
    `sesiones/`, ni aunque la cierre otro hilo distinto, y de ella no se
-   recuerda nada en `.matrioshka/` (se borra la muñeca que hubiera).
+   recuerda nada en `.matrioshka/` ni en `.marcapaginas/` (se borra lo que
+   hubiera).
 3. **Corte del fichero local** (`--recortar`/`--recortar-tramo`): reescribe de
    verdad el `.jsonl` que usa la propia app de Claude Code para reconstruir el
-   hilo, con una copia `.antes` del original. Solo tiene sentido con el hilo
-   YA cerrado — si sigue vivo, la app puede volver a escribir encima.
+   hilo, con una copia `.antes` del original, y borra lo derivado de esa sesión
+   (`.matrioshka/<id>.json` y `.marcapaginas/<id>/`) para que lo cortado no siga
+   vivo ahí. Solo tiene sentido con el hilo YA cerrado — si sigue vivo, la app
+   puede volver a escribir encima.
 
 ## Cómo se ejecuta
 
@@ -60,8 +63,9 @@ si se rehúsa (hilo vivo, mensaje no encontrado).
 ## Qué sale de la máquina
 
 Nada. Todo local: `memory/parentesis.json`, `memory/sesiones/.omitir` (y, con
-`--omitir-sesion`, borrar `memory/.matrioshka/<id>.json`), y el propio `.jsonl`
-que se recorte (con su copia `.antes`).
+`--omitir-sesion` y los recortes, borrar `memory/.matrioshka/<id>.json` y
+`memory/.marcapaginas/<id>/`), y el propio `.jsonl` que se recorte (con su copia
+`.antes`).
 
 ## Límites honestos
 
@@ -76,9 +80,10 @@ que se recorte (con su copia `.antes`).
   (medida, frases y lecturas salen de una sola lectura, y la firma de lo que
   recuerda lleva los tramos: abrir o cerrar uno obliga a releer),
   `varas.py --index` (una lectura de una ficha hecha dentro del tramo no
-  cuenta como uso, no le sube el ◆) y `modelo.recorrer()` (un turno respondido
-  por otro modelo dentro del tramo no se reinyecta en el aviso
-  `[modelo · revisión]` de `continuidad.py --despertar`).
+  cuenta como uso, no le sube el ◆) y `modelo.recorrer()` (el texto de un turno
+  dicho dentro del tramo no se reinyecta en el aviso `[modelo · revisión]` de
+  `continuidad.py --despertar`; los sucesos de modelo de dentro, como un
+  fallback o un `/model`, sí cuentan).
 - `--recortar`/`--recortar-tramo` solo aceptan `.jsonl` sin comprimir (el
   transcript vivo que usa la app nunca está gzipeado).
 

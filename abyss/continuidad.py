@@ -98,6 +98,11 @@ try:
 except ImportError:
     import parentesis as PZ
 
+try:
+    from . import marcapaginas as MP
+except ImportError:
+    import marcapaginas as MP
+
 STOP = set("""a al algo ante aquel aquella aquello aquí así aun aunque bien cada casi como con cosa
 cual cuando cómo de del desde donde dos el ella ellas ello ellos en entre era eres es esa ese eso esta
 estar este esto estoy fue ha hace hacer hacia han has hay he hemos la las le les lo los más me mi mis
@@ -298,6 +303,7 @@ def cerrar(sid_actual=None, transcript_path=None):
             if os.path.basename(p)[:-6] != sid_actual:
                 guardar(p)
     P.barrer_munecas()  # fuera lo recordado de sesiones omitidas o que ya no tienen fichero
+    MP.barrer(mem, proj)  # y del marcapáginas: omitidas, sin transcript, 6 h sin tocar o más allá de las 4 más recientes
     data = P.medir_todas([SES])
     hechos = relojes_guardados(); nuevos = 0
     with open(RELOJES, 'a', encoding='utf-8') as fh:
@@ -563,6 +569,7 @@ if __name__ == '__main__':
             if avisos:  # aquí el stdout no tiene que ser JSON: se puede imprimir tal cual
                 print('\n'.join(avisos))
         if sid:
+            MP.olvidar(mem, sid)  # la sesión se cierra: lo que el vigía y modelo guardaban de ella ya no sirve
             apagar(sid)
         sys.exit(0)
     if modo == '--arranque':
@@ -619,7 +626,7 @@ if __name__ == '__main__':
                 from . import modelo
             except ImportError:
                 import modelo
-            partes.append(modelo.texto(tp))  # aviso si respondo bajado de Fable
+            partes.append(modelo.texto(tp))  # aviso de downgrade automático y revisión al salir de él
         except Exception:
             pass
         # La sala se abre en CADA prompt (como la suya), pero un reloj no despierta dos

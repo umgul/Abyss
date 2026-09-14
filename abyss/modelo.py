@@ -1,33 +1,44 @@
-"""Modelo: detectar el downgrade Fable→Opus, avisar para volver, y al volver REVISAR.
+"""Modelo: avisar cuando el sistema cambia de modelo sin que lo elija el usuario, y al salir de ahí, revisar.
 
-LÍMITE HONESTO (docs de Anthropic): no hay forma de que un gancho devuelva la sesión a
-Fable por sí solo, y ningún gancho observa un cambio de modelo desde dentro de la
-sesión: los eventos reales de Claude Code son PreToolUse, PostToolUse, Stop,
-SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact y Notification —
-no existen `PostModelSwitch` ni `PreModelSwitch`. El único retorno al modelo preferido
-lo teclea el usuario con `/model`; este módulo vive como LIBRERÍA de
-`continuidad.py --despertar`, que llama a `texto(tp)` en cada prompt (ahí se detecta el
-downgrade, no en un gancho propio). Regla: NO pausar — el plan de la conversación se
-suele trazar en mensajes anteriores con el modelo preferido, así que volver a él permite
-revisar lo dicho mientras tanto con el otro modelo.
+Solo avisa con prueba de un cambio automático en el transcript; un cambio hecho por el usuario se permite:
+- **safeguard**: la primera respuesta del modelo de reserva trae un bloque `content[].type == "fallback"` con
+  `from`/`to`. La línea `system`/`model_refusal_fallback` (`originalModel` → `fallbackModel`) llega unas líneas
+  después con el mismo `requestId`, y solo cuenta cuando no hubo bloque (versiones que no lo escribían).
+- **inicio**: tras una marca `SessionStart:startup`/`SessionStart:resume` (la deja cualquier gancho de SessionStart),
+  la primera respuesta llega de un modelo por debajo del que llevaba el hilo, sin `/model` entre medias. Rango:
+  familia (mythos > fable > opus > sonnet > haiku) y después generación (claude-opus-5 > claude-opus-4-8).
+Un `/model` con hora igual o posterior al suceso lo da por decidido por el usuario, elija el modelo que elija. Cuenta
+la hora y no la posición porque un `/model` hecho a mitad de turno se escribe al acabar el turno, con su hora. Una
+respuesta de un modelo distinto del de reserva cierra la bajada.
 
-- preferido(): el último modelo que el usuario fijó con `/model` → cache.
-- actual(tp): el último modelo que realmente respondió (campo `model` del transcript).
-- texto(tp): aviso `[modelo]` con el comando para volver si responde fuera de
-  Fable/Mythos; `[modelo · revisión]` UNA vez si acaba de volver y hay turnos
-  respondidos por otro modelo aún no revisados, para que los repase.
+No avisa, y es un límite: un cambio sin ningún rastro (sin `/model`, sin fallback, sin marca de sesión; los hay en
+2.1.219–2.1.237), porque nada dice si fue a mano; una sesión nueva, que no sabe con qué modelo iba otro hilo; una
+reanudación sin gancho SessionStart instalado. Si la app escribiera un `/model` por su cuenta al reanudar, contaría
+como elección del usuario. El aviso de inicio llega en el prompt siguiente a la primera respuesta: al enviar el
+primero aún no ha respondido nadie. `<synthetic>` (errores de la API, límites) no es un modelo y se ignora.
 
-`recorrer()` respeta el tramo marcado por `parentesis.py` — igual que
-`continuidad.frases_usuario()`, `vigia.leer_turno()` y `propiocepcion.medir()` — para no
-reinyectar en `[modelo · revisión]` (que `continuidad.py --despertar` mete en
-`additionalContext` y por tanto vuelve a viajar a la API en el prompt siguiente) texto
-dicho dentro de un paréntesis.
+Claude Code tiene un evento `PostModelSwitch` (visto en transcripts de 2.1.255 a 2.1.260, siempre junto a un
+`/model`), pero no hay medida de si salta con el selector, con un fallback o al reanudar: este módulo no lo usa ni
+lleva gancho propio. Vive como LIBRERÍA de `continuidad.py --despertar`, que llama a `texto(tp)` en cada prompt.
+Ningún gancho puede devolver la sesión a otro modelo: el regreso lo teclea el usuario con `/model`.
 
-Carpeta de datos: NUNCA `dirname(__file__)`; se resuelve con `rutas.resolver()` (§1 de
-ESPECIFICACION.md). `texto(tp)`/`actual(tp)`/`recorrer(tp)` ya reciben el `transcript_path`
-de quien los llama (típicamente `continuidad.py`) y con eso basta para resolver sin tocar
-stdin. Si nada resuelve: como librería, no revienta a quien importa el módulo; a mano
-(`--estado`, CLI suelta) si falla se avisa claro, como hace `rutas.resolver()`.
+- texto(tp): `[modelo]` mientras dura una bajada automática, con el comando para volver y el de quedarse;
+  `[modelo · revisión]` UNA vez cuando ya responde otro modelo que el de la bajada, con los turnos respondidos
+  durante ella (quedarse con el de reserva no la dispara; `--estado` la enseña sin gastarla).
+- actual(tp): el último modelo que respondió.
+- recorrer(tp): el estado del hilo tras la última línea (ver `_estado_vacio()`).
+
+Paréntesis (`parentesis.py`): los sucesos cuentan también dentro de un tramo, porque no llevan texto del usuario; el
+texto de un turno dicho dentro no se guarda, así que no vuelve en `[modelo · revisión]` (que `continuidad.py
+--despertar` mete en `additionalContext` y viaja a la API en el prompt siguiente).
+
+Marcapáginas (`marcapaginas.py`): el estado se guarda en `mem/.marcapaginas/<sid>/modelo.json` y en cada prompt solo
+se leen las líneas nuevas. Sin marcapáginas, la lectura entera de siempre.
+
+Carpeta de datos: NUNCA `dirname(__file__)`; se resuelve con `rutas.resolver()` (§1 de ESPECIFICACION.md).
+`texto(tp)`/`actual(tp)`/`recorrer(tp)` ya reciben el `transcript_path` de quien los llama (típicamente
+`continuidad.py`) y con eso basta para resolver sin tocar stdin. Si nada resuelve: como librería, no revienta a quien
+importa el módulo; a mano (`--estado`, CLI suelta) si falla se avisa claro, como hace `rutas.resolver()`.
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -35,13 +46,19 @@ try:                       # la consola de Windows y la salida tienen que hablar
 except ImportError:
     import consola
 consola.preparar()
-import os, re, json, time
+import os, re, json
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import rutas  # noqa: E402
+import marcapaginas as MP  # noqa: E402
 
-RE_CMD = re.compile(r'<command-name>/model</command-name>.*?<command-args>\s*([\w.\-]+)', re.S)
-FAMILIA_OK = ('fable', 'mythos')
+# Con `match`: la línea del comando EMPIEZA por la etiqueta (153 de 153 en los transcripts medidos); un prompt que pega
+# un `/model` en medio de su texto no es una elección.
+RE_CMD = re.compile(r'\s*<command-name>/model</command-name>.*?<command-args>\s*([\w.\-]+)', re.S)
+FAMILIAS = ('haiku', 'sonnet', 'opus', 'fable', 'mythos')  # de menos a más
+MAX_REQUESTS = 16  # requestId de los últimos bloques fallback: su línea system llega pocas líneas después
+HUELLA = MP.huella('modelo.py', 'parentesis.py', 'marcapaginas.py')
 
 _CACHE = {}  # 'proj'/'mem' una vez resueltos en este proceso
 
@@ -74,43 +91,13 @@ def _ruta(nombre, tp=None):
     return os.path.join(m, nombre) if m else None
 
 
-def preferido(tp=None):
-    ruta = _ruta('modelo_preferido.json', tp)
-    try:
-        with open(ruta, encoding='utf-8') as fh:
-            return json.load(fh).get('modelo')
-    except Exception:
-        return 'claude-fable-5-1'
-
-
-def fijar_preferido(m, tp=None):
-    ruta = _ruta('modelo_preferido.json', tp)
-    if not ruta:
-        return  # sin proyecto resoluble no se fija nada; se reintenta la próxima llamada
-    with open(ruta, 'w', encoding='utf-8') as fh:
-        json.dump({'modelo': m, 'ts': time.time()}, fh, ensure_ascii=False)
-
-
 def _iter(tp):
-    if not tp or not os.path.exists(tp):
-        return
     with open(tp, encoding='utf-8', errors='ignore') as fh:
         for line in fh:
             try:
                 yield json.loads(line)
             except Exception:
                 continue
-
-
-def es_preferido(modelo):
-    return bool(modelo) and any(f in modelo for f in FAMILIA_OK)
-
-
-def _elegido_a_mano(fij, actual):
-    """`fij` (argumento del último `/model`) puede ser alias ('opus') o id completo
-    ('claude-opus-5'): contenido en cualquier sentido cuenta como el mismo modelo que
-    `actual` — elegido a propósito, no downgrade, aunque quede fuera de FAMILIA_OK."""
-    return bool(fij) and bool(actual) and (fij.lower() in actual.lower() or actual.lower() in fij.lower())
 
 
 def _sid_de_ruta(tp):
@@ -128,131 +115,278 @@ def _sid_de_ruta(tp):
     return base or None
 
 
-def _parentesis_de(sid, tp):
-    """Una función `(sid, ts)` con la regla de `parentesis.en_parentesis()` y los tramos
-    de esta sesión ya leídos (una vez por recorrido, no un fichero abierto por línea), o
-    `None` si no se puede resolver (sin sid, sin proyecto, o el propio módulo falla) —
-    fail-open: sin poder consultar el tramo, `recorrer()` simplemente no filtra nada, en
-    vez de reventar la librería de `continuidad.py --despertar` que lo llama en cada
-    prompt. `_mem(tp)` se llama ANTES de importar `parentesis` para que su
-    `rutas.resolver()` (que lee el `sys.argv` de ESTE proceso) encuentre `ABYSS_PROYECTO`
-    ya fijado, en vez de adivinar.
+def _tramos_de(sid, tp):
+    """(módulo `parentesis`, tramos de esta sesión como listas), o (None, None) si no se pueden consultar (sin sid,
+    sin proyecto, o el propio módulo no se deja importar) — fail-open: entonces no se oculta ningún texto, en vez de
+    reventar la librería de `continuidad.py --despertar` que lo llama en cada prompt. `_mem(tp)` se llama ANTES de
+    importar `parentesis` para que su `rutas.resolver()` (que lee el `sys.argv` de ESTE proceso) encuentre
+    `ABYSS_PROYECTO` ya fijado, en vez de adivinar.
 
-    Los tramos se leen FUERA de ese fail-open: si `parentesis.json` existe pero no se deja
-    leer como tramos, `recorrer()` falla y `--despertar` calla el aviso de ese prompt,
-    antes que reinyectar en `[modelo · revisión]` algo dicho dentro de un paréntesis."""
+    Los tramos se leen FUERA de ese fail-open: si `parentesis.json` existe pero no se deja leer como tramos,
+    `recorrer()` falla y `--despertar` calla el aviso de ese prompt, antes que reinyectar en `[modelo · revisión]`
+    algo dicho dentro de un paréntesis."""
     if not sid or _mem(tp) is None:
-        return None
+        return None, None
     try:
         try:
             from . import parentesis as PZ
         except ImportError:
             import parentesis as PZ
     except Exception:
+        return None, None
+    return PZ, [list(t) for t in PZ.tramos(sid)]
+
+
+def _epoch(ts):
+    try:
+        return datetime.fromisoformat(ts.replace('Z', '+00:00')).timestamp()
+    except Exception:
         return None
-    tramos = PZ.tramos(sid)
-    return lambda _sid, ts: PZ.en_tramos(tramos, ts)
+
+
+def _no_antes(ts, suceso):
+    """¿`ts` es igual o posterior a `suceso`? Sin hora legible en alguno de los dos manda la posición en el fichero:
+    lo leído después cuenta como posterior."""
+    a, b = _epoch(ts), _epoch(suceso)
+    return a is None or b is None or a >= b
+
+
+def _rango(modelo):
+    """(familia, generación) para comparar modelos: mythos > fable > opus > sonnet > haiku y, dentro de la familia,
+    la generación (`claude-opus-5` > `claude-opus-4-8`, `claude-fable-5-1` > `claude-fable-5`); una fecha de 8 cifras
+    no es generación. None si no es de ninguna familia conocida: entonces no se compara."""
+    s = str(modelo or '').lower().split('[')[0]
+    familia = next((i for i, f in enumerate(FAMILIAS) if f in s), None)
+    if familia is None:
+        return None
+    return familia, tuple(int(x) for x in re.findall(r'\d+', s) if len(x) < 8)
+
+
+def _por_debajo(modelo, referencia):
+    a, b = _rango(modelo), _rango(referencia)
+    return a is not None and b is not None and a < b
+
+
+def _casa(elegido, modelo):
+    """`elegido` (argumento de `/model`: alias como 'opus' o id completo) y `modelo` (el id que respondió) son el
+    mismo si uno contiene al otro."""
+    return bool(elegido) and bool(modelo) and (elegido.lower() in modelo.lower() or modelo.lower() in elegido.lower())
+
+
+def _estado_vacio():
+    """Lo que `recorrer()` sabe del hilo tras la última línea leída (se guarda tal cual en el marcapáginas):
+    - ultimo: el último modelo que respondió.
+    - bajada: {'de', 'a', 'motivo': 'safeguard'|'inicio', 'ts'} mientras dura una bajada automática; si no, None.
+    - inicio: {'de', 'ts'} desde una marca de arranque o reanudación hasta la primera respuesta; si no, None.
+    - fij / fij_tras_ultima: el argumento del último `/model` y si llegó después de la última respuesta.
+    - requests: `requestId` de los últimos bloques fallback, para no contar dos veces su línea system.
+    - turnos: los turnos ya cerrados respondidos durante una bajada, dichos fuera de paréntesis.
+    - cur: el turno en curso; entra en `turnos` cuando llega el prompt siguiente, si le toca. De cada turno se guarda
+      el último modelo que respondió (`modelo`), el que respondió durante la bajada (`modelo_bajada`) y el primer
+      texto de cada modelo (`textos`): un turno puede empezar en la bajada y acabar en el modelo de origen."""
+    return {'ultimo': None, 'bajada': None, 'inicio': None, 'fij': None, 'fij_tras_ultima': False,
+            'requests': [], 'turnos': [], 'cur': None}
+
+
+def _estado_valido(e):
+    return (isinstance(e, dict) and set(e) == set(_estado_vacio()) and isinstance(e['requests'], list)
+            and isinstance(e['turnos'], list) and (e['cur'] is None or isinstance(e['cur'], dict)))
+
+
+def _plano(texto, n):
+    return re.sub(r'\s+', ' ', texto.strip())[:n]
+
+
+def _caer(e, de, a, motivo, ts):
+    e['bajada'] = {'de': de, 'a': a, 'motivo': motivo, 'ts': ts}
+    cur = e['cur']
+    if cur is not None and cur['modelo'] == a:
+        cur['bajada'] = True; cur['modelo_bajada'] = a
+
+
+def _paso(e, d, oculto):
+    """Aplica una línea del transcript (ya parseada) al estado `e`. `oculto`: la línea cae dentro de un tramo de
+    paréntesis; su texto no se guarda, sus sucesos sí cuentan."""
+    t = d.get('type')
+    m = d.get('message') if isinstance(d.get('message'), dict) else {}
+    ts = d.get('timestamp') if isinstance(d.get('timestamp'), str) else None
+    if t == 'user':
+        c = m.get('content')
+        if not isinstance(c, str):
+            return
+        mm = RE_CMD.match(c)
+        if mm:
+            e['fij'] = mm.group(1); e['fij_tras_ultima'] = True
+            for clave in ('bajada', 'inicio'):
+                if e[clave] is not None and _no_antes(ts, e[clave]['ts']):
+                    e[clave] = None
+            return
+        if d.get('isMeta') or c.lstrip().startswith('This session is being continued') or c.lstrip().startswith('<command-name>'):
+            return
+        cur = e['cur']
+        if cur is not None and cur['bajada'] and not cur['oculto']:
+            e['turnos'].append(cur)
+        e['cur'] = {'prompt': '' if oculto else _plano(c, 70), 'ts': (ts or '')[11:16], 'iso': ts or '',
+                    'modelo': None, 'modelo_bajada': None, 'textos': {}, 'bajada': False, 'oculto': oculto}
+    elif t == 'assistant':
+        mo = m.get('model')
+        if not isinstance(mo, str) or not mo or mo.startswith('<'):
+            return
+        contenido = m.get('content') if isinstance(m.get('content'), list) else []
+        cur = e['cur']
+        if cur is not None:
+            cur['modelo'] = mo
+            if mo not in cur['textos'] and not oculto:
+                for b in contenido:
+                    if isinstance(b, dict) and b.get('type') == 'text' and isinstance(b.get('text'), str) and b['text'].strip():
+                        cur['textos'][mo] = _plano(b['text'], 90); break
+        if e['bajada'] is not None and mo != e['bajada']['a']:
+            e['bajada'] = None
+        fallback = next((b for b in contenido if isinstance(b, dict) and b.get('type') == 'fallback'), None)
+        de = fallback.get('from') if fallback is not None else None
+        de = de.get('model') if isinstance(de, dict) else None
+        if isinstance(de, str) and de:
+            rid = d.get('requestId')
+            if isinstance(rid, str) and rid:
+                e['requests'] = (e['requests'] + [rid])[-MAX_REQUESTS:]
+            _caer(e, de, mo, 'safeguard', ts)
+        inicio = e['inicio']
+        if inicio is not None:
+            e['inicio'] = None
+            if e['bajada'] is None and _por_debajo(mo, inicio['de']):
+                _caer(e, inicio['de'], mo, 'inicio', inicio['ts'])
+        if cur is not None and e['bajada'] is not None and mo == e['bajada']['a']:
+            cur['bajada'] = True; cur['modelo_bajada'] = mo
+        e['ultimo'] = mo; e['fij_tras_ultima'] = False
+    elif t == 'system':
+        if d.get('subtype') != 'model_refusal_fallback' or d.get('requestId') in e['requests']:
+            return
+        de, a = d.get('originalModel'), d.get('fallbackModel')
+        if isinstance(de, str) and de and isinstance(a, str) and a:
+            _caer(e, de, a, 'safeguard', ts)
+    elif t == 'attachment':
+        at = d.get('attachment')
+        if not isinstance(at, dict) or at.get('hookEvent') != 'SessionStart':
+            return
+        if str(at.get('hookName') or '').rsplit(':', 1)[-1] not in ('startup', 'resume') or e['inicio'] is not None:
+            return
+        de = e['bajada']['de'] if e['bajada'] is not None else e['ultimo']
+        if de:
+            e['inicio'] = {'de': de, 'ts': ts}
+
+
+def _aplicar(e, d, PZ, tramos):
+    if isinstance(d, dict):
+        _paso(e, d, PZ is not None and PZ.en_tramos(tramos, d.get('timestamp')))
+
+
+def _leer_entero(tp, PZ, tramos):
+    e = _estado_vacio()
+    for d in _iter(tp):
+        _aplicar(e, d, PZ, tramos)
+    return e
 
 
 def recorrer(tp):
-    """Lista de turnos: {'prompt', 'ts', 'modelo', 'resp'} por cada mensaje real del
-    usuario, con el modelo y el primer texto de la respuesta. También el último
-    /model y si fue posterior a la última respuesta.
-
-    Respeta el tramo marcado por `parentesis.py` (`parentesis.en_parentesis()`):
-    cualquier línea cuya `timestamp` cae dentro de un tramo abierto de esta sesión se
-    salta ENTERA — ni como turno de usuario, ni como respuesta, ni como modelo. Sin
-    este filtro, `texto()` podría reinyectar en `[modelo · revisión]` (que vuelve a
-    viajar a la API en el siguiente prompt) texto dicho dentro de un paréntesis, justo
-    lo que el tramo promete impedir."""
+    """El estado del hilo (`_estado_vacio()`) tras la última línea completa del transcript, siguiendo desde el
+    marcapáginas de la sesión; sin marcapáginas, leyendo entero."""
+    if not tp or not os.path.isfile(tp):
+        return _estado_vacio()
     sid = _sid_de_ruta(tp)
-    en_parentesis = _parentesis_de(sid, tp)
-    turnos = []; cur = None; fij = None; tras_ultima = False
-    preferido_tras_fij = False  # volvió la familia preferida después del último /model
-    for d in _iter(tp):
-        if en_parentesis is not None and en_parentesis(sid, d.get('timestamp')):
-            continue
-        t = d.get('type'); m = d.get('message') or {}
-        if t == 'user':
-            c = m.get('content')
-            if not isinstance(c, str):
-                continue
-            mm = RE_CMD.search(c)
-            if mm:
-                fij = mm.group(1); tras_ultima = True; preferido_tras_fij = False; continue
-            if d.get('isMeta') or c.lstrip().startswith('This session is being continued') or c.lstrip().startswith('<command-name>'):
-                continue
-            cur = {'prompt': re.sub(r'\s+', ' ', c.strip())[:70], 'ts': (d.get('timestamp') or '')[11:16], 'modelo': None, 'resp': ''}
-            turnos.append(cur)
-        elif t == 'assistant':
-            mo = m.get('model')
-            if mo:
-                tras_ultima = False
-                if fij and es_preferido(mo):
-                    preferido_tras_fij = True
-                if cur is not None:
-                    cur['modelo'] = mo
-                    if not cur['resp']:
-                        for b in (m.get('content') or []):
-                            if isinstance(b, dict) and b.get('type') == 'text' and b.get('text', '').strip():
-                                cur['resp'] = re.sub(r'\s+', ' ', b['text'].strip())[:90]; break
-    return turnos, fij, tras_ultima, preferido_tras_fij
+    PZ, tramos = _tramos_de(sid, tp)
+    l = MP.Lectura.abrir(_CACHE.get('mem'), _CACHE.get('proj'), tp, sid, 'modelo', HUELLA, tramos or [])
+    if l is None:
+        return _leer_entero(tp, PZ, tramos)
+    e = None
+    try:
+        guardado = l.estado if l.estado is not None else (None if l.offset else _estado_vacio())
+        if not _estado_valido(guardado):
+            # la firma casa pero el estado no se deja usar: se quita para que la próxima lectura empiece de cero
+            MP.apuntar_fallo(l.mem, 'modelo', sid, ValueError('estado del marcapáginas ilegible'))
+            try:
+                os.remove(os.path.join(l.carpeta, 'modelo.json'))
+            except OSError:
+                pass
+        else:
+            for linea in l.lineas_nuevas():
+                try:
+                    d = json.loads(linea)
+                except Exception:
+                    continue
+                _aplicar(guardado, d, PZ, tramos)
+            l.confirmar(guardado)
+            e = guardado
+    except Exception as fallo:  # un fallo de lectura o de disco no decide nada: se apunta y se lee entero
+        MP.apuntar_fallo(l.mem, 'modelo', sid, fallo)
+        e = None
+    finally:
+        l.soltar()
+    return e if e is not None else _leer_entero(tp, PZ, tramos)
 
 
 def actual(tp):
-    turnos = recorrer(tp)[0]
-    for t in reversed(turnos):
-        if t['modelo']:
-            return t['modelo']
-    return None
+    return recorrer(tp)['ultimo']
 
 
-def texto(tp):
-    turnos, fij, tras_ultima, preferido_tras_fij = recorrer(tp)
-    # Solo un `/model` de la familia preferida fija el preferido: un `/model opus-5` no
-    # debe dejar "respondes como opus-5, no como opus-5".
-    if fij and es_preferido(fij):
-        fijar_preferido(fij, tp)
-    a = next((t['modelo'] for t in reversed(turnos) if t['modelo']), None)
-    pref = preferido(tp)
-    # (b) si ya volvió (o ya responde como preferido): ¿hay turnos ajenos sin revisar?
-    if (tras_ultima and es_preferido(fij)) or es_preferido(a):
-        ajenos = [t for t in turnos if t['modelo'] and not es_preferido(t['modelo'])]
-        if ajenos:
-            rev = _ruta('.modelo_revisado', tp)
-            marca = None
-            if rev:
-                os.makedirs(rev, exist_ok=True)
-                marca = os.path.join(rev, os.path.basename(tp)[:-6]) if tp else None
-            ya = 0
-            try:
-                with open(marca, encoding='utf-8') as fh:
-                    ya = int(fh.read().strip() or 0)
-            except Exception:
-                pass
-            nuevos = ajenos[ya:]
-            if nuevos:
-                if marca:
-                    with open(marca, 'w', encoding='utf-8') as fh:
-                        fh.write(str(len(ajenos)))
-                L = [f'[modelo · revisión] Has vuelto a {pref}. Entre medias respondió otro modelo en {len(nuevos)} turno(s); '
-                     'repásalos antes de seguir (volver al preferido es la ocasión de revisar lo dicho por el otro):']
-                for t in nuevos[:8]:
-                    L.append(f"  - {t['ts']} {t['modelo']} · usuario: «{t['prompt']}» → «{t['resp']}»")
-                if len(nuevos) > 8:
-                    L.append(f'  … y {len(nuevos) - 8} más (grep en el transcript por el modelo)')
-                return '\n'.join(L)
+def _revisado_hasta(marca):
+    """Hora ISO del último turno ya listado en `[modelo · revisión]`; '' sin marca o si la marca es un número (un
+    recuento de turnos, que no dice cuáles)."""
+    try:
+        with open(marca, encoding='utf-8') as fh:
+            hasta = fh.read().strip()
+    except Exception:
         return ''
-    # (a) sigue respondiendo fuera de la familia preferida
-    if not a:
+    return '' if hasta.isdigit() else hasta
+
+
+def _posterior(iso, hasta):
+    if not hasta:
+        return True
+    a, b = _epoch(iso), _epoch(hasta)
+    return (iso > hasta) if a is None or b is None else a > b
+
+
+def texto(tp, marcar=True):
+    """El aviso de este prompt. `marcar=False` (lo usa `--estado`) enseña la revisión pendiente sin darla por hecha:
+    la única vez que sale tiene que ser la que `continuidad.py --despertar` inyecta."""
+    e = recorrer(tp)
+    b = e['bajada']
+    if b is not None:
+        if b['motivo'] == 'safeguard':
+            causa = f"un safeguard pasó la sesión de {b['de']} a {b['a']}"
+            extra = ' Si el mensaje que lo disparó sigue en el hilo, edítalo antes de reintentar o volverá a bajar.'
+        else:
+            causa = f"la sesión arrancó con {b['a']} y el hilo venía de {b['de']}"
+            extra = ''
+        return (f"[modelo] downgrade automático: estás respondiendo como {b['a']} porque {causa}. "
+                f"No puedo volver solo: teclea `/model {b['de']}` para regresar.{extra} "
+                f"Si prefieres seguir con {b['a']}, teclea `/model {b['a']}` y dejo de avisar.")
+    # Sin hora no se puede recordar qué turnos se listaron: esos no entran (en un transcript real no pasa).
+    lista = [t for t in e['turnos'] if t['iso']]
+    cur = e['cur']
+    if cur is not None and cur['bajada'] and not cur['oculto'] and cur['iso']:
+        lista.append(cur)
+    ahora = e['fij'] if e['fij_tras_ultima'] else e['ultimo']
+    if not lista or not ahora or _casa(ahora, lista[-1]['modelo_bajada']):
         return ''
-    # el usuario lo pidió con su último /model, y la familia preferida no ha vuelto a responder
-    # después: si volvió y ahora baja otra vez, eso sí es un downgrade
-    if _elegido_a_mano(fij, a) and not preferido_tras_fij:
+    rev = _ruta('.modelo_revisado', tp)
+    marca = os.path.join(rev, _sid_de_ruta(tp)) if rev else None
+    hasta = _revisado_hasta(marca) if marca else ''
+    nuevos = [t for t in lista if _posterior(t['iso'], hasta)]
+    if not nuevos:
         return ''
-    return (f'[modelo] estás respondiendo como {a}, no como {pref} (downgrade por un safeguard o por el sistema). '
-            f'No puedo volver solo: teclea `/model {pref}` para regresar. Si el mensaje que lo disparó sigue en el hilo, '
-            'edítalo antes de reintentar o volverá a bajar.')
+    if marca and marcar:
+        os.makedirs(rev, exist_ok=True)
+        with open(marca, 'w', encoding='utf-8') as fh:
+            fh.write(nuevos[-1]['iso'])
+    modelos = ', '.join(sorted({t['modelo_bajada'] for t in nuevos}))
+    L = [f'[modelo · revisión] Terminó el downgrade automático: ahora responde {ahora}. Durante la bajada respondió '
+         f'{modelos} en {len(nuevos)} turno(s); repásalos antes de seguir:']
+    for t in nuevos[:8]:
+        L.append(f"  - {t['ts']} {t['modelo_bajada']} · usuario: «{t['prompt']}» → «{t['textos'].get(t['modelo_bajada'], '')}»")
+    if len(nuevos) > 8:
+        L.append(f'  … y {len(nuevos) - 8} más (grep en el transcript por el modelo)')
+    return '\n'.join(L)
 
 
 if __name__ == '__main__':
@@ -268,6 +402,10 @@ if __name__ == '__main__':
     sj = {'transcript_path': tp_arg} if tp_arg else None
     _CACHE['proj'], _CACHE['mem'] = rutas.resolver(argv=a, stdin_json=sj)
     if es_estado:
-        print('preferido:', preferido(tp_arg), '· actual:', actual(tp_arg)); print(texto(tp_arg) or '(sin aviso)')
+        e = recorrer(tp_arg)
+        b = e['bajada']
+        print('actual:', e['ultimo'] or '—', '· downgrade automático:',
+              f"{b['de']} → {b['a']} ({b['motivo']})" if b else 'ninguno')
+        print(texto(tp_arg, marcar=False) or '(sin aviso)')
         sys.exit(0)
     print(texto(tp_arg))

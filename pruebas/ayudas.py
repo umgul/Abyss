@@ -74,6 +74,37 @@ def asistente_texto(texto, ts=None, modelo=None):
     return d
 
 
+def asistente_fallback(texto, ts, de, a, request_id=None):
+    """La primera respuesta del modelo de reserva tras un safeguard: `model` es el de reserva y el content trae el
+    bloque `fallback` con `from`/`to`, como lo escribe Claude Code."""
+    d = asistente_texto(texto, ts, modelo=a)
+    d['message']['content'].insert(0, {'type': 'fallback', 'from': {'model': de}, 'to': {'model': a}})
+    if request_id:
+        d['requestId'] = request_id
+    return d
+
+
+def sistema_fallback(ts, de, a, request_id=None):
+    """La línea `system`/`model_refusal_fallback` que acompaña a un safeguard."""
+    d = {'type': 'system', 'subtype': 'model_refusal_fallback', 'originalModel': de, 'fallbackModel': a,
+         'direction': 'retry', 'trigger': 'refusal', 'scope': 'session', 'timestamp': ts}
+    if request_id:
+        d['requestId'] = request_id
+    return d
+
+
+def marca_sesion(ts, fuente='resume', tipo='hook_success'):
+    """El adjunto que deja un gancho SessionStart al arrancar (`startup`), reanudar (`resume`) o compactar (`compact`)."""
+    return {'type': 'attachment', 'timestamp': ts,
+            'attachment': {'type': tipo, 'hookName': f'SessionStart:{fuente}', 'hookEvent': 'SessionStart'}}
+
+
+def model_elegido(arg, ts):
+    """La línea `user` del comando `/model <arg>`, como la escribe Claude Code al elegir modelo."""
+    return usuario(f'<command-name>/model</command-name>\n            <command-message>model</command-message>\n'
+                   f'            <command-args>{arg}</command-args>', ts)
+
+
 def asistente_tool_use(nombre, entrada_dict, ts=None):
     d = {'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'name': nombre, 'input': entrada_dict}]}}
     if ts:

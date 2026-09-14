@@ -99,7 +99,7 @@ Ninguna vara nueva se activa sin probarla primero contra datos reales y contra e
 | `varas.py` | Peso de uso real de cada ficha de memoria (citas + lecturas) | Cuantiles de la distribución de uso actual |
 | `continuidad.py` (sala) | Parecido entre el prompt y sesiones pasadas | Coseno TF-IDF sobre el suelo del nulo + media/σ del prompt |
 | `vigia.py` | Números/rutas/citas de la propia respuesta sin fuente verificable | Presencia en la evidencia (usuario + herramientas); precisión por descargos |
-| `modelo.py` | Si se está respondiendo fuera del modelo preferido | Comparación exacta contra `modelo_preferido.json`, sin inferencia |
+| `modelo.py` | Si el sistema bajó de modelo sin que lo eligiera el usuario | Rastro en el transcript: bloque o línea de fallback, o marca de arranque y rango por familia y generación; sin rastro, sin aviso |
 | `noticias.py` (temas auto) | Si un nombre propio recurrente merece ser tema de prensa | Frecuencia por sesión + parecido de sus titulares sobre el suelo del nulo |
 
 ## Piezas de la segunda tanda

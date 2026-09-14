@@ -24,7 +24,8 @@ Claude Code). Regla:
   `.despertados/`, `.vivo/`, `.omitir`, `confabulaciones.jsonl`, `lugar.json`, `meteo.json`,
   `modelo_*`, `.modelo_revisado/`, `noticias.json`, `temas_*.json`, `temas_log.jsonl`, `ojo.log`,
   `propiocepcion.json`, `.matrioshka/` (lo que `propiocepcion.extraer()` sacó de cada sesión, con la
-  firma del fichero leído), `imagen.log`, `imagenes/`, `varas.log` (avisos y fallos de `varas.py
+  firma del fichero leído), `.marcapaginas/` (hasta dónde leyeron vigía y modelo el transcript de cada
+  sesión viva, con la firma de lo leído), `imagen.log`, `imagenes/`, `varas.log` (avisos y fallos de `varas.py
   --index` que dispara `continuidad.cerrar()`) viven en `mem`. `MEMORY.md` y las fichas también,
   junto con sus copias fechadas `MEMORY.md.abyss-AAAAMMDD-HHMMSS.bak` (una por cada recorte real
   de `varas.py --index --recortar`, nunca en el pase automático).

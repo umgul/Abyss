@@ -71,9 +71,17 @@ que nadie ha mirado. `--presion` da las cazas de una sesión contra la
 distribución. `--estados-baseline` cuenta estados sin vara en todas las sesiones
 guardadas.
 
+En cada Stop no relee el transcript entero: sigue desde su marcapáginas
+(`memory/.marcapaginas/<id>/`), donde la evidencia de la sesión crece con cada
+línea nueva ya derivada (tal cual, sin puntos ni comas, en minúsculas con los
+espacios colapsados, y los hosts que aparecen). Si algo de la firma no casa (el
+transcript se recortó, se abrió un paréntesis, cambió el código), vuelve a
+empezar desde el principio; si no puede usarlo, lee entero como siempre.
+
 ## Qué sale de la máquina
 
-Nada. Todo local: lee el transcript y escribe `confabulaciones.jsonl`.
+Nada. Todo local: lee el transcript y escribe `confabulaciones.jsonl` y su
+marcapáginas.
 
 ## Límites honestos
 
@@ -89,6 +97,15 @@ Nada. Todo local: lee el transcript y escribe `confabulaciones.jsonl`.
   puede seguir siendo una copia.
 - Bloquea como mucho una vez por turno; si el asistente insiste tras el primer
   bloqueo, pasa y solo queda anotado como "reincidente".
+- El marcapáginas guarda la evidencia de la sesión (texto del usuario y de
+  herramientas) en local y sin cifrar, como `sesiones/`. Se borra al cerrar la
+  sesión; si no llega a cerrarse, lo barre un arranque, cierre o lectura
+  posterior del mismo proyecto (6 horas sin tocar, o fuera de las 4 sesiones
+  más recientes), y si nadie vuelve a abrir el proyecto se queda. Nada de una
+  sesión omitida, y `--omitir-sesion` y los recortes de `parentesis.py` lo
+  borran. Una sesión
+  omitida se sigue leyendo entera en cada Stop, y la primera vez de cada sesión
+  (o tras un recorte o un paréntesis nuevo) también.
 
 ## Reglas SGICP de esta pieza
 

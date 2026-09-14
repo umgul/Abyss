@@ -56,8 +56,9 @@ map.
   percentile against the others.
 - [`varas`](skills/varas/SKILL.md) — recomputes the usage weight ◆/◆◆/◆◆◆ of
   every memory file by quantiles of citations and reads.
-- [`modelo`](skills/modelo/SKILL.md) — detects when the reply is coming from a
-  model other than the preferred one, and flags the turns to review on return.
+- [`modelo`](skills/modelo/SKILL.md) — warns about an automatic downgrade (a
+  safeguard, or a session that starts below the thread's model) and flags the
+  turns to review once it's over; switching down by hand with `/model` is fine.
 - [`parentesis`](skills/parentesis/SKILL.md) — marks a stretch (or a whole
   session) to keep out of future memory, and trims the local transcript
   already closed if the user asks.
@@ -187,8 +188,8 @@ its own (see "Where the data lives" below).
 /plugin install abyss@abyss
 ```
 
-(that repository path is where publication is planned; adjust it if
-`umgul/Abyss` changes). This installs only the *skills* under `skills/`. The
+(`umgul/Abyss` is the package's public repository on GitHub). This installs
+only the *skills* under `skills/`. The
 plugin declares no hooks: Claude Code would load a `hooks/hooks.json` on its
 own when installing it, and this package deliberately ships none, so that
 nothing runs on every session, every prompt or after every tool unless the
@@ -204,8 +205,8 @@ so it works in any project with no paths to configure.
 
 What the plugin does not bring either, because it needs data only a person
 can give: the **telegram** module (needs a bot token and a chat id) and
-seeding the configuration templates (`modelo_preferido.json`,
-`temas_noticias.json`, `imagen_config.json`). That's what `instalar.py` is for.
+seeding the configuration templates (`temas_noticias.json`,
+`imagen_config.json`). That's what `instalar.py` is for.
 
 ### With `instalar.py`
 
@@ -249,10 +250,11 @@ asks for those two values (via console prompts or
 `--telegram-token`/`--telegram-chat`) and writes the filled-in copy **outside
 the repo**, in `memory/`, never in the installed code.
 
-Three modules come **off by default** (they must be checked on purpose):
+Four modules come **off by default** (they must be checked on purpose):
 **permisos** (granting Abyss `Edit` permission on `settings.json`), **huella**
 (its `PostToolUse` hook runs after every tool call, with the cost that
-implies — see its skill), and **taller** (leaves a local image server's
+implies — see its skill), **telegram** (asks for the token and chat id
+above), and **taller** (leaves a local image server's
 config ready, but does not install `diffusers`/`torch` or start it: that
 weighs GB and minutes, and it's a decision for whoever installs it, not the
 installer on its own). Every other module — including **preferencias**
@@ -348,12 +350,13 @@ another's.
 |---|---|---|---|
 | `rutas.py` | Resolves where the code lives and where the data lives for every other script. | None (library everything else imports) | Only creates `memory/` if missing. |
 | `continuidad.py` | Saves every session, measures its clock, opens the room of clocks, and keeps the heartbeat of which threads are still alive. `--comprimir` gzips old sessions. | `SessionStart` (`--arranque`) · `SessionEnd` (`--cierre`) · `UserPromptSubmit` (`--despertar`) | `sesiones/*.jsonl(.gz)` · `relojes.jsonl` · `bolsas.json` · `.despertados/` · `.vivo/` · `sesiones/.omitir` · `varas.log` (warnings and failures from `varas.py --index` after each close) |
-| `vigia.py` | Checks the last reply against the session's real evidence and blocks the turn's closing once if it finds unsourced numbers, paths, or quotes. | `Stop` (`--verificar`) | `confabulaciones.jsonl` |
+| `vigia.py` | Checks the last reply against the session's real evidence and blocks the turn's closing once if it finds unsourced numbers, paths, or quotes. The evidence grows from its bookmark: each Stop only reads the new lines. | `Stop` (`--verificar`) | `confabulaciones.jsonl` · `.marcapaginas/<id>/` |
+| `marcapaginas.py` | Keeps how far each reader (watchdog, model) got through each live session's transcript, with a signature of what was read, so it can continue from there; if anything doesn't match, it reads from the start again. | None — library used by `vigia.py` and `modelo.py` | `.marcapaginas/<id>/` (deleted when the session ends; see "Honest limits") |
 | `propiocepcion.py` | Measures each session from its transcript and gives its percentile against everything measured so far. A single read per file takes the numbers, the phrases that word bags and clocks use, and the file reads that `varas.py` counts, and it is remembered with the file's signature so the file isn't read again while it doesn't change. | None of its own — library used by `continuidad.py` and `varas.py`; also a standalone CLI | `propiocepcion.json` · `.matrioshka/` (one record per session with what that read took; nothing from sessions in `sesiones/.omitir`) |
 | `varas.py` | Recomputes each file's ◆/◆◆/◆◆◆ weight by quantiles of citations + reads, and rewrites those glyphs in the index. If `MEMORY.md` exceeds 24 KB it only **warns** on stdout; actual trimming is manual, via `varas.py --index --recortar` (it saves a dated copy first); it never deletes a whole line. | None of its own — called by `continuidad.py` after each close; also a standalone CLI | Rewrites `MEMORY.md` · `MEMORY.md.abyss-YYYYMMDD-HHMMSS.bak` (one per actual trim) |
-| `parentesis.py` | Marks a stretch or a whole session to keep out of future memory; trims the local transcript already closed (`--recortar`/`--recortar-tramo`, with a `.antes` copy). | None — manual use | `parentesis.json` · `sesiones/.omitir` (reused) · with `--omitir-sesion`, deletes `.matrioshka/<id>.json` |
+| `parentesis.py` | Marks a stretch or a whole session to keep out of future memory; trims the local transcript already closed (`--recortar`/`--recortar-tramo`, with a `.antes` copy). | None — manual use | `parentesis.json` · `sesiones/.omitir` (reused) · with `--omitir-sesion` and the trims, deletes `.matrioshka/<id>.json` and `.marcapaginas/<id>/` |
 | `exterocepcion.py` | Location (by IP and by what's said), weather at that location, and the entry channel of the last message. | None of its own — library used by `continuidad.py` | `lugar.json` · `meteo.json` |
-| `modelo.py` | Detects replies coming from a model other than the preferred one and flags turns to review on return. | None of its own — there is no «PostModelSwitch»/«PreModelSwitch» event in Claude Code; library used by `continuidad.py --despertar` | `modelo_preferido.json` · `.modelo_revisado/` |
+| `modelo.py` | Warns about an automatic downgrade —a safeguard that moves the session to a fallback model, or a session that starts below the model the thread was on— with the command to go back, and once it's over lists what was answered during it, once. Switching down by hand with `/model` is fine; a change with no trace in the transcript doesn't warn. | None of its own — library used by `continuidad.py --despertar` | `.marcapaginas/<id>/modelo.json` · `.modelo_revisado/` |
 | `noticias.py` | Front page and topic headlines on startup; self-curated automatic topics. | None of its own — library used by `continuidad.py --arranque` | `noticias.json` · `temas_auto.json` · `temas_log.jsonl` · `temas_noticias.json` (hand-editable) · `temas_veto.json` |
 | `ojo.py` | Eight verbs, one entry point, none via a hook: `mirar` (a single webcam frame, self-contained) and, delegating entirely to its module, `texto`/`fotocopia`/`tarjeta`/`manual` (→ `lectura_visual.py`), `despiece`/`prompt3d` (→ `volumen.py`), and `gestos` (→ `gestos.py`). | None — never via a hook | `ojo.log` (verbs `mirar`/`texto`/`fotocopia`/`tarjeta`/`manual`) plus whatever file each verb asks for; `despiece`/`prompt3d`/`gestos` touch nothing in `memory/` |
 | `lectura_visual.py` | OCR of an image via Windows's own engine (WinRT, nothing to install) or `tesseract` (second path, PATH): `texto` (plain text, optionally to the clipboard), `fotocopia` (straightens/corrects lighting on a photographed or camera-captured document, PNG or multi-page PDF — a WIA scanner is one MORE optional source, never the path), `tarjeta` (patterns + position heuristic → `.vcf` and `.png`), `manual` (orders several photos, without summarizing). Used by `ojo.py`. | None | `lectura_visual.log`; whatever output file each verb asks for (next to the input, or in `memory/` if it came from `--camara`/`--escaner`) |
@@ -480,6 +483,16 @@ another's.
   unencrypted, like `sesiones/`. It keeps nothing from a session listed in
   `sesiones/.omitir`, and deleting the whole folder changes no result: it only
   forces a re-read.
+- `.marcapaginas/` keeps the evidence the watchdog uses (the user's and the
+  tools' text, already derived) and what `modelo.py` knows about the thread
+  (with the turns answered during an automatic downgrade), so the transcript
+  isn't reread on every turn: local and unencrypted, like `sesiones/`. A
+  session's folder is deleted when it ends (`SessionEnd`); if it never ends
+  cleanly, any later start, end or read in the same project sweeps it once it
+  has gone 6 hours untouched or falls outside the 4 most recent. If nobody
+  opens that project again, it stays. It keeps nothing from an omitted session
+  (which is still read whole), and `--omitir-sesion` and the `parentesis.py`
+  trims delete it.
 - The watchdog blocks at most once per turn; if it keeps confabulating after
   the first block, it lets it through and only logs it as a "repeat offender."
 - Below 8 measured sessions there's no measure at all: `propiocepcion.py`,
@@ -491,9 +504,11 @@ another's.
 - The room of clocks compares word bags (TF-IDF), not ideas: it can wake up a
   session by shared vocabulary without the topic actually being the same, and
   vice versa.
-- There's no automatic return to the preferred model: `modelo.py` only
+- There's no automatic return to the previous model: `modelo.py` only
   detects and warns; the person has to type `/model` to come back, because no
-  API today exposes a way to do that from a hook.
+  API today exposes a way to do that from a hook. And it only warns with a
+  trace in the transcript: a model change with no `/model`, no fallback and no
+  session marker doesn't warn, because nothing says whether it was by hand.
 - Location by IP can get the city wrong (VPN, mobile networks) and only
   refreshes at session start; "what's said" depends on the message matching a
   recognized phrasing, not any way of saying where you are.

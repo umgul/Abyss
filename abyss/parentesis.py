@@ -169,21 +169,34 @@ def cerrar(sid):
 
 # ---------- --omitir-sesion (reusa mem/sesiones/.omitir de continuidad.py) ----------
 
-def _borrar_muneca(sid):
-    """Quita `mem/.matrioshka/<sid>.json`: lo que `propiocepcion.extraer()` recordaba de
-    esta sesión (su medida, sus frases y los trozos de línea que nombran fichas). De una
-    sesión omitida no se vuelve a guardar nada ahí; esto se lleva lo de antes. Devuelve ''
-    si ya no queda, o el aviso que hay que decir si no se pudo borrar (en Windows, por
-    ejemplo, mientras otro proceso la tiene abierta)."""
+def _borrar_lo_derivado(sid, recorte=False):
+    """Quita lo que se sacó de esta sesión y se guardó aparte: su muñeca (`mem/.matrioshka/<sid>.json`:
+    medida, frases y trozos de línea que nombran fichas) y su marcapáginas (`mem/.marcapaginas/<sid>/`: la
+    evidencia del vigía y los turnos de `modelo`). Lo llaman `--omitir-sesion` (de esa sesión no se guarda
+    nada más) y los dos recortes (lo cortado no puede seguir vivo en lo derivado). Devuelve '' si ya no
+    queda nada, o el aviso que hay que decir si algo no se pudo borrar (en Windows, por ejemplo, mientras
+    otro proceso lo tiene abierto): de una sesión omitida lo quita el barrido de `continuidad.py` al arrancar o
+    cerrar una sesión; tras un recorte no se barre, pero su firma ya no casa y la próxima lectura lo rehace."""
+    fallos = []
     ruta = os.path.join(mem, rutas.MATRIOSHKA, sid + '.json')
     try:
         os.remove(ruta)
     except FileNotFoundError:
         pass
     except OSError as e:
-        return (f' · AVISO: no se pudo borrar {rutas.MATRIOSHKA}/{sid}.json ({e.__class__.__name__}); '
-                f'la quitará el barrido del próximo cierre de sesión')
-    return ''
+        fallos.append(f'{rutas.MATRIOSHKA}/{sid}.json ({e.__class__.__name__})')
+    carpeta = os.path.join(mem, rutas.MARCAPAGINAS, sid)
+    if os.path.isdir(carpeta):
+        shutil.rmtree(carpeta, ignore_errors=True)
+        if os.path.exists(carpeta):
+            fallos.append(f'{rutas.MARCAPAGINAS}/{sid}/')
+    if not fallos:
+        return ''
+    if recorte:
+        return (f' · AVISO: no se pudo borrar {", ".join(fallos)}; ya no se usa, porque su firma no casa con el '
+                f'transcript recortado, y la próxima lectura lo rehace')
+    return (f' · AVISO: no se pudo borrar {", ".join(fallos)}; '
+            f'lo quitará el barrido del próximo arranque o cierre de sesión')
 
 
 def omitir_sesion(sid):
@@ -195,13 +208,13 @@ def omitir_sesion(sid):
     except Exception:
         existentes = set()
     if sid in existentes:
-        return f'{sid[:8]} ya estaba en sesiones/.omitir' + _borrar_muneca(sid)
+        return f'{sid[:8]} ya estaba en sesiones/.omitir' + _borrar_lo_derivado(sid)
     # Primero se apunta y luego se borra: una lectura que termine después ya ve la sesión
-    # en `.omitir` y no deja muñeca (ver `propiocepcion._guardar_muneca`).
+    # en `.omitir` y no deja nada (ver `propiocepcion._guardar_muneca` y `marcapaginas.Lectura.confirmar`).
     with open(ruta, 'a', encoding='utf-8') as fh:
         fh.write(sid + '\n')
     return (f'{sid[:8]} añadida a sesiones/.omitir: ningún hilo (este u otro haciendo la cosecha) la copiará a mem/sesiones/'
-            + _borrar_muneca(sid))
+            + _borrar_lo_derivado(sid))
 
 
 # ---------- heurística de sesión actual (sin gancho, sin session_id) ----------
@@ -315,7 +328,8 @@ def recortar(ruta_jsonl, ultimo_mensaje):
     with open(ruta_jsonl, 'w', encoding='utf-8') as fh:
         fh.writelines(lineas[:idx_corte])
     return True, (f'{os.path.basename(ruta_jsonl)} recortado a {idx_corte}/{len(lineas)} líneas '
-                   f'(conservado hasta la respuesta a «{ultimo_mensaje[:60]}»); original en {os.path.basename(antes)}')
+                   f'(conservado hasta la respuesta a «{ultimo_mensaje[:60]}»); original en {os.path.basename(antes)}'
+                   + _borrar_lo_derivado(sid, recorte=True))
 
 
 def recortar_tramo(ruta_jsonl, inicio_iso, fin_iso):
@@ -357,7 +371,8 @@ def recortar_tramo(ruta_jsonl, inicio_iso, fin_iso):
     with open(ruta_jsonl, 'w', encoding='utf-8') as fh:
         fh.writelines(conservadas)
     return True, (f'{os.path.basename(ruta_jsonl)}: {quitadas} línea(s) del tramo {inicio_iso}–{fin_iso} '
-                   f'eliminadas ({len(conservadas)} quedan); original en {os.path.basename(antes)}')
+                   f'eliminadas ({len(conservadas)} quedan); original en {os.path.basename(antes)}'
+                   + _borrar_lo_derivado(sid, recorte=True))
 
 
 # ---------- CLI ----------

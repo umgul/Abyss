@@ -148,15 +148,16 @@ MARCA_SKILL_LINEA = 'abyss-managed: true'
 
 # Datos que sí genera abyss en mem/ y que `--borrar-datos` puede limpiar en el
 # desinstalador. Deliberadamente NO incluye MEMORY.md, las fichas *.md, ni ficheros
-# de configuración que el usuario tecleó a mano (modelo_preferido.json,
-# imagen_config.json con su huggingface_key, temas_noticias.json): eso es lo que él
+# de configuración que el usuario tecleó a mano (imagen_config.json con su
+# huggingface_key, temas_noticias.json): eso es lo que él
 # puso o su memoria de verdad, nunca "datos generados" que se puedan tirar sin más.
 DATOS_GENERADOS = (
     'sesiones', 'relojes.jsonl', 'bolsas.json', '.despertados', '.vivo',
     os.path.join('sesiones', '.omitir'),  # cuelga de sesiones/, no de mem/ directamente
     'confabulaciones.jsonl', 'lugar.json', 'meteo.json', '.modelo_revisado',
     'modelo_log.jsonl', 'noticias.json', 'temas_auto.json', 'temas_veto.json',
-    'temas_log.jsonl', 'ojo.log', 'propiocepcion.json', '.matrioshka', 'imagen.log', 'imagenes',
+    'temas_log.jsonl', 'ojo.log', 'propiocepcion.json', '.matrioshka', '.marcapaginas', 'imagen.log', 'imagenes',
+    'modelo_preferido.json',  # lo escribía modelo.py con cada /model de Fable; ya no lo lee nadie
     # Telemetría/caché regenerable de las piezas nuevas. NO incluye
     # `parentesis.json` (tramos que el usuario pidió a propósito, no telemetría
     # automática) ni `imagen_config.json` (claves puestas a mano) — mismo criterio
@@ -198,9 +199,11 @@ MODULOS = [
     dict(id='vigia', script='vigia.py', defecto=True,
          linea='Penaliza la confabulación: caza números, rutas y citas que no salieron de ninguna parte.',
          linea_en='Penalizes confabulation: catches numbers, paths and quotes that came from nowhere.',
-         toca='gancho Stop → vigia.py --verificar; ficheros mem/confabulaciones.jsonl',
+         toca='gancho Stop → vigia.py --verificar; ficheros mem/confabulaciones.jsonl y mem/.marcapaginas/ '
+              '(la evidencia de las sesiones vivas, para no releer el transcript en cada Stop)',
          hooks=[('Stop', ['--verificar'], 30)],
-         toca_en="Stop hook → vigia.py --verificar; files: mem/confabulaciones.jsonl"),
+         toca_en="Stop hook → vigia.py --verificar; files: mem/confabulaciones.jsonl and mem/.marcapaginas/ "
+                 "(the evidence of live sessions, so the transcript isn't reread on every Stop)"),
     dict(id='exterocepcion', script='exterocepcion.py', defecto=True,
          linea='Lugar, meteo y canal en cada prompt (ipinfo.io, open-meteo.com, nominatim); sin red, «sin dato».',
          linea_en='Place, weather and channel on every prompt (ipinfo.io, open-meteo.com, nominatim); '
@@ -210,17 +213,14 @@ MODULOS = [
          toca_en="no hook of its own (continuidad --despertar uses it); files: mem/lugar.json, "
                  "mem/meteo.json"),
     dict(id='modelo', script='modelo.py', defecto=True,
-         linea='Avisa si Fable bajó a Opus y qué revisar cuando se vuelve.',
-         linea_en='Warns if Fable dropped to Opus, and what to check when it comes back.',
-         # Sin gancho propio: no existe un evento «PostModelSwitch»/«PreModelSwitch» en
-         # Claude Code (los eventos reales son PreToolUse, PostToolUse, Stop,
-         # SubagentStop, SessionStart, SessionEnd, UserPromptSubmit, PreCompact,
-         # Notification). `modelo.py` es una librería que usa `continuidad.py
-         # --despertar` en cada prompt.
-         toca='sin gancho propio (lo usa continuidad --despertar); ficheros mem/modelo_preferido.json',
+         linea='Avisa de un downgrade automático (safeguard o arranque por debajo) y qué revisar al salir.',
+         linea_en='Warns about an automatic downgrade (safeguard, or starting below) and what to check after.',
+         # Sin gancho propio: `modelo.py` es una librería que usa `continuidad.py
+         # --despertar` en cada prompt. Claude Code tiene un evento `PostModelSwitch`,
+         # pero no hay medida de cuándo salta (selector, fallback, reanudación): no se usa.
+         toca='sin gancho propio (lo usa continuidad --despertar); ficheros mem/.modelo_revisado/, mem/.marcapaginas/',
          hooks=[],
-         plantilla='modelo_preferido.json',
-         toca_en="no hook of its own (continuidad --despertar uses it); files: mem/modelo_preferido.json"),
+         toca_en="no hook of its own (continuidad --despertar uses it); files: mem/.modelo_revisado/, mem/.marcapaginas/"),
     dict(id='noticias', script='noticias.py', defecto=True,
          linea='El día y lo reciente nuestro visto desde fuera (Google News RSS), al arrancar.',
          linea_en='The day and our recent activity seen from outside (Google News RSS), on startup.',
@@ -355,12 +355,14 @@ MODULOS = [
          linea_en='Marks a stretch or a whole session so it does not enter future memory; can trim the '
                   'local transcript once it is already closed.',
          toca='sin gancho — uso manual (--abrir/--cerrar/--omitir-sesion/--recortar/--recortar-tramo); '
-              'ficheros mem/parentesis.json, mem/sesiones/.omitir; --omitir-sesion borra mem/.matrioshka/<id>.json',
+              'ficheros mem/parentesis.json, mem/sesiones/.omitir; --omitir-sesion y los recortes borran '
+              'mem/.matrioshka/<id>.json y mem/.marcapaginas/<id>/',
          hooks=[],
          aviso='no puede deshacer lo que ya viajó a la API dentro de un turno: gobierna la memoria LOCAL de '
                'este paquete (lo que el propio asistente vuelve a leer), no los servidores de Anthropic.',
          toca_en="no hook — manual use (--abrir/--cerrar/--omitir-sesion/--recortar/--recortar-tramo); "
-                 "files mem/parentesis.json, mem/sesiones/.omitir; --omitir-sesion deletes mem/.matrioshka/<id>.json",
+                 "files mem/parentesis.json, mem/sesiones/.omitir; --omitir-sesion and the trims delete "
+                 "mem/.matrioshka/<id>.json and mem/.marcapaginas/<id>/",
          aviso_en="it can't undo what already went to the API within a turn: it governs this package's "
                   "LOCAL memory (what the assistant itself reads back), not Anthropic's servers."),
     dict(id='huella', script='huella.py', defecto=False,

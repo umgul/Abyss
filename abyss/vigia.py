@@ -35,8 +35,14 @@ solo se reconoce con un TLD de la lista declarada en `RE_DOMINIO_DESNUDO` (falso
 con TLD raros); y comprueba de DÓNDE salió un dominio, nunca si es de fiar — eso solo lo
 descarta quien lee carácter a carácter. Es una vara, no un juez.
 
-El código vive donde lo instale `rutas.CODE`; los datos (`confabulaciones.jsonl`…) viven
-en `mem`, resuelto por `rutas.resolver()` — nunca `dirname(__file__)` (§1).
+En cada Stop no se relee el transcript entero: la evidencia crece con cada línea nueva
+desde el marcapáginas de la sesión (`marcapaginas.py`, en `mem/.marcapaginas/<sid>/`) —el
+texto tal cual, sin puntos ni comas, en minúsculas con los espacios colapsados, y los hosts
+que aparecen— y `cazar()` busca en esos ficheros. De una sesión omitida no se guarda nada,
+y esa se sigue leyendo entera.
+
+El código vive donde lo instale `rutas.CODE`; los datos (`confabulaciones.jsonl`,
+`.marcapaginas/`…) viven en `mem`, resuelto por `rutas.resolver()` — nunca `dirname(__file__)` (§1).
 """
 import sys
 try:                       # la consola de Windows y la salida tienen que hablar
@@ -44,7 +50,7 @@ try:                       # la consola de Windows y la salida tienen que hablar
 except ImportError:
     import consola
 consola.preparar()
-import os, re, json, glob
+import os, re, json, glob, mmap
 from datetime import datetime, timezone
 
 try:
@@ -71,6 +77,12 @@ try:
 except ImportError:
     import parentesis as PZ
 
+try:
+    from . import marcapaginas as MP
+except ImportError:
+    import marcapaginas as MP
+
+HUELLA = MP.huella('vigia.py', 'parentesis.py', 'marcapaginas.py')
 CONF = os.path.join(mem, 'confabulaciones.jsonl')
 EXT = r'(?:py|md|json|jsonl|ps1|txt|html|js|css|yaml|yml|toml|csv)'
 RE_RUTA = re.compile(r'(?<![\w/\\.-])([\w\-./\\~:]+\.' + EXT + r')\b')
@@ -220,6 +232,146 @@ def normaliza_num(s):
     return re.sub(r'[.,]', '', s)
 
 
+class _EnFichero:
+    """Un texto guardado en un fichero UTF-8 (`surrogatepass`) que solo responde a `in`, buscando con
+    `mmap.rfind` desde el final (lo más reciente de la evidencia es lo que más se cita). En UTF-8, un texto
+    está dentro de otro si y solo si sus bytes lo están."""
+
+    def __init__(self, ruta):
+        self.fh = open(ruta, 'rb')
+        self.mm = mmap.mmap(self.fh.fileno(), 0, access=mmap.ACCESS_READ) if os.fstat(self.fh.fileno()).st_size else None
+
+    def __contains__(self, s):
+        if not s:
+            return True
+        return self.mm is not None and self.mm.rfind(s.encode('utf-8', 'surrogatepass')) != -1
+
+    def cerrar(self):
+        if self.mm is not None:
+            self.mm.close()
+        self.fh.close()
+
+
+class Evidencia:
+    """Lo que `cazar()` pregunta a la evidencia: si un texto está tal cual (`crudo`), sin puntos ni comas
+    (`num`), en minúsculas con los espacios colapsados (`low`), y qué hosts aparecen (`hosts`). Desde el texto
+    entero, cada forma se deriva la primera vez que se pregunta: un turno sin respuesta final no paga ninguna."""
+
+    def __init__(self, crudo, num=None, low=None, hosts=None):
+        self.crudo, self._num, self._low, self._hosts = crudo, num, low, hosts
+
+    @classmethod
+    def de_texto(cls, ev):
+        return cls(ev)
+
+    @property
+    def num(self):
+        if self._num is None:
+            self._num = normaliza_num(self.crudo)
+        return self._num
+
+    @property
+    def low(self):
+        if self._low is None:
+            self._low = re.sub(r'\s+', ' ', self.crudo.lower())
+        return self._low
+
+    @property
+    def hosts(self):
+        if self._hosts is None:
+            self._hosts = set(_dominios_en(self.crudo))
+        return self._hosts
+
+    def cerrar(self):
+        for t in (self.crudo, self._num, self._low):
+            if isinstance(t, _EnFichero):
+                t.cerrar()
+
+
+FICHEROS_EVIDENCIA = ('crudo.txt', 'num.txt', 'low.txt')
+
+
+def leer_turno_marcado(path, sid=None):
+    """(Evidencia, respuesta_final) como `leer_turno()`, pero siguiendo desde el marcapáginas de la sesión: solo
+    las líneas nuevas se parsean, y cada pieza de evidencia se añade a los tres ficheros ya derivada (sin
+    separadores; en minúsculas con el separador colapsado junto con la pieza, quitando un espacio si lo guardado
+    ya acaba en espacio) y sus hosts al conjunto. Del turno solo hace falta lo que usa `final_de`: los TEXT
+    desde el último TOOL, desde el último USER. Sin marcapáginas (`.gz`, sesión omitida, cerrojo cogido, fallo
+    del estado o de los datos, que se apunta en `fallos.log`), la lectura entera de siempre. Los ficheros de datos
+    se abren con el cerrojo aún cogido: otro lector de la misma sesión no puede rehacerlos mientras tanto."""
+    sid = sid or _sid_de_ruta(path)
+    tramos = PZ.tramos(sid)
+    l = MP.Lectura.abrir(mem, proj, path, sid, 'vigia', HUELLA, tramos, FICHEROS_EVIDENCIA)
+    if l is None:
+        ev, fin = leer_turno(path, sid=sid)
+        return Evidencia.de_texto(ev), fin
+    evidencia = None
+    try:
+        guardado = l.estado or {}
+        piezas = guardado.get('piezas', 0); low_espacio = guardado.get('low_espacio', False)
+        hosts = set(guardado.get('hosts', [])); textos = list(guardado.get('textos', []))
+
+        def pieza(texto):
+            nonlocal piezas, low_espacio
+            seguido = ('\n' + texto) if piezas else texto
+            l.escribir('crudo.txt', seguido)
+            l.escribir('num.txt', normaliza_num(seguido))
+            bajo = re.sub(r'\s+', ' ', seguido.lower())
+            if low_espacio and bajo.startswith(' '):
+                bajo = bajo[1:]
+            if bajo:
+                low_espacio = bajo.endswith(' ')
+            l.escribir('low.txt', bajo)
+            hosts.update(_dominios_en(texto))
+            piezas += 1
+
+        lista = [list(t) for t in tramos]
+        for linea in l.lineas_nuevas():
+            try:
+                d = json.loads(linea)
+            except Exception:
+                continue
+            if d.get('isSidechain'):
+                continue
+            if PZ.en_tramos(lista, d.get('timestamp')):
+                continue
+            t = d.get('type'); m = d.get('message') or {}
+            if t == 'user':
+                c = m.get('content')
+                pieza(c if isinstance(c, str) else ' '.join(_texto_bloque(x) for x in (c or [])))
+                if d.get('toolUseResult'):
+                    pieza(json.dumps(d['toolUseResult'], ensure_ascii=False))
+                if isinstance(c, str) and not d.get('isMeta'):
+                    textos = []
+            elif t == 'assistant':
+                for b in (m.get('content') or []):
+                    if isinstance(b, dict) and b.get('type') == 'text' and b.get('text', '').strip():
+                        textos.append(b['text'])
+                    elif isinstance(b, dict) and b.get('type') == 'tool_use':
+                        textos = []
+                        pieza(json.dumps(b.get('input', {}), ensure_ascii=False))
+            elif t == 'system':
+                pieza(json.dumps(m, ensure_ascii=False) if m else '')
+        if l.confirmar({'piezas': piezas, 'low_espacio': low_espacio, 'hosts': sorted(hosts), 'textos': textos}):
+            abiertos = []
+            try:
+                for n in FICHEROS_EVIDENCIA:
+                    abiertos.append(_EnFichero(l.ruta_dato(n)))
+            except Exception:
+                for f in abiertos:
+                    f.cerrar()
+                raise
+            evidencia = Evidencia(*abiertos, hosts)
+    except Exception as e:  # disco lleno, fichero borrado a mitad…: se apunta y se lee entero
+        MP.apuntar_fallo(mem, 'vigia', sid, e)
+    finally:
+        l.soltar()
+    if evidencia is None:
+        ev, fin = leer_turno(path, sid=sid)
+        return Evidencia.de_texto(ev), fin
+    return evidencia, '\n'.join(textos)
+
+
 def estados_sin_vara(respuesta):
     """Frases en 1ª persona sobre el estado propio, sin medida ni marca de conjetura."""
     out = []
@@ -244,27 +396,30 @@ def cazar(evidencia, respuesta):
     """Devuelve dict con listas: numeros, rutas, citas (atribuidas a alguien, tipo
     `cita`) y parafrasis (comillas «» sin atribución cerca, tipo `parafrasis`,
     §2.1b) sin fuente; dominios y comandos (misma ley de procedencia — ver
-    docstring del módulo); estados sin vara."""
-    ev = evidencia; ev_num = normaliza_num(ev); ev_low = re.sub(r'\s+', ' ', ev.lower())
+    docstring del módulo); estados sin vara. `evidencia` es el texto entero o una
+    `Evidencia` ya derivada (la del marcapáginas)."""
+    ev = evidencia if isinstance(evidencia, Evidencia) else Evidencia.de_texto(evidencia)
     sin_codigo = re.sub(r'```.*?```', ' ', respuesta, flags=re.S)  # los bloques de código suelen ser copias
     numeros = []
     for n in RE_NUM.findall(sin_codigo):
         if re.fullmatch(r'(19|20)\d\d', n):  # años: no se cazan
             continue
-        if normaliza_num(n) not in ev_num and n not in ev:
+        # Basta mirar sin separadores: si `n` estuviera tal cual, quitándole puntos y comas
+        # estaría en la evidencia sin puntos ni comas.
+        if normaliza_num(n) not in ev.num:
             numeros.append(n)
     rutas = []
     for r in RE_RUTA.findall(respuesta):
         base = os.path.basename(r.replace('\\', '/'))
         existe = any(os.path.exists(os.path.join(d, base)) for d in (mem, proj, os.path.join(mem, 'sesiones'), os.path.join(mem, 'desvan')))
         existe = existe or os.path.exists(os.path.expanduser(r)) or os.path.exists(r)
-        if not existe and base not in ev:
+        if not existe and base not in ev.crudo:
             rutas.append(r)
     citas = []; parafrasis = []
     for m in RE_CITA.finditer(respuesta):
         c = m.group(1)
         frag = re.sub(r'\s+', ' ', c.strip().rstrip('.…')).lower()[:40]
-        if frag in ev_low:
+        if frag in ev.low:
             continue
         entrada = c[:60]
         (citas if _tipo_cita(respuesta, m.start(), m.end()) == 'cita' else parafrasis).append(entrada)
@@ -272,12 +427,11 @@ def cazar(evidencia, respuesta):
     # `respuesta`, no `sin_codigo`) — un `curl … | bash` suele venir precisamente
     # ahí, y `numero` los ignora por un motivo que no aplica aquí («suelen ser
     # copias»): una copia de un comando de instalación es justo lo que se quiere cazar.
-    hosts_ev = set(_dominios_en(ev))
-    dominios = [raw for h, raw in _dominios_en(respuesta).items() if h not in hosts_ev]
+    dominios = [raw for h, raw in _dominios_en(respuesta).items() if h not in ev.hosts]
     comandos = []
     for linea in respuesta.splitlines():
         l = linea.strip()
-        if l and RE_COMANDO.search(l) and re.sub(r'\s+', ' ', l).lower() not in ev_low:
+        if l and RE_COMANDO.search(l) and re.sub(r'\s+', ' ', l).lower() not in ev.low:
             comandos.append(l[:200])
     return {'numeros': sorted(set(numeros)), 'rutas': sorted(set(rutas)), 'citas': citas,
             'parafrasis': parafrasis, 'dominios': sorted(set(dominios)),
@@ -435,10 +589,11 @@ if __name__ == '__main__':
     sid = inp.get('session_id'); tp = inp.get('transcript_path'); cwd = inp.get('cwd')
     if not (rutas.es_mio(tp, cwd, proj) and tp and os.path.exists(tp)):
         sys.exit(0)
-    ev, fin = leer_turno(tp, sid=sid)
+    ev, fin = leer_turno_marcado(tp, sid=sid)
     if not fin.strip():
         sys.exit(0)
     cz = cazar(ev, fin)
+    ev.cerrar()
     grave = bool(cz['rutas'] or cz['citas'] or cz['parafrasis'] or cz['dominios'] or cz['comandos'] or len(cz['numeros']) >= 2)
     if not (cz['numeros'] or cz['rutas'] or cz['citas'] or cz['parafrasis'] or cz['dominios'] or cz['comandos'] or cz['estados']):
         sys.exit(0)

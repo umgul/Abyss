@@ -18,9 +18,9 @@ class ReadmesNoPrometenPostModelSwitch(unittest.TestCase):
             self.assertNotIn('--postswitch', texto, f'{nombre} sigue mencionando la bandera del gancho retirado')
 
     def test_ningun_texto_reclama_un_gancho_postmodelswitch_activo(self):
-        # "PostModelSwitch" SÍ puede aparecer para EXPLICAR que no existe (el
-        # README y el SKILL.md lo hacen a propósito); lo que no puede aparecer es
-        # la forma que reclama un gancho activo en ese evento.
+        # "PostModelSwitch" SÍ puede aparecer para explicar que este paquete no lo
+        # usa (el SKILL.md lo hace a propósito); lo que no puede aparecer es la
+        # forma que reclama un gancho activo en ese evento.
         for nombre in ('README.md', 'README.en.md', 'skills/modelo/SKILL.md'):
             texto = (RAIZ / nombre).read_text(encoding='utf-8')
             self.assertNotIn('modelo.py --postswitch` en', texto)
@@ -53,7 +53,7 @@ class InstalarYReadmeCoinciden(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         self.assertEqual(mod.MODULOS_POR_ID['modelo']['hooks'], [],
-                          'el módulo modelo ya no debe declarar ningún gancho (PostModelSwitch no existe)')
+                          'el módulo modelo no declara ningún gancho: es librería de continuidad --despertar')
 
 
 class EspecificacionImagenCoincideConElCodigo(unittest.TestCase):

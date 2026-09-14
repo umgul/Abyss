@@ -115,7 +115,7 @@ against the null.
 | `varas.py` | Real usage weight of each memory file (citations + reads) | Quantiles of the current usage distribution |
 | `continuidad.py` (room) | Similarity between the prompt and past sessions | TF-IDF cosine over the null's floor + the prompt's own mean/σ |
 | `vigia.py` | Numbers/paths/quotes in the reply itself with no verifiable source | Presence in the evidence (user + tools); precision via overrides |
-| `modelo.py` | Whether the reply is running outside the preferred model | Exact comparison against `modelo_preferido.json`, no inference |
+| `modelo.py` | Whether the system dropped the model without the user choosing it | Trace in the transcript: fallback block or line, or session-start marker and family/generation rank; no trace, no warning |
 | `noticias.py` (auto topics) | Whether a recurring proper name deserves to become a press topic | Frequency per session + similarity of its headlines over the null's floor |
 
 ## Pieces from the second batch

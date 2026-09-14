@@ -48,6 +48,9 @@ CLAUDE_PROJECTS = os.path.join(os.path.expanduser('~'), '.claude', 'projects')
 # Se nombra aquí porque la tocan dos módulos: propiocepcion la escribe y parentesis
 # (`--omitir-sesion`) borra la de la sesión que el usuario pide no guardar.
 MATRIOSHKA = '.matrioshka'
+# Carpeta de `mem` donde `marcapaginas.py` guarda hasta dónde leyó cada lector (vigía, modelo) el transcript de
+# cada sesión viva; `parentesis.py` la borra con `--omitir-sesion` y con los dos recortes.
+MARCAPAGINAS = '.marcapaginas'
 
 
 def leer_stdin(tope_s=None):
