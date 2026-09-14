@@ -142,12 +142,12 @@ class EspecificacionDocsYLeyesCoinciden(unittest.TestCase):
     def test_docs_no_lleva_fichas_de_diseno_originales(self):
         docs = RAIZ / 'docs'
         nombres = sorted(p.name for p in docs.iterdir() if p.is_file())
-        permitidos = ['AUDITORIA_DE_ABYSS.en.md', 'AUDITORIA_DE_ABYSS.md',
+        permitidos = ['.nojekyll', 'AUDITORIA_DE_ABYSS.en.md', 'AUDITORIA_DE_ABYSS.md', 'abyss.html',
                       'ganchos_settings_ejemplo.json', 'leyes.en.md', 'leyes.md']
         self.assertEqual(nombres, permitidos,
                           'docs/ no debe llevar más que la lista blanca declarada: el leyes.md '
-                          'destilado (y su espejo en inglés), el ejemplo de ganchos, y el informe '
-                          'de auditoría (y su espejo en inglés)')
+                          'destilado (y su espejo en inglés), el ejemplo de ganchos, el informe '
+                          'de auditoría (y su espejo en inglés) y la página abyss.html que sirve GitHub Pages')
 
     def test_leyes_md_tiene_exactamente_seis_leyes_numeradas(self):
         texto = (RAIZ / 'docs' / 'leyes.md').read_text(encoding='utf-8')

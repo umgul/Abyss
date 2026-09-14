@@ -101,8 +101,9 @@ Claude Code). Regla:
 guarda y dónde, cómo se desinstala, límites honestos: los ganchos corren en cada mensaje,
 `sesiones/` guarda transcripts enteros en local, el vigía bloquea una vez por turno). Un resumen
 en inglés al final. `docs/` lleva un `leyes.md` destilado (las SEIS leyes del SGICP propio y
-qué mide cada pieza); las fichas de diseño originales NO se publican, por ser notas
-personales del autor con su fecha y su voz en primera persona.
+qué mide cada pieza) y `abyss.html`, la descripción completa del paquete que GitHub Pages sirve
+desde `docs/` (con `.nojekyll`, para que se publique tal cual); las fichas de diseño originales NO
+se publican, por ser notas personales del autor con su fecha y su voz en primera persona.
 
 ## 6 · Pruebas (`pruebas/`)
 Sin Claude Code: cada gancho se prueba con un JSON de stdin falso (`session_id`,

@@ -1,0 +1,832 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Qué es Abyss, cómo se instala, qué hace cada pieza, lo que ha logrado con cifras medidas y cómo se compara con otras soluciones y con GPT-6 Astra.">
+<title>Abyss para Claude Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400;1,6..72,500;1,6..72,600&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Red+Hat+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --papel: #EDF2F1;
+  --superficie: #F7FAF9;
+  --tinta: #0F2B33;
+  --tinta-2: #4E6A70;
+  --contorno: #B7CCCD;
+  --contorno-hondo: #8FB0B2;
+  --regla: #CBDADA;
+  --acento: #A3245F;
+  --acento-suave: #F3E3EA;
+  --codigo: #E3ECEB;
+  --si: #2B6F55;
+  --si-fondo: #DDEEE6;
+  --parcial: #875C0E;
+  --parcial-fondo: #F4EAD6;
+  --no: #6B7F83;
+  --no-fondo: #E4EAEA;
+  --serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Red Hat Mono", "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --papel: #081A1F;
+    --superficie: #0D242A;
+    --tinta: #D7E7E5;
+    --tinta-2: #92ADAF;
+    --contorno: #173A41;
+    --contorno-hondo: #23525A;
+    --regla: #1C3940;
+    --acento: #E77AA9;
+    --acento-suave: #2A1822;
+    --codigo: #102C33;
+    --si: #7FCBA8;
+    --si-fondo: #12302A;
+    --parcial: #E3B660;
+    --parcial-fondo: #2E2614;
+    --no: #8EA3A6;
+    --no-fondo: #15292D;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --papel: #081A1F;
+  --superficie: #0D242A;
+  --tinta: #D7E7E5;
+  --tinta-2: #92ADAF;
+  --contorno: #173A41;
+  --contorno-hondo: #23525A;
+  --regla: #1C3940;
+  --acento: #E77AA9;
+  --acento-suave: #2A1822;
+  --codigo: #102C33;
+  --si: #7FCBA8;
+  --si-fondo: #12302A;
+  --parcial: #E3B660;
+  --parcial-fondo: #2E2614;
+  --no: #8EA3A6;
+  --no-fondo: #15292D;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--acento); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--acento); outline-offset: 3px; border-radius: 2px; }
+code, kbd, .mono { font-family: var(--mono); font-size: 0.86em; }
+p code, li code, td code, dd code { background: var(--codigo); padding: 0.08em 0.35em; border-radius: 3px; overflow-wrap: anywhere; }
+
+/* ---------- portada ---------- */
+.portada {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--regla);
+}
+#batimetria {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.portada-dentro {
+  position: relative;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 4.5rem) 1.5rem 2rem;
+  display: grid;
+  gap: 1rem;
+}
+.antetitulo {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+.antetitulo a { color: inherit; }
+h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(3.6rem, 11vw, 7.25rem);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+}
+.entrada {
+  margin: 0;
+  max-width: 38rem;
+  font-size: clamp(1.15rem, 2.2vw, 1.35rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.tesis {
+  margin: 0.25rem 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--acento);
+}
+.sondas {
+  position: relative;
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem 2.25rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem 2rem;
+}
+.sonda {
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--tinta);
+  display: grid;
+  gap: 0.2rem;
+  align-content: start;
+}
+.sonda dt {
+  font-family: var(--mono);
+  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.sonda dd { margin: 0; font-size: 0.86rem; line-height: 1.4; color: var(--tinta-2); }
+
+/* ---------- índice ---------- */
+.indice {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 1rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--regla);
+}
+.indice a { color: var(--tinta-2); text-decoration: none; }
+.indice a:hover { color: var(--acento); text-decoration: underline; }
+
+/* ---------- secciones ---------- */
+main { max-width: 64rem; margin: 0 auto; padding: 0 1.5rem 4rem; }
+.seccion {
+  display: grid;
+  grid-template-columns: 11.5rem minmax(0, 1fr);
+  gap: 0 3rem;
+  padding: 3.25rem 0 1rem;
+  border-bottom: 1px solid var(--regla);
+}
+.seccion:last-of-type { border-bottom: 0; }
+.margen { padding-top: 0.55rem; }
+.marca {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+.cifra-margen {
+  display: block;
+  margin-top: 1.1rem;
+  font-family: var(--mono);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta);
+}
+.cifra-margen small { display: block; font-family: var(--sans); font-size: 0.78rem; color: var(--tinta-2); line-height: 1.35; margin-top: 0.2rem; }
+.cuerpo { max-width: 44rem; min-width: 0; }
+.ancho { grid-column: 1 / -1; min-width: 0; }
+h2 {
+  margin: 0 0 1rem;
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+  font-size: clamp(1.9rem, 3.6vw, 2.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+h3 {
+  margin: 2rem 0 0.6rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+.cuerpo > p, .cuerpo li { max-width: 66ch; text-wrap: pretty; }
+.cuerpo > p { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.2rem; margin: 0 0 1rem; }
+li { margin: 0.35rem 0; }
+li::marker { color: var(--tinta-2); }
+strong { font-weight: 600; }
+
+/* leyes */
+.leyes { list-style: none; padding: 0; margin: 1.25rem 0 1rem; display: grid; gap: 0.8rem; }
+.leyes li { margin: 0; padding-left: 1.1rem; border-left: 2px solid var(--acento); }
+.leyes b { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 1.15rem; }
+
+/* muestra de lo que inyectan los ganchos */
+.muestra {
+  margin: 1.5rem 0 0.4rem;
+  padding: 1rem 1.1rem;
+  background: var(--superficie);
+  border: 1px solid var(--regla);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  white-space: pre;
+}
+.muestra .g { color: var(--acento); }
+.pie { margin: 0 0 1rem; font-size: 0.82rem; color: var(--tinta-2); }
+
+/* rutas de instalación */
+.rutas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 1.25rem 0; }
+.ruta { padding: 1.1rem 1.2rem 1.2rem; background: var(--superficie); border: 1px solid var(--regla); border-radius: 4px; min-width: 0; }
+.ruta h3 { margin-top: 0; }
+.ruta p { margin: 0 0 0.75rem; font-size: 0.95rem; }
+pre.orden {
+  margin: 0.5rem 0 0.9rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--codigo);
+  border-radius: 3px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+.pasos { counter-reset: paso; list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 0.85rem; }
+.pasos > li { counter-increment: paso; margin: 0; display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 0.6rem; font-size: 0.95rem; }
+.pasos > li::before { content: counter(paso); font-family: var(--mono); font-size: 0.8rem; color: var(--acento); padding-top: 0.15rem; }
+.pasos pre.orden { margin: 0.35rem 0 0; }
+
+/* funcionalidades */
+.familia { margin: 2rem 0 0; }
+.familia:first-of-type { margin-top: 0.5rem; }
+.modulos { margin: 0; display: grid; gap: 0; }
+.modulo { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 1rem; padding: 0.8rem 0; border-top: 1px solid var(--regla); }
+.modulo dt { font-family: var(--mono); font-size: 0.86rem; font-weight: 500; padding-top: 0.12rem; }
+.modulo dt span { display: block; font-family: var(--sans); font-weight: 400; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tinta-2); margin-top: 0.2rem; }
+.modulo dd { margin: 0; font-size: 0.96rem; }
+
+/* logros */
+.logros { list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 0; }
+.logro { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr); gap: 1.25rem; padding: 1rem 0; border-top: 1px solid var(--regla); margin: 0; }
+.logro .dato { font-family: var(--mono); font-size: 1rem; font-variant-numeric: tabular-nums; color: var(--acento); line-height: 1.35; }
+.logro .dato small { display: block; color: var(--tinta-2); font-family: var(--sans); font-size: 0.74rem; margin-top: 0.25rem; }
+.logro p { margin: 0; }
+.logro b { display: block; font-weight: 600; margin-bottom: 0.15rem; }
+
+/* tablas */
+.tabla-marco { overflow-x: auto; margin: 1.25rem 0 0.5rem; border: 1px solid var(--regla); border-radius: 4px; background: var(--superficie); }
+table { border-collapse: collapse; width: 100%; min-width: 46rem; font-size: 0.88rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.7rem 0.8rem; border-bottom: 1px solid var(--regla); }
+thead th { font-family: var(--mono); font-weight: 500; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--tinta-2); background: var(--papel); position: sticky; top: 0; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+tbody th { font-weight: 600; width: 13rem; }
+.p { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 999px; font-size: 0.74rem; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; margin-bottom: 0.25rem; }
+.p.si { color: var(--si); background: var(--si-fondo); }
+.p.parcial { color: var(--parcial); background: var(--parcial-fondo); }
+.p.no { color: var(--no); background: var(--no-fondo); }
+td small { display: block; color: var(--tinta-2); line-height: 1.4; }
+
+.aviso-nombre { margin: 1.25rem 0; padding: 0.85rem 1rem; border-left: 2px solid var(--acento); background: var(--acento-suave); font-size: 0.95rem; }
+.sondas.astra { padding: 0; margin: 1.5rem 0 0.5rem; max-width: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sondas.astra dt { font-size: 1.2rem; }
+table:not(.cara) { min-width: 58rem; }
+table:not(.cara) tbody th { width: 9.5rem; }
+table.cara { min-width: 40rem; }
+table.cara tbody th { width: 11rem; }
+table.cara td { width: 42%; }
+.seccion > .ancho + .margen, .seccion > .ancho + .margen + .cuerpo { margin-top: 0.5rem; }
+.ruta ul { margin: 0; padding-left: 1.1rem; font-size: 0.95rem; }
+.veredicto { margin: 1.5rem 0 0; font-family: var(--serif); font-size: 1.28rem; line-height: 1.5; font-style: italic; max-width: 40rem; text-wrap: pretty; }
+
+.fuentes { font-size: 0.85rem; columns: 2 20rem; column-gap: 2rem; padding-left: 1rem; }
+.fuentes li { break-inside: avoid; overflow-wrap: anywhere; }
+
+footer { max-width: 64rem; margin: 0 auto; padding: 2rem 1.5rem 3rem; border-top: 1px solid var(--regla); font-size: 0.82rem; color: var(--tinta-2); }
+
+@media (max-width: 860px) {
+  .seccion { grid-template-columns: minmax(0, 1fr); gap: 0.5rem; padding-top: 2.5rem; }
+  .margen { padding-top: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 1rem; }
+  .cifra-margen { margin-top: 0; }
+  .sondas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rutas { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .modulo, .logro { grid-template-columns: minmax(0, 1fr); gap: 0.3rem; }
+  .sonda dt { white-space: normal; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+<header class="portada">
+  <canvas id="batimetria" aria-hidden="true"></canvas>
+  <div class="portada-dentro">
+    <p class="antetitulo">Paquete para Claude Code · Apache-2.0 · <a href="https://github.com/umgul/Abyss">github.com/umgul/Abyss</a></p>
+    <h1>Abyss</h1>
+    <p class="entrada">Skills y ganchos que dan a Claude memoria entre hilos, un vigía contra lo que no tiene fuente, sentidos medidos y un par de manos. No cambia el modelo: le pone instrumentos y leyes.</p>
+    <p class="tesis">Ley o medida, nunca estado.</p>
+  </div>
+  <dl class="sondas">
+    <div class="sonda"><dt>37,1 → 2,2 s</dt><dd>arranque de sesión con memoria, en caliente, tras recordar cada lectura con su firma</dd></div>
+    <div class="sonda"><dt>6,31 → 0,22 s</dt><dd>vigía por respuesta en un transcript de 147 MB, con la misma salida</dd></div>
+    <div class="sonda"><dt>936</dt><dd>pruebas en verde; 68 mutantes plantados a propósito, todos cazados</dd></div>
+    <div class="sonda"><dt>19 · 24</dt><dd>skills del plugin · módulos del instalador, uno a uno</dd></div>
+  </dl>
+</header>
+
+<nav class="indice" aria-label="Secciones">
+  <a href="#que-es">Qué es</a>
+  <a href="#instalacion">Instalación</a>
+  <a href="#funcionalidades">Funcionalidades</a>
+  <a href="#ventajas">Ventajas</a>
+  <a href="#logros">Logros</a>
+  <a href="#comparacion">Comparación</a>
+  <a href="#astra">Frente a GPT-6 Astra</a>
+  <a href="#limites">Límites</a>
+  <a href="#fuentes">Fuentes</a>
+</nav>
+
+<main>
+
+<section class="seccion" id="que-es">
+  <div class="margen"><span class="marca">Qué es</span></div>
+  <div class="cuerpo">
+    <h2>Instrumentos para un asistente que trabaja en tu máquina</h2>
+    <p>Abyss es un conjunto de <em>skills</em> y ganchos para Claude Code que el asistente usa sobre su propia memoria, su propio comportamiento y su propio entorno. Se reparte en cuatro familias: <strong>memoria y continuidad</strong>, <strong>honestidad</strong>, <strong>sentidos</strong> y <strong>manos</strong>.</p>
+    <p>No es un modelo ni un servicio en la nube, y no hace a Claude más listo: el modelo que responde es el mismo. Lo que cambia es que los errores salen antes de llegar al usuario. Cada pieza mide algo del transcript o de la máquina, o aplica una regla fija, y lo dice con su cifra y con su límite.</p>
+    <ol class="leyes">
+      <li><b>Ley o medida, nunca estado.</b> Nada se decreta a ojo: cada frase sobre la sesión sale de medir el transcript o de una regla escrita.</li>
+      <li><b>Cortes por cuantiles, nunca umbrales fijos.</b> Lo que cuenta como destacado sale de la propia distribución acumulada, y rota con ella.</li>
+      <li><b>El nulo como suelo.</b> Antes de decir que dos cosas se parecen, se mide cuánto vale el ruido con frases que no tienen nada que ver.</li>
+      <li><b>Cazar lo que no salió de ninguna parte.</b> Un vigía contrasta cada respuesta con la evidencia real de la sesión y bloquea una vez lo que no tiene fuente.</li>
+      <li><b>Fail-closed, nunca inventar.</b> Sin proyecto no hay datos, sin sesiones suficientes no hay percentil y sin red no hay meteo: la respuesta es «sin dato».</li>
+    </ol>
+    <p>El repositorio destila una sexta ley en <code>docs/leyes.md</code>: una vara sin varianza no mide, y hay que falsar antes de fiarse.</p>
+    <h3>Así llega a cada conversación</h3>
+    <div class="muestra" role="img" aria-label="Ejemplo de las líneas que inyectan los ganchos al empezar cada mensaje"><span class="g">[tiempo]</span> ahora lun 14-sep 21:55 · desde tu último mensaje 27 s
+<span class="g">[mundo]</span> lugar &lt;ciudad&gt; (por IP) · meteo nubes y claros, 25 °C · canal claude-desktop
+<span class="g">[cuerpo]</span> ram libre 25,5 GB: por encima de tu p95 (23,2) · vram libre 11,7 GiB
+<span class="g">[vigía]</span> presión de confabulación en esta sesión: 3 cazas (mediana mía 0)
+<span class="g">[modelo]</span> downgrade automático: estás respondiendo como claude-opus-4-8 porque
+         un safeguard pasó la sesión de claude-fable-5-1 a claude-opus-4-8.</div>
+    <p class="pie">Formato real de lo que añaden los ganchos antes de cada mensaje; valores de ejemplo y lugar ocultado.</p>
+  </div>
+</section>
+
+<section class="seccion" id="instalacion">
+  <div class="margen"><span class="marca">Instalación</span><span class="cifra-margen">Python 3.12+<small>biblioteca estándar; lo opcional, por módulo</small></span></div>
+  <div class="cuerpo">
+    <h2>Dos caminos: las skills por el plugin, los ganchos por el instalador</h2>
+    <p>El camino corto: clona el repositorio, abre Claude Code en esa carpeta y pide que lo instale. El <code>CLAUDE.md</code> de la raíz está escrito para Claude: le enseña a listar los módulos antes de tocar nada y las tres cosas que no puede hacer sin preguntar.</p>
+    <div class="rutas">
+      <div class="ruta">
+        <h3>Plugin · solo skills</h3>
+        <p>Las 19 skills se descubren solas. El plugin no declara ningún gancho: nada corre en cada mensaje sin haberlo elegido.</p>
+        <pre class="orden">/plugin marketplace add umgul/Abyss
+/plugin install abyss@abyss</pre>
+      </div>
+      <div class="ruta">
+        <h3>Instalador · ganchos módulo a módulo</h3>
+        <ol class="pasos">
+          <li><div>Descarga el paquete.<pre class="orden">git clone https://github.com/umgul/Abyss</pre></div></li>
+          <li><div>Mira qué hay: una línea por módulo, con <code>⚠</code> si tiene aviso.<pre class="orden">python instalar.py --listar</pre></div></li>
+          <li><div>Lee qué toca lo que vas a instalar.<pre class="orden">python instalar.py --listar defecto</pre></div></li>
+          <li><div>Instala los de por defecto, o por nombre.<pre class="orden">python instalar.py --instalar defecto
+python instalar.py --instalar continuidad,vigia</pre></div></li>
+        </ol>
+      </div>
+    </div>
+    <h3>Qué toca y cómo se deshace</h3>
+    <ul>
+      <li>Fusiona sus ganchos en el <code>settings.json</code> del usuario sin tocar los ajenos, y antes deja una copia fechada.</li>
+      <li>Apunta cada cambio en un manifiesto dentro de la memoria del proyecto, con el valor previo de cada clave: <code>--desinstalar</code> lo deja como estaba y pregunta antes de borrar datos.</li>
+      <li>Una skill del usuario con el mismo nombre nunca se toca, ni al instalar ni al desinstalar.</li>
+      <li>Cuatro módulos vienen apagados porque cuestan algo: <code>huella</code>, <code>taller</code>, <code>telegram</code> y <code>permisos</code>. También hay ventana con casillas: <code>python instalar.py</code>.</li>
+    </ul>
+    <h3>Alcance</h3>
+    <ul>
+      <li><strong>Ganchos:</strong> en todas las sesiones de Claude Code de esa máquina (terminal, app de escritorio, IDE), sea cual sea la carpeta.</li>
+      <li><strong>Memoria:</strong> por carpeta de proyecto, en <code>~/.claude/projects/&lt;proyecto&gt;/memory/</code>; la comparten los chats abiertos en esa carpeta.</li>
+      <li><strong>Descargas aparte, siempre a petición:</strong> <code>--manos</code> baja MediaPipe (unos 27 MB) para controlar los visores con la mano, y <code>--modelo</code> una red de 4.574.861 bytes para quitar fondos.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="seccion" id="funcionalidades">
+  <div class="margen"><span class="marca">Funcionalidades</span><span class="cifra-margen">40 guiones<small>Python en <code>abyss/</code>, cada uno usable por línea de órdenes</small></span></div>
+  <div class="cuerpo">
+    <h2>Cuatro familias de piezas</h2>
+
+    <div class="familia">
+      <h3>Memoria y continuidad</h3>
+      <dl class="modulos">
+        <div class="modulo"><dt>continuidad<span>3 ganchos</span></dt><dd>Guarda cada sesión, mide su reloj de esfuerzo y despierta sesiones pasadas parecidas al mensaje actual, por encima del ruido medido. Avisa de otros hilos vivos que escriben en la misma memoria.</dd></div>
+        <div class="modulo"><dt>propiocepcion<span>librería</span></dt><dd>Mide cada sesión (horas, turnos, herramientas, tokens, correcciones) y da su percentil contra las demás. Con menos de 8 sesiones no hay vara.</dd></div>
+        <div class="modulo"><dt>varas<span>tras cada cierre</span></dt><dd>Recalcula el peso de uso ◆, ◆◆ o ◆◆◆ de cada ficha de <code>MEMORY.md</code> por cuantiles de citas y lecturas reales.</dd></div>
+        <div class="modulo"><dt>modelo<span>en cada prompt</span></dt><dd>Avisa solo con prueba de un cambio automático de modelo (el bloque de fallback de un safeguard, o un arranque por debajo del modelo del hilo). Lo que el usuario elige con <code>/model</code> se respeta. Al salir, lista una vez lo que respondió el modelo de reserva.</dd></div>
+        <div class="modulo"><dt>parentesis<span>a petición</span></dt><dd>Marca un tramo o una sesión entera para que no entre en la memoria futura, y recorta el transcript local ya cerrado dejando una copia <code>.antes</code>.</dd></div>
+      </dl>
+    </div>
+
+    <div class="familia">
+      <h3>Honestidad</h3>
+      <dl class="modulos">
+        <div class="modulo"><dt>vigia<span>gancho Stop</span></dt><dd>Contrasta la respuesta con la evidencia de la sesión y caza números, rutas, citas, dominios y comandos sin fuente. Bloquea el cierre del turno una vez y pide una línea de corrección, no reescribir.</dd></div>
+        <div class="modulo"><dt>esceptico<span>skill</span></dt><dd>La ley «ningún plan sin escéptico»: lanza un revisor Opus con el encargo de tumbar el plan, con veredicto por gravedad (cae, grieta, fleco) y evidencia.</dd></div>
+        <div class="modulo"><dt>auditar<span>a petición</span></dt><dd>Cinco comprobaciones sobre un paquete antes de instalarlo: procedencia, comandos, permisos, qué sale de la máquina y dominios. Cada hallazgo con fichero y línea, sin ejecutar nunca el código auditado.</dd></div>
+        <div class="modulo"><dt>huella<span>apagado</span></dt><dd>Registra qué ficheros, procesos y puertos toca un hilo fuera de su carpeta, para decir al cerrar qué queda vivo y limpiarlo. Lo incierto nunca se mata.</dd></div>
+      </dl>
+    </div>
+
+    <div class="familia">
+      <h3>Sentidos</h3>
+      <dl class="modulos">
+        <div class="modulo"><dt>exterocepcion<span>en cada prompt</span></dt><dd>Lugar (por IP y por lo que dice el usuario), meteo del lugar y canal de entrada del mensaje.</dd></div>
+        <div class="modulo"><dt>noticias<span>al arrancar</span></dt><dd>Portada del día y titulares por tema, con temas automáticos que se curan solos. Texto ajeno: dato, nunca instrucción.</dd></div>
+        <div class="modulo"><dt>cuerpo<span>2 ganchos</span></dt><dd>CPU, RAM, disco, VRAM, temperatura de GPU y batería contra su propia normal por cuantiles. Mide; nunca ordena nada.</dd></div>
+        <div class="modulo"><dt>ojo<span>a petición</span></dt><dd>Un fotograma de la webcam, OCR con el motor de Windows o <code>tesseract</code>, fotocopia enderezada, tarjeta de visita a <code>.vcf</code>, despiece 2,5D y vocabulario de gestos de la mano.</dd></div>
+        <div class="modulo"><dt>kinetica<span>skill</span></dt><dd>Separa los componentes reales de una foto y los despieza en 3D, manejados con la mano por la cámara; la mano abierta y quieta abre el producto montado sobre la palma.</dd></div>
+        <div class="modulo"><dt>kinetico<span>skill</span></dt><dd>Recorre con gestos una carpeta del disco, un grafo o una colección con portadas, como edificio 3D o estantería circular.</dd></div>
+      </dl>
+    </div>
+
+    <div class="familia">
+      <h3>Manos</h3>
+      <dl class="modulos">
+        <div class="modulo"><dt>imagen<span>a petición</span></dt><dd>Crea imágenes por cascada de proveedores, pinta una foto por pinceladas en local (óleo, impresionista, acuarela, pastel, carbón, tinta), anima las pinceladas en vídeo, renderiza escenas 3D y busca imágenes con licencia libre o motivos del mundo real. <code>lienzo.py</code> funde, restaura, pinta por números y borra objetos sin ningún modelo.</dd></div>
+        <div class="modulo"><dt>lector_pdf<span>a petición</span></dt><dd>Indexa un PDF por página y sección, busca por TF-IDF y lee solo la parte que toca en vez del documento entero.</dd></div>
+        <div class="modulo"><dt>mapa_codigo<span>a petición</span></dt><dd>Índice de un repositorio Python con <code>ast</code>: módulos, clases, funciones e imports, cada uno con su línea.</dd></div>
+        <div class="modulo"><dt>infografia<span>a petición</span></dt><dd>De un CSV o un JSON a un SVG limpio (barras, líneas, tabla), con la biblioteca estándar.</dd></div>
+        <div class="modulo"><dt>presenta<span>a petición</span></dt><dd>Genera un vídeo corto que enseña las piezas haciendo demostraciones reales en el momento; lo que falta en la máquina se salta y el vídeo lo dice.</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="seccion" id="ventajas">
+  <div class="margen"><span class="marca">Ventajas</span><span class="cifra-margen">669.884 B<small>el único binario de terceros que viaja dentro: three.js, MIT</small></span></div>
+  <div class="cuerpo">
+    <h2>Por qué este diseño y no otro</h2>
+    <ul>
+      <li><strong>Local y legible.</strong> El repositorio es texto. La memoria, las medidas y los registros viven en ficheros de la propia máquina, que se pueden abrir, buscar con <code>grep</code> y borrar.</li>
+      <li><strong>Cada módulo dice qué sale de la máquina.</strong> La red está declarada pieza a pieza (lugar, meteo, noticias, proveedores de imágenes), y <code>ABYSS_SIN_RED=1</code> la corta entera.</li>
+      <li><strong>Medido contra sí mismo.</strong> Los cortes salen de la propia distribución y los parecidos se miden sobre el ruido, no con umbrales puestos a mano.</li>
+      <li><strong>Falla cerrado.</strong> Si no puede resolver el proyecto, calla; si no tiene datos, dice «sin dato». Nunca rellena un hueco con un valor inventado.</li>
+      <li><strong>Modular y reversible.</strong> Se instala módulo a módulo, con copia fechada y manifiesto; desinstalar restaura las claves previas.</li>
+      <li><strong>Probado para que las pruebas midan.</strong> 936 pruebas, oráculos de lectura entera y mutantes plantados a propósito que alguna prueba tiene que cazar. Un guardián impide que se publiquen datos personales.</li>
+      <li><strong>Honesto con sus costes.</strong> Los límites de cada pieza están escritos en su skill y en el README: latencia, red, disco y lo que no ve.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="seccion" id="logros">
+  <div class="margen"><span class="marca">Logros</span></div>
+  <div class="cuerpo">
+    <h2>Lo que Claude Code no hacía antes, con su medida</h2>
+    <p>Cifras de la instalación del autor, en Windows, con transcripts reales copiados y proyectos temporales.</p>
+    <ul class="logros">
+      <li class="logro"><div class="dato">37,1 → 2,2 s<small>13,3 s en frío</small></div><p><b>Arrancar con memoria sin esperar.</b> El arranque releía cientos de megas de sesiones en cada inicio; ahora cada lectura se recuerda con la firma del fichero y solo se relee lo que cambió.</p></li>
+      <li class="logro"><div class="dato">6,31 → 0,22 s<small>0,11 s en caliente</small></div><p><b>No releer un transcript de 147 MB en cada respuesta.</b> El vigía y el aviso de modelo siguen desde donde se quedaron, y dan la misma salida que la lectura entera en todos los cortes probados.</p></li>
+      <li class="logro"><div class="dato">90 · 27<small>avisos · episodios</small></div><p><b>Distinguir una bajada de modelo automática de una elegida.</b> Sobre 40 transcripts reales y 4.139 prompts, los avisos solo salieron en episodios reales de safeguard, y ninguno en los hilos que empezaron en Opus.</p></li>
+      <li class="logro"><div class="dato">3 cazas<small>en una sesión real de 33 h</small></div><p><b>Pararse cuando cita algo que nadie dijo así.</b> En uso real, el vigía bloqueó respuestas con comillas atribuidas al README que el README no decía, y obligó a corregirlas en una línea.</p></li>
+      <li class="logro"><div class="dato">4 cae<small>antes de publicar</small></div><p><b>Revisar sus propios planes en frío.</b> En el desarrollo de la última versión, un revisor Opus tumbó la primera regla del aviso de modelo con cuatro fallos graves sacados de transcripts reales, y otro cazó un borrado de skills ajenas que ya existía en el instalador.</p></li>
+      <li class="logro"><div class="dato">55 frente a 78.947<small>píxeles inventados</small></div><p><b>Despiezar una foto en 3D y manejarla con la mano.</b> Con el fondo quitado, la silueta se mide en vez de estimarse: con la misma foto, el relleno inventó 78.947 píxeles con fondo y 55 sin él.</p></li>
+      <li class="logro"><div class="dato">5 comprobaciones<small>sin ejecutar el código</small></div><p><b>Auditar un paquete antes de instalarlo.</b> Procedencia, comandos, permisos, red y dominios con fichero y línea, leyendo texto y el historial local de git.</p></li>
+      <li class="logro"><div class="dato">3 niveles<small>tramo · sesión · recorte</small></div><p><b>Olvidar de verdad lo que se pide olvidar, en local.</b> Tramos que no entran en la memoria, sesiones omitidas y recorte del transcript con copia <code>.antes</code>; lo derivado de esa sesión se borra con él.</p></li>
+    </ul>
+  </div>
+</section>
+
+<section class="seccion" id="comparacion">
+  <div class="margen"><span class="marca">Comparación</span></div>
+  <div class="cuerpo">
+    <h2>Frente a soluciones parecidas</h2>
+    <p>A septiembre de 2026 no hay ningún paquete que junte estas piezas. Hay piezas sueltas muy buenas: memoria para agentes, evaluadores de alucinación y escáneres de MCP. Y varias de las de Abyss no tienen ningún equivalente empaquetado.</p>
+  </div>
+  <div class="ancho">
+    <div class="tabla-marco">
+      <table>
+        <thead>
+          <tr><th scope="col">Qué hace</th><th scope="col">Abyss</th><th scope="col">Claude Code de serie</th><th scope="col">claude-mem y afines</th><th scope="col">Letta · mem0 · Zep</th><th scope="col">ChatGPT · Gemini</th><th scope="col">Guardarraíles y escáneres</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Memoria entre sesiones</th>
+            <td><span class="p si">Sí</span><small>local, por proyecto; despierta sesiones parecidas sobre el ruido medido</small></td>
+            <td><span class="p si">Sí</span><small>CLAUDE.md y memoria automática; no busca sesiones parecidas</small></td>
+            <td><span class="p si">Sí</span><small>resúmenes con IA que se inyectan; alguno busca por significado</small></td>
+            <td><span class="p si">Sí</span><small>capas de memoria para agentes, local o en nube de pago</small></td>
+            <td><span class="p si">Sí</span><small>en la nube, con memorias que el usuario edita</small></td>
+            <td><span class="p no">No</span></td></tr>
+          <tr><th scope="row">Bloquear respuestas sin fuente</th>
+            <td><span class="p si">Sí</span><small>al cerrar cada turno: cifras, rutas, citas, dominios y comandos</small></td>
+            <td><span class="p no">No</span><small>los hooks permiten construirlo</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span><small>no documentado como control del usuario</small></td>
+            <td><span class="p parcial">Parcial</span><small>evaluadores de fidelidad (Guardrails AI, HHEM, Lynx) que hay que cablear</small></td></tr>
+          <tr><th scope="row">Medirse a sí mismo</th>
+            <td><span class="p si">Sí</span><small>percentil de cada sesión y estado de la máquina contra su propia normal</small></td>
+            <td><span class="p parcial">Parcial</span><small><code>/usage</code>: coste y tokens</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td></tr>
+          <tr><th scope="row">Contexto del mundo en cada mensaje</th>
+            <td><span class="p si">Sí</span><small>lugar, meteo, canal y noticias</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span><small>hay servidores MCP sueltos de clima y noticias</small></td></tr>
+          <tr><th scope="row">Aviso de cambio automático de modelo</th>
+            <td><span class="p si">Sí</span><small>solo con prueba en el transcript</small></td>
+            <td><span class="p no">No</span><small>hay peticiones abiertas para tenerlo</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td></tr>
+          <tr><th scope="row">Olvidar un tramo concreto</th>
+            <td><span class="p si">Sí</span><small>tramos, sesiones omitidas y recorte del transcript</small></td>
+            <td><span class="p no">No</span><small>se borra la conversación entera</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p parcial">Parcial</span><small>editar o borrar memorias sueltas</small></td>
+            <td><span class="p parcial">Parcial</span><small>borrar memorias o chats; chat temporal</small></td>
+            <td><span class="p no">No</span></td></tr>
+          <tr><th scope="row">Auditar antes de instalar</th>
+            <td><span class="p si">Sí</span><small>cinco comprobaciones, sin ejecutar el código</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p si">Sí, en MCP</span><small>mcp-scan busca herramientas envenenadas e inyecciones</small></td></tr>
+          <tr><th scope="row">Revisor de planes antes de ejecutar</th>
+            <td><span class="p si">Sí</span><small>un Opus con el encargo de tumbarlo</small></td>
+            <td><span class="p parcial">Parcial</span><small>modo plan, con aprobación humana</small></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td>
+            <td><span class="p no">No</span></td></tr>
+          <tr><th scope="row">Dónde corre</th>
+            <td>En la máquina</td>
+            <td>En la máquina</td>
+            <td>En la máquina</td>
+            <td>Local o nube</td>
+            <td>Nube</td>
+            <td>Local; mcp-scan valida con la API de Snyk</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="pie">«No» significa que no aparece en su documentación pública consultada, no que sea imposible construirlo encima.</p>
+  </div>
+  <div class="margen" aria-hidden="true"></div>
+  <div class="cuerpo">
+    <h3>Donde otros van por delante</h3>
+    <ul>
+      <li>claude-mem, Letta, mem0 y Zep buscan recuerdos por significado; la sala de los relojes de Abyss compara palabras.</li>
+      <li>ChatGPT y Gemini recuerdan en todos los dispositivos de la cuenta; Abyss recuerda en una máquina.</li>
+      <li>HHEM, Lynx o Guardrails AI juzgan si un texto es fiel al contexto; el vigía caza formas concretas y no ve una afirmación falsa que no las lleve.</li>
+      <li>mcp-scan vigila servidores MCP en vivo y detecta instrucciones escondidas en sus herramientas; <code>auditar</code> lee el paquete con reglas antes de instalar.</li>
+      <li>Cursor, Codex CLI y Gemini CLI traen los mimbres (reglas, memorias, <code>AGENTS.md</code>, hooks, extensiones), pero ninguna de estas piezas ya hecha.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="seccion" id="astra">
+  <div class="margen"><span class="marca">GPT-6 Astra</span></div>
+  <div class="cuerpo">
+    <h2>Claude con Abyss frente a GPT-6 Astra</h2>
+    <p class="aviso-nombre"><strong>Dos Astras.</strong> GPT-6 Astra es el modelo de OpenAI publicado en septiembre de 2026. Project Astra es el prototipo de asistente multimodal de Google DeepMind. Aquí se compara el de OpenAI.</p>
+    <p>No son la misma clase de cosa. GPT-6 Astra es un modelo; Abyss es un conjunto de instrumentos y leyes que corre alrededor de Claude, en la máquina de quien lo instala. La comparación honesta es entre dos formas de trabajar: Claude Code con Abyss, y GPT-6 Astra en ChatGPT, Codex o la API.</p>
+    <dl class="sondas astra">
+      <div class="sonda"><dt>3–4 sep 2026</dt><dd>vista previa limitada y salida general</dd></div>
+      <div class="sonda"><dt>1.050.000</dt><dd>tokens de contexto: hasta 922.000 de entrada y 128.000 de salida</dd></div>
+      <div class="sonda"><dt>10 $ · 50 $</dt><dd>por millón de tokens de entrada y de salida, en la API</dd></div>
+      <div class="sonda"><dt>97,6 %</dt><dd>FrontierMath Tier 4, según OpenAI</dd></div>
+    </dl>
+  </div>
+  <div class="ancho">
+    <div class="tabla-marco">
+      <table class="cara">
+        <thead>
+          <tr><th scope="col">Dimensión</th><th scope="col">Claude Code con Abyss</th><th scope="col">GPT-6 Astra</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Qué es</th><td>Instrumentos y leyes locales alrededor del modelo de Claude que se use. No cambia el modelo.</td><td>Modelo de frontera de OpenAI, en la nube: ChatGPT, API, Azure y Bedrock.</td></tr>
+          <tr><th scope="row">Capacidad bruta</th><td>La del modelo de Claude. Abyss no suma nada en benchmarks.</td><td>OpenAI lo presenta como estado del arte en uso de ordenador, navegación, programación y ciencia; entre sus cifras, 99,9 % en ARC-AGI-3.</td></tr>
+          <tr><th scope="row">Contexto largo</th><td>La ventana de Claude Code. Abyss no la amplía: evita releer lo ya leído y recuerda cada lectura con su firma.</td><td>1.050.000 tokens. Según el anuncio, Codex prueba un modo que guarda notas entre ventanas de contexto.</td></tr>
+          <tr><th scope="row">Memoria</th><td>Ficheros locales por proyecto que se leen, buscan y borran: sesiones enteras, relojes de esfuerzo, parecidos medidos sobre el ruido y peso de uso de cada ficha.</td><td>En ChatGPT, memorias que el usuario ve, edita y borra, más una síntesis en segundo plano; todo en la nube. En la API, sin memoria persistente por defecto.</td></tr>
+          <tr><th scope="row">Veracidad</th><td>Un gancho externo al modelo bloquea al cerrar el turno las cifras, rutas y citas sin fuente, y lleva la cuenta por sesión. No depende de que el modelo se autoevalúe.</td><td>OpenAI declara sustancialmente menos errores factuales que GPT-5.6 Sol, medidos sobre chats que los usuarios marcaron, y avisa de que no es la tasa real. Su system card reconoce que su razonamiento es menos monitorizable.</td></tr>
+          <tr><th scope="row">Conocerse a sí mismo</th><td>Percentil de cada sesión, estado de la máquina contra su propia normal y aviso de cambio automático de modelo.</td><td>No documentado.</td></tr>
+          <tr><th scope="row">Sentidos</th><td>Lugar, meteo, canal y noticias en cada mensaje; webcam y OCR a petición; visores 3D manejados con la mano.</td><td>Entrada de texto e imagen, salida de texto.</td></tr>
+          <tr><th scope="row">Olvido</th><td>Tramos que no entran en la memoria, sesiones omitidas y recorte del transcript local con copia.</td><td>Chat temporal que no crea memoria; borrar memorias o chats en la nube.</td></tr>
+          <tr><th scope="row">Auditoría y revisión</th><td>Audita paquetes antes de instalarlos sin ejecutarlos; ningún plan sin revisor Opus.</td><td>No documentado como función del producto.</td></tr>
+          <tr><th scope="row">Extensión</th><td>Skills, plugin y ganchos de Claude Code, módulo a módulo.</td><td>Skills y conectores MCP en ChatGPT; Codex CLI tiene hooks locales en su ciclo de vida.</td></tr>
+          <tr><th scope="row">Privacidad</th><td>Local por defecto. Cada módulo declara qué sale de la máquina, y <code>ABYSS_SIN_RED=1</code> lo corta.</td><td>En la nube, con retención cero para clientes de API elegibles, según OpenAI.</td></tr>
+          <tr><th scope="row">Coste</th><td>Gratis y abierto (Apache-2.0), sobre el uso de Claude.</td><td>10 $ / 50 $ por millón de tokens en la API; incluido en los planes de pago de ChatGPT.</td></tr>
+          <tr><th scope="row">Límites</th><td>Solo Claude Code en la máquina donde se instala; medido en Windows; añade latencia; el vigía no ve afirmaciones falsas sin cifras, rutas ni citas.</td><td>Primer modelo de OpenAI en nivel crítico de ciberseguridad de su marco de preparación; su cadena de pensamiento es menos monitorizable que la de sus predecesores.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="margen" aria-hidden="true"></div>
+  <div class="cuerpo">
+    <div class="rutas">
+      <div class="ruta">
+        <h3>Mejor GPT-6 Astra si necesitas</h3>
+        <ul>
+          <li>la máxima capacidad de modelo publicada hoy, según las cifras de OpenAI;</li>
+          <li>contexto de un millón de tokens y uso de ordenador y navegador;</li>
+          <li>memoria que te sigue en todos tus dispositivos, sin instalar nada.</li>
+        </ul>
+      </div>
+      <div class="ruta">
+        <h3>Mejor Claude con Abyss si necesitas</h3>
+        <ul>
+          <li>memoria en ficheros tuyos que puedes leer, buscar y borrar;</li>
+          <li>un control de fuentes que no depende de lo que el modelo diga de sí mismo;</li>
+          <li>olvidar un tramo, auditar antes de instalar y revisar planes en frío.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="veredicto">Astra sube el techo: más modelo, más contexto y un producto gestionado. Abyss sube el suelo: lo que el asistente puede comprobar de sí mismo, de sus fuentes y de su entorno, en ficheros que el usuario lee.</p>
+    <p>No compiten por lo mismo, y por eso lo interesante no es elegir. Las leyes de Abyss no dependen del modelo, y Codex CLI también tiene hooks donde podrían correr. Esto último es una conjetura sin probar.</p>
+  </div>
+</section>
+
+<section class="seccion" id="limites">
+  <div class="margen"><span class="marca">Límites</span></div>
+  <div class="cuerpo">
+    <h2>Lo que no hace, dicho claro</h2>
+    <ul>
+      <li>Los ganchos corren en cada mensaje y en cada cierre de turno: añaden latencia y proceso, y algunos módulos hacen red.</li>
+      <li>Solo funciona en Claude Code (terminal, app de escritorio, IDE) de la máquina donde se instala. No actúa en los chats de claude.ai ni viaja entre ordenadores.</li>
+      <li>Se ha medido en Windows. En macOS y Linux, las piezas que dependen del sistema están escritas pero sin probar.</li>
+      <li>El vigía no ve una afirmación falsa que no lleve número, ruta ni cita.</li>
+      <li><code>sesiones/</code> guarda los transcripts enteros, en local y sin cifrar.</li>
+      <li>La sala de los relojes compara bolsas de palabras, no ideas.</li>
+      <li>No devuelve el modelo por su cuenta: solo avisa. El aviso de un arranque por debajo del modelo del hilo aún no se ha visto en uso real.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="seccion" id="fuentes">
+  <div class="margen"><span class="marca">Fuentes</span></div>
+  <div class="cuerpo">
+    <h2>De dónde sale cada dato</h2>
+    <p>Lo de Abyss sale de su repositorio (README, skills y pruebas) y de medidas hechas sobre la instalación del autor. Lo de terceros, de estas páginas, consultadas el 15-sep-2026:</p>
+    <h3>GPT-6 Astra</h3>
+    <ul class="fuentes">
+      <li><a href="https://openai.com/index/gpt-6-astra/">OpenAI · GPT-6 Astra: A new generation of intelligence</a></li>
+      <li><a href="https://openai.com/index/gpt-6-astra-next-generation-work/">OpenAI · GPT-6 Astra para el trabajo</a></li>
+      <li><a href="https://developers.openai.com/api/docs/models/gpt-6-astra">OpenAI · ficha del modelo para desarrolladores</a></li>
+      <li><a href="https://deploymentsafety.openai.com/gpt-6-astra">OpenAI · GPT-6 Astra System Card</a></li>
+      <li><a href="https://en.wikipedia.org/wiki/GPT-6_Astra">Wikipedia · GPT-6 Astra</a></li>
+      <li><a href="https://help.openai.com/en/articles/8590148-memory-faq">OpenAI · preguntas frecuentes sobre la memoria</a></li>
+      <li><a href="https://openai.com/index/chatgpt-memory-dreaming/">OpenAI · síntesis de memoria en segundo plano</a></li>
+      <li><a href="https://help.openai.com/en/articles/8914046-temporary-chat-faq">OpenAI · chat temporal</a></li>
+      <li><a href="https://developers.openai.com/codex/config-advanced">OpenAI · configuración avanzada y hooks de Codex</a></li>
+      <li><a href="https://deepmind.google/models/project-astra/">Google DeepMind · Project Astra</a></li>
+    </ul>
+    <h3>Soluciones parecidas</h3>
+    <ul class="fuentes">
+      <li><a href="https://code.claude.com/docs/en/memory">Claude Code · memoria</a></li>
+      <li><a href="https://code.claude.com/docs/en/hooks">Claude Code · hooks</a></li>
+      <li><a href="https://code.claude.com/docs/en/skills">Claude Code · skills</a></li>
+      <li><a href="https://code.claude.com/docs/en/plugin-marketplaces">Claude Code · marketplaces de plugins</a></li>
+      <li><a href="https://code.claude.com/docs/en/permission-modes">Claude Code · modos de permiso y modo plan</a></li>
+      <li><a href="https://github.com/thedotmack/claude-mem">claude-mem</a></li>
+      <li><a href="https://github.com/christian-byrne/claude-code-vector-memory">claude-code-vector-memory</a></li>
+      <li><a href="https://github.com/SuperClaude-Org/SuperClaude_Framework">SuperClaude Framework</a></li>
+      <li><a href="https://github.com/ruvnet/claude-flow">claude-flow</a></li>
+      <li><a href="https://github.com/letta-ai/letta">Letta</a></li>
+      <li><a href="https://github.com/mem0ai/mem0">mem0 y OpenMemory</a></li>
+      <li><a href="https://www.getzep.com/">Zep</a></li>
+      <li><a href="https://support.google.com/gemini/answer/16598469">Gemini · memoria y contexto personal</a></li>
+      <li><a href="https://cursor.com/docs/rules">Cursor · reglas y memorias</a></li>
+      <li><a href="https://github.com/openai/codex">OpenAI Codex CLI</a></li>
+      <li><a href="https://geminicli.com/docs/extensions/">Gemini CLI · extensiones</a></li>
+      <li><a href="https://huggingface.co/vectara/hallucination_evaluation_model">Vectara HHEM</a></li>
+      <li><a href="https://www.patronus.ai/blog/lynx-state-of-the-art-open-source-hallucination-detection-model">Patronus Lynx</a></li>
+      <li><a href="https://www.guardrailsai.com/">Guardrails AI</a></li>
+      <li><a href="https://github.com/NVIDIA-NeMo/Guardrails">NeMo Guardrails</a></li>
+      <li><a href="https://github.com/invariantlabs-ai/mcp-scan">mcp-scan</a></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>Abyss · Apache-2.0 · <a href="https://github.com/umgul/Abyss">github.com/umgul/Abyss</a> · Documento escrito el 15 de septiembre de 2026 con el estado publicado del repositorio.</footer>
+
+<script>
+(function () {
+  var lienzo = document.getElementById('batimetria');
+  if (!lienzo || !lienzo.getContext) return;
+  var ctx = lienzo.getContext('2d');
+
+  function campo(x, y) {
+    return Math.sin(x * 1.3 + 0.4) * 0.6
+      + Math.cos(y * 1.9 - 0.2) * 0.45
+      + Math.sin((x + y) * 0.85 + 1.1) * 0.5
+      + Math.cos(Math.hypot(x - 3.1, y - 0.9) * 2.2) * 0.55
+      + Math.sin(Math.hypot(x - 0.8, y - 1.6) * 1.6) * 0.35;
+  }
+
+  function dibujar() {
+    var estilos = getComputedStyle(document.documentElement);
+    var claro = estilos.getPropertyValue('--contorno').trim();
+    var hondo = estilos.getPropertyValue('--contorno-hondo').trim();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = lienzo.clientWidth, h = lienzo.clientHeight;
+    if (!w || !h) return;
+    lienzo.width = Math.round(w * dpr);
+    lienzo.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    var paso = 7;
+    var cols = Math.ceil(w / paso) + 1, filas = Math.ceil(h / paso) + 1;
+    var escala = 6.2 / Math.max(w, 700);
+    var v = new Float32Array(cols * filas);
+    for (var j = 0; j < filas; j++) {
+      for (var i = 0; i < cols; i++) {
+        v[j * cols + i] = campo(i * paso * escala, j * paso * escala);
+      }
+    }
+    var niveles = [-1.5, -1.2, -0.9, -0.6, -0.3, 0, 0.3, 0.6, 0.9, 1.2, 1.5];
+    niveles.forEach(function (nivel) {
+      ctx.beginPath();
+      ctx.strokeStyle = nivel <= -0.9 ? hondo : claro;
+      ctx.lineWidth = nivel === 0 ? 1.15 : 0.75;
+      for (var j = 0; j < filas - 1; j++) {
+        for (var i = 0; i < cols - 1; i++) {
+          var a = v[j * cols + i], b = v[j * cols + i + 1];
+          var c = v[(j + 1) * cols + i + 1], d = v[(j + 1) * cols + i];
+          var caso = (a > nivel ? 8 : 0) | (b > nivel ? 4 : 0) | (c > nivel ? 2 : 0) | (d > nivel ? 1 : 0);
+          if (caso === 0 || caso === 15) continue;
+          var x = i * paso, y = j * paso;
+          var t = function (p, q) { var dq = q - p; return dq === 0 ? 0.5 : (nivel - p) / dq; };
+          var arriba = [x + paso * t(a, b), y];
+          var derecha = [x + paso, y + paso * t(b, c)];
+          var abajo = [x + paso * t(d, c), y + paso];
+          var izquierda = [x, y + paso * t(a, d)];
+          var seg = function (p, q) { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); };
+          switch (caso) {
+            case 1: case 14: seg(izquierda, abajo); break;
+            case 2: case 13: seg(abajo, derecha); break;
+            case 3: case 12: seg(izquierda, derecha); break;
+            case 4: case 11: seg(arriba, derecha); break;
+            case 5: seg(izquierda, arriba); seg(abajo, derecha); break;
+            case 6: case 9: seg(arriba, abajo); break;
+            case 7: case 8: seg(izquierda, arriba); break;
+            case 10: seg(izquierda, abajo); seg(arriba, derecha); break;
+          }
+        }
+      }
+      ctx.stroke();
+    });
+  }
+
+  var pendiente = null;
+  function pedir() {
+    if (pendiente) cancelAnimationFrame(pendiente);
+    pendiente = requestAnimationFrame(function () { pendiente = null; dibujar(); });
+  }
+  dibujar();
+  if (window.ResizeObserver) new ResizeObserver(pedir).observe(lienzo);
+  else window.addEventListener('resize', pedir);
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (mq.addEventListener) mq.addEventListener('change', pedir);
+  }
+  new MutationObserver(pedir).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+})();
+</script>
+
+</body>
+</html>
