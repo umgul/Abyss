@@ -22,17 +22,18 @@ def _cargar_instalador():
     return mod
 
 
-def _listar(idioma, extra_env=None):
-    """`instalar.py --listar --idioma <idioma>` de verdad, por subprocess, sobre un
+def _listar(idioma, extra_env=None, detalle=False):
+    """`instalar.py --listar [todos] --idioma <idioma>` de verdad, por subprocess, sobre un
     `settings.json` temporal (nunca el real): mide la salida tal como la ve el usuario,
-    no una `_listar()` en proceso que podría no coincidir con la CLI real."""
+    no una `_listar()` en proceso que podría no coincidir con la CLI real. `detalle=True`
+    pide el de todos los módulos (`toca`/`aviso`); sin él, la lista corta."""
     tmp = Path(tempfile.mkdtemp(prefix='abyss_listar_idioma_'))
     settings_ruta = tmp / 'settings.json'
     env = dict(os.environ)
     if extra_env:
         env.update(extra_env)
     r = ay.ejecutar(ay.RAIZ / 'instalar.py',
-                     ['--listar', '--idioma', idioma, '--settings', str(settings_ruta)], env)
+                     ['--listar'] + (['todos'] if detalle else []) + ['--idioma', idioma, '--settings', str(settings_ruta)], env)
     return r
 
 
@@ -64,20 +65,22 @@ class ListarEnInglesNoLlevaVocabularioDeControlCastellano(unittest.TestCase):
     imprime ni una palabra de la lista castellana de control"."""
 
     def test_idioma_en_listar_sin_palabras_de_control(self):
-        r = _listar('en')
-        self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
-        presentes = _palabras_de_control_presentes(r.stdout)
-        self.assertEqual(presentes, [],
-                          f'--idioma en --listar no debe llevar vocabulario de control castellano: {presentes}')
+        for detalle in (False, True):
+            r = _listar('en', detalle=detalle)
+            self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
+            presentes = _palabras_de_control_presentes(r.stdout)
+            self.assertEqual(presentes, [], f'--idioma en --listar (detalle={detalle}) no debe llevar '
+                                            f'vocabulario de control castellano: {presentes}')
 
     def test_falsador_idioma_es_listar_si_las_lleva(self):
         """Contraprueba: si ninguna palabra de control apareciera jamás en la salida, la
         prueba de arriba sería trivialmente cierta. En castellano SÍ deben salir."""
-        r = _listar('es')
-        self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
-        presentes = _palabras_de_control_presentes(r.stdout)
-        self.assertTrue(presentes, '--idioma es --listar debería llevar vocabulario de control castellano '
-                                    '(si esto falla, la prueba de arriba no está midiendo nada)')
+        for detalle in (False, True):
+            r = _listar('es', detalle=detalle)
+            self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
+            presentes = _palabras_de_control_presentes(r.stdout)
+            self.assertTrue(presentes, f'--idioma es --listar (detalle={detalle}) debería llevar vocabulario de '
+                                        'control castellano (si esto falla, la prueba de arriba no mide nada)')
 
     def test_idioma_en_no_omite_la_documentacion_de_los_modulos(self):
         """El detalle `toca`/`aviso` se omite en inglés a propósito (ver el comentario
@@ -136,18 +139,20 @@ class IdiomaEnNoDejaBloquesLargosSinTraducir(unittest.TestCase):
                                    '(si esto falla, la prueba de arriba no está midiendo nada)')
 
     def test_listar_en_sin_bloques_largos_sin_traducir(self):
-        r = _listar('en')
-        self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
-        hallados = _bloques_largos_sin_traducir_presentes(r.stdout)
-        self.assertEqual(hallados, [],
-                          f'--idioma en --listar no debe llevar castellano sin traducir: {hallados}\n{r.stdout}')
+        for detalle in (False, True):
+            r = _listar('en', detalle=detalle)
+            self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
+            hallados = _bloques_largos_sin_traducir_presentes(r.stdout)
+            self.assertEqual(hallados, [], f'--idioma en --listar (detalle={detalle}) no debe llevar castellano '
+                                            f'sin traducir: {hallados}\n{r.stdout}')
 
     def test_falsador_listar_es_si_los_lleva(self):
-        r = _listar('es')
-        self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
-        hallados = _bloques_largos_sin_traducir_presentes(r.stdout)
-        self.assertTrue(hallados, '--idioma es --listar debería llevar castellano '
-                                   '(si esto falla, la prueba de arriba no está midiendo nada)')
+        for detalle in (False, True):
+            r = _listar('es', detalle=detalle)
+            self.assertEqual(r.returncode, 0, f'stdout={r.stdout!r} stderr={r.stderr!r}')
+            hallados = _bloques_largos_sin_traducir_presentes(r.stdout)
+            self.assertTrue(hallados, f'--idioma es --listar (detalle={detalle}) debería llevar castellano '
+                                       '(si esto falla, la prueba de arriba no está midiendo nada)')
 
 
 class DependenciasYModulosCaenAlCastellanoSiFaltaLaTraduccion(unittest.TestCase):

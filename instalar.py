@@ -20,11 +20,14 @@ excepción). Sin rutas de usuario en el código: dónde está `~/.claude`, qué 
 y qué `python` se resuelven en tiempo de ejecución.
 
 Módulos (nombre · una línea · qué toca): ver `MODULOS` más abajo; `--listar` los
-imprime todos con su estado real leído de `settings.json`.
+imprime en una línea cada uno con su estado real leído de `settings.json`, y
+`--listar <id>[,<id>]` o `--listar todos` añade qué toca cada uno y sus avisos.
 
 Uso por línea de comandos:
-    python instalar.py --listar
+    python instalar.py --listar [id1,id2|todos]
     python instalar.py --instalar continuidad,vigia,modelo
+    python instalar.py --listar defecto              (qué instalaría --instalar defecto, con lo que toca)
+    python instalar.py --instalar defecto            (los que la ventana marca, sin preferencias ni skills copiadas)
     python instalar.py --desinstalar telegram [--borrar-datos]
     python instalar.py --sin-ventana                (equivale a --listar)
     python instalar.py                               (sin más: abre la ventana Tk)
@@ -98,6 +101,7 @@ import time
 import shutil
 import subprocess
 import locale
+import textwrap
 import platform
 import warnings
 import socket
@@ -195,7 +199,14 @@ MODULOS = [
              ('UserPromptSubmit', ['--despertar'], 30),
          ],
          toca_en="SessionStart/SessionEnd/UserPromptSubmit hooks → continuidad.py "
-                 "--arranque/--cierre/--despertar"),
+                 "--arranque/--cierre/--despertar",
+         aviso='puede hacer red al arrancar y en cada prompt a través de exterocepcion (ipinfo.io, open-meteo.com, '
+               'nominatim) y, al arrancar, de noticias (news.google.com), con un presupuesto de tiempo; sin red, '
+               '«sin dato». Desinstalar exterocepcion o noticias no la corta; ABYSS_SIN_RED=1 en el entorno, sí.',
+         aviso_en='may reach the network at startup and on every prompt through exterocepcion (ipinfo.io, '
+                  'open-meteo.com, nominatim) and, at startup, through noticias (news.google.com), under a time '
+                  'budget; with no network, "no data". Uninstalling exterocepcion or noticias does not stop it; '
+                  'ABYSS_SIN_RED=1 in the environment does.'),
     dict(id='vigia', script='vigia.py', defecto=True,
          linea='Penaliza la confabulación: caza números, rutas y citas que no salieron de ninguna parte.',
          linea_en='Penalizes confabulation: catches numbers, paths and quotes that came from nowhere.',
@@ -510,8 +521,8 @@ MODULOS = [
          toca_en="Notification hook → powershell + mem/notify_telegram.ps1 (never in the code)",
          aviso_en="asks for a bot token and chat id; saves them only in mem/notify_telegram.ps1."),
     dict(id='permisos', script=None, defecto=False, especial='permisos',
-         linea='Da permiso de Edit sobre tu settings.json (autoedición). APAGADO por defecto.',
-         linea_en='Grants Edit permission over your settings.json (self-editing). OFF by default.',
+         linea='Da permiso de Edit sobre tu settings.json (autoedición).',
+         linea_en='Grants Edit permission over your settings.json (self-editing).',
          toca='clave permissions.allow += "Edit(<settings.json>)"',
          hooks=[], aviso='deja que el propio asistente edite settings.json sin preguntar cada vez.',
          toca_en="key permissions.allow += \"Edit(<settings.json>)\"",
@@ -552,7 +563,7 @@ MODULOS_POR_ID = {m['id']: m for m in MODULOS}
 #   - `lector_pdf.py` necesita `fitz` (PyMuPDF) O `pypdf` (con fitz, mejor
 #     heurística de secciones); basta con una de las dos — `grupo_alternativa`
 #     las liga, para no pedir instalar ambas cuando con una sobra.
-#   - `gestos.py` (módulo propio, APAGADO por defecto) necesita mediapipe +
+#   - `gestos.py` (módulo propio) necesita mediapipe +
 #     opencv-python + numpy para leer la cámara y calcular los landmarks.
 # ---------------------------------------------------------------------------------
 DEPENDENCIAS = {
@@ -1306,6 +1317,15 @@ TEXTOS = {
         'estado_sin_gancho': 'sin gancho propio',
         'listar_detalle_nota': '',  # en castellano SÍ se imprime toca/aviso; no hace falta nota
         'apagado_como': 'apagado por defecto; para encenderlo:',
+        'apagado_corto': 'apagado por defecto',
+        'listar_pie_detalle': ('Detalle, con lo que toca y sus avisos (⚠): --listar <id>[,<id>] · lo que instala '
+                               'defecto: --listar defecto · todo: --listar todos'),
+        'listar_pie_defecto': ('Instalar los de por defecto, tras leer --listar defecto: python instalar.py --instalar '
+                               'defecto (sin los apagados, sin preferencias y sin las skills {skills}, que trae el '
+                               'plugin o se piden por nombre)'),
+        'defecto_expandido': 'se instala (lo que ya estaba queda igual): {ids}',
+        'skill_ajena_al_instalar': ('{mid}: {destino} ya existe y no lleva la marca de abyss — no se toca; si es una '
+                                    'copia vieja de abyss, bórrala a mano y vuelve a instalar'),
         'toca_label': 'toca:',
         'aviso_label': 'aviso:',
         'falta_valor': 'falta el valor de {bandera}',
@@ -1373,8 +1393,8 @@ TEXTOS = {
         'vendor_mp_licencia_escrita': 'licencia escrita en abyss/vendor/mp/LICENSE-mediapipe.txt',
         'uso': (
             "Uso:\n"
-            "  python instalar.py --listar\n"
-            "  python instalar.py --instalar mod1,mod2 [--telegram-token T --telegram-chat ID]\n"
+            "  python instalar.py --listar [mod1,mod2|defecto|todos]  (una línea por módulo; con valor, qué toca)\n"
+            "  python instalar.py --instalar mod1,mod2|defecto [--telegram-token T --telegram-chat ID]\n"
             "  python instalar.py --desinstalar mod1[,mod2] [--borrar-datos] [--sin-preguntar]\n"
             "  python instalar.py --dependencias\n"
             "  python instalar.py --instalar-dependencias [mod1,mod2]\n"
@@ -1430,6 +1450,15 @@ TEXTOS = {
         'estado_sin_gancho': 'no hook of its own',
         'listar_detalle_nota': '',  # the per-module details are translated too: no note needed
         'apagado_como': 'off by default; to turn it on:',
+        'apagado_corto': 'off by default',
+        'listar_pie_detalle': ('Details, with what it touches and its warnings (⚠): --listar <id>[,<id>] · what '
+                               'default installs: --listar default · everything: --listar all'),
+        'listar_pie_defecto': ('Install the defaults, after reading --listar default: python instalar.py --instalar '
+                               'default (without the ones off by default, without preferencias and without the '
+                               '{skills} skills, which come with the plugin or can be asked for by name)'),
+        'defecto_expandido': 'installing (whatever was already there stays the same): {ids}',
+        'skill_ajena_al_instalar': ('{mid}: {destino} already exists and does not carry the abyss mark — left '
+                                    'untouched; if it is an old abyss copy, delete it by hand and install again'),
         'toca_label': 'touches:',
         'aviso_label': 'note:',
         'falta_valor': 'missing value for {bandera}',
@@ -1498,8 +1527,8 @@ TEXTOS = {
         'vendor_mp_licencia_escrita': 'license written to abyss/vendor/mp/LICENSE-mediapipe.txt',
         'uso': (
             "Usage:\n"
-            "  python instalar.py --listar\n"
-            "  python instalar.py --instalar mod1,mod2 [--telegram-token T --telegram-chat ID]\n"
+            "  python instalar.py --listar [mod1,mod2|default|all]  (one line per module; with a value, what it touches)\n"
+            "  python instalar.py --instalar mod1,mod2|default [--telegram-token T --telegram-chat ID]\n"
             "  python instalar.py --desinstalar mod1[,mod2] [--borrar-datos] [--sin-preguntar]\n"
             "  python instalar.py --dependencias\n"
             "  python instalar.py --instalar-dependencias [mod1,mod2]\n"
@@ -1702,12 +1731,16 @@ def _copiar_skill(carpeta_skill, skills_dir):
     en el frontmatter de su `SKILL.md` — es lo que la distingue de una skill que el
     usuario tuviera puesta por su cuenta con el mismo nombre) a
     `<skills_dir>/<carpeta_skill>/`. Devuelve la ruta de destino. Si el destino ya
-    existe (una instalación previa, nuestra o ajena), se sustituye entero — instalar
-    dos veces debe dejar la copia buena, no dos mezcladas."""
+    existe y es nuestro (lleva la marca), se sustituye entero — instalar dos veces debe
+    dejar la copia buena, no dos mezcladas. Si existe y NO lleva la marca (una skill del
+    usuario con el mismo nombre), no se toca y devuelve None: la misma regla que el
+    desinstalador."""
     origen = os.path.join(RAIZ_SKILLS, carpeta_skill)
     destino = os.path.join(skills_dir, carpeta_skill)
     os.makedirs(skills_dir, exist_ok=True)
     if os.path.isdir(destino):
+        if not _skill_es_nuestra(os.path.join(destino, 'SKILL.md')):
+            return None
         shutil.rmtree(destino)
     shutil.copytree(origen, destino)
     # Fuera del sistema de plugins nadie define CLAUDE_PLUGIN_ROOT: se escribe la ruta real.
@@ -1918,6 +1951,12 @@ def instalar(ids, *, settings_ruta, python_exe, mem, telegram=None, skills_dir=N
 
         if mod.get('especial') == 'skill':
             destino = _copiar_skill(mod['carpeta_skill'], skills_dir)
+            if destino is None:
+                mensajes.append(_texto(idioma, 'skill_ajena_al_instalar', mid=mid,
+                                        destino=os.path.join(skills_dir, mod['carpeta_skill'])))
+                instalados.discard(mid)
+                manifiesto['detalle'].pop(mid, None)
+                continue
             manifiesto['detalle'].setdefault(mid, {})['skill_destino'] = destino
             mensajes.append(_texto(idioma, 'skill_copiada', mid=mid, destino=destino))
 
@@ -2175,7 +2214,64 @@ def _claves(argv, idioma='es'):
           'No key leaves your machine by installing the package, and none travels inside it.')
 
 
+PALABRAS_DEFECTO = ('defecto', 'default')  # en `--instalar` y `--listar`: ver `_expandir_defecto`
+PALABRAS_TODOS = ('todos', 'all')          # en `--listar`: el detalle de todos los módulos
+
+
+def _ids_defecto():
+    """Los módulos que `defecto` instala: los que la ventana marca de partida (`defecto=True`),
+    menos los que cambian una clave de `settings.json` (`preferencias`: esa decisión es del
+    usuario y repetir `defecto` la pisaría) y menos las skills que se copian (`especial='skill'`:
+    las trae el plugin, y copiarlas encima las duplicaría). Un conjunto fijo: repetir `defecto`
+    no pisa nada —un gancho ya puesto no se duplica y una plantilla solo se siembra si falta— y
+    vuelve a poner lo que alguien quitó a mano."""
+    return [m['id'] for m in MODULOS
+            if m.get('defecto', True) and not m.get('claves') and m.get('especial') != 'skill']
+
+
+def _expandir_defecto(ids):
+    """La lista de `--instalar` (o de `--listar`) con `defecto` cambiado por `_ids_defecto()`.
+    Los ids escritos a mano se quedan; el orden es el de la lista y ninguno se repite."""
+    salida = []
+    for i in ids:
+        for n in (_ids_defecto() if i in PALABRAS_DEFECTO else [i]):
+            if n not in salida:
+                salida.append(n)
+    return salida
+
+
+def _cabecera_listar(settings_ruta, idioma):
+    print(_texto(idioma, 'settings_prefix') + str(settings_ruta)
+          + ('' if os.path.exists(settings_ruta) else _texto(idioma, 'no_existe_aun')))
+
+
 def _listar(settings_ruta, skills_dir=None, idioma='es'):
+    """Una línea por módulo: id, estado, `linea` (`_linea_localizada()`), `⚠` si tiene
+    aviso y, si viene apagado, que viene apagado. Debajo, cómo ver el detalle y cómo
+    instalar los de por defecto. El detalle (`toca`/`aviso`) sale con `_listar_detalle()`."""
+    settings = _leer_json(settings_ruta)
+    _cabecera_listar(settings_ruta, idioma)
+    # Cada fila cabe en una línea del terminal (sin terminal, 100 columnas): la línea se corta con «…» y las marcas
+    # del final no se pierden. Lo entero está en el detalle.
+    ancho = shutil.get_terminal_size((100, 24)).columns
+    for mod in MODULOS:
+        st = estado_modulo(settings, mod, settings_ruta, skills_dir)
+        etiqueta = _texto(idioma, _ETIQUETA_ESTADO_CLAVE[st])
+        inicio = f'  {mod["id"]:14} [{etiqueta:16}] '
+        marcas = (' ⚠' if mod.get('aviso') else '') + ('' if mod.get('defecto', True) else ' · ' + _texto(idioma, 'apagado_corto'))
+        linea = _linea_localizada(idioma, mod)
+        cabe = max(20, ancho - 1 - len(inicio) - len(marcas))
+        if len(linea) > cabe:
+            linea = linea[:cabe - 1].rstrip() + '…'
+        print(f'{inicio}{linea}{marcas}')
+    print()
+    print(textwrap.fill(_texto(idioma, 'listar_pie_detalle'), width=ancho - 1))
+    print(textwrap.fill(_texto(idioma, 'listar_pie_defecto',
+                               skills=', '.join(m['id'] for m in MODULOS if m.get('especial') == 'skill')),
+                        width=ancho - 1))
+
+
+def _listar_detalle(settings_ruta, ids, skills_dir=None, idioma='es'):
     """`idioma='es'`: con `--idioma en`, la etiqueta de estado, las cabeceras y
     `mod['linea']` (vía `_linea_localizada()`, cayendo al castellano si falta
     `linea_en`) cambian de idioma. `toca`/`aviso` (vocabulario castellano de
@@ -2183,10 +2279,8 @@ def _listar(settings_ruta, skills_dir=None, idioma='es'):
     (`_campo_localizado()`): es lo que hay que leer antes de decidir instalar un
     módulo o no."""
     settings = _leer_json(settings_ruta)
-    existe = os.path.exists(settings_ruta)
-    print(_texto(idioma, 'settings_prefix') + str(settings_ruta)
-          + ('' if existe else _texto(idioma, 'no_existe_aun')))
-    for mod in MODULOS:
+    _cabecera_listar(settings_ruta, idioma)
+    for mod in (MODULOS_POR_ID[i] for i in ids):
         st = estado_modulo(settings, mod, settings_ruta, skills_dir)
         etiqueta = _texto(idioma, _ETIQUETA_ESTADO_CLAVE[st])
         print(f'  {mod["id"]:14} [{etiqueta:16}] {_linea_localizada(idioma, mod)}')
@@ -2250,12 +2344,12 @@ def _lista_flag_opcional(argv, nombre):
 # ---------------------------------------------------------------------------------
 _FLAGS_CON_VALOR = ('--settings', '--python', '--proyecto', '--instalar', '--desinstalar',
                     '--telegram-token', '--telegram-chat', '--skills-dir', '--idioma')
-_FLAGS_SIN_VALOR = ('--listar', '--claves', '--sin-ventana', '--borrar-datos', '--sin-preguntar', '-h', '--help',
+_FLAGS_SIN_VALOR = ('--claves', '--sin-ventana', '--borrar-datos', '--sin-preguntar', '-h', '--help',
                     '--dependencias', '--manos', '--modelo')
 # `--instalar-dependencias` lleva un valor OPCIONAL ("[mod1,mod2]" en el uso:
 # sin lista, se comprueban/instalan TODOS los módulos de `DEPENDENCIAS`) — a
 # diferencia de `_FLAGS_CON_VALOR`, que siempre exige un valor detrás.
-_FLAGS_VALOR_OPCIONAL = ('--instalar-dependencias',)
+_FLAGS_VALOR_OPCIONAL = ('--instalar-dependencias', '--listar')
 
 
 def _es_bandera(tok):
@@ -2664,7 +2758,19 @@ if __name__ == '__main__':
     skills_dir = _valor_flag(argv, '--skills-dir', SKILLS_DIR_POR_DEFECTO)
 
     if '--listar' in argv:
-        _listar(settings_ruta, skills_dir=skills_dir, idioma=idioma)
+        pedidos = _lista_flag_opcional(argv, '--listar')
+        if not pedidos:
+            _listar(settings_ruta, skills_dir=skills_dir, idioma=idioma)
+            sys.exit(0)
+        desconocidos = [i for i in pedidos
+                        if i not in PALABRAS_TODOS and i not in PALABRAS_DEFECTO and i not in MODULOS_POR_ID]
+        if desconocidos:
+            for i in desconocidos:
+                sys.stderr.write(_texto(idioma, 'modulo_desconocido', id=i) + '\n')
+            sys.exit(2)
+        todos = any(i in PALABRAS_TODOS for i in pedidos)
+        ids = [m['id'] for m in MODULOS] if todos else _expandir_defecto(pedidos)
+        _listar_detalle(settings_ruta, ids, skills_dir=skills_dir, idioma=idioma)
         sys.exit(0)
 
     if '--claves' in argv:
@@ -2702,7 +2808,8 @@ if __name__ == '__main__':
     ids_instalar = _lista_flag(argv, '--instalar')
     ids_desinstalar = _lista_flag(argv, '--desinstalar')
 
-    desconocidos = [i for i in (ids_instalar or []) + (ids_desinstalar or []) if i not in MODULOS_POR_ID]
+    desconocidos = ([i for i in ids_instalar if i not in PALABRAS_DEFECTO and i not in MODULOS_POR_ID]
+                    + [i for i in ids_desinstalar if i not in MODULOS_POR_ID])
     if desconocidos:
         for i in desconocidos:
             sys.stderr.write(_texto(idioma, 'modulo_desconocido', id=i) + '\n')
@@ -2712,6 +2819,9 @@ if __name__ == '__main__':
         proj, mem = _resolver_mem(argv)
         if mem is None:
             sys.exit(_texto(idioma, 'error_proyecto'))
+        if any(i in PALABRAS_DEFECTO for i in ids_instalar):
+            ids_instalar = _expandir_defecto(ids_instalar)
+            print(_texto(idioma, 'defecto_expandido', ids=', '.join(ids_instalar)))
         telegram = _pedir_telegram_cli(argv, idioma) if 'telegram' in ids_instalar else None
         for msj in instalar(ids_instalar, settings_ruta=settings_ruta, python_exe=python_exe, mem=mem,
                              telegram=telegram, skills_dir=skills_dir, idioma=idioma):

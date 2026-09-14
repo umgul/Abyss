@@ -204,9 +204,12 @@ sembrado de plantillas de configuración (`temas_noticias.json`,
 ### Con `instalar.py`
 
 ```
-python instalar.py --listar                       # qué módulos hay y si están instalados
+python instalar.py --listar                       # qué módulos hay y si están instalados, una línea cada uno
+python instalar.py --listar todos                 # y qué toca cada uno, con sus avisos (o --listar vigia,huella)
+python instalar.py --listar defecto               # qué instalaría --instalar defecto, con lo que toca cada uno
 python instalar.py                                 # ventana Tk: casilla por módulo + Instalar/Desinstalar/Cerrar
 python instalar.py --instalar continuidad,vigia    # instala solo esos módulos, sin ventana
+python instalar.py --instalar defecto              # lo que la ventana marca de partida, sin preferencias ni las skills que trae el plugin
 
 # Los cuatro que vienen APAGADOS por defecto, con su comando para encenderlos.
 # Ninguno se enciende solo: cada uno cuesta algo y esa decisión es de quien instala.
@@ -258,7 +261,7 @@ una *skill* (`skills/esceptico/`) que el instalador COPIA a
 `~/.claude/skills/esceptico/` (o a donde apunte `--skills-dir <ruta>`), con
 una marca en su frontmatter (`abyss-managed: true`) para que el desinstalador
 sepa que es la nuestra — una skill que el usuario ya tuviera puesta a mano con
-el mismo nombre, sin esa marca, nunca se toca al desinstalar.
+el mismo nombre, sin esa marca, nunca se toca, ni al instalar ni al desinstalar.
 
 **Desinstalar**: `python instalar.py --desinstalar <módulo>` (o desmarcar la
 casilla) hace lo inverso: lee `memory/abyss_manifiesto.json`, quita del

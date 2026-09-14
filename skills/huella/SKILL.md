@@ -84,7 +84,7 @@ Viene **apagada**, y encenderla es un comando:
 python instalar.py --instalar huella
 ```
 
-`python instalar.py --listar` la muestra con su estado, lo que toca y su aviso de coste
+`python instalar.py --listar huella` la muestra con su estado, lo que toca y su aviso de coste
 antes de que decidas. Para apagarla otra vez: `python instalar.py --desinstalar huella`.
 
 Está apagada por el gancho `PostToolUse`, que corre **tras cada herramienta**: la foto de

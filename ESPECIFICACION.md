@@ -93,7 +93,7 @@ Claude Code). Regla:
   sesiones y relojes son memoria del usuario).
 - Interfaz: Tk (viene con Python en Windows), ventana pequeña: lista de módulos con casilla,
   línea de descripción, estado instalado/no, botones Instalar / Desinstalar / Cerrar. La misma
-  lógica por CLI: `instalar.py --listar | --instalar mod1,mod2 | --desinstalar mod1 | --sin-ventana`.
+  lógica por CLI: `instalar.py --listar [mod1,mod2|defecto|todos] | --instalar mod1,mod2|defecto | --desinstalar mod1 | --sin-ventana`.
 - Nada de esto escribe en el repo del usuario ni en la carpeta del código salvo `config.json`.
 
 ## 5 · Documentación

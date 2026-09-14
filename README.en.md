@@ -211,16 +211,19 @@ seeding the configuration templates (`temas_noticias.json`,
 ### With `instalar.py`
 
 ```
-python instalar.py --listar                       # which modules exist and whether they're installed
+python instalar.py --listar                       # which modules exist and whether they're installed, one line each
+python instalar.py --listar all                   # plus what each one touches and its warnings (or --listar vigia,huella)
+python instalar.py --listar default               # what --instalar default would install, with what each one touches
 python instalar.py                                 # Tk window: checkbox per module + Install/Uninstall/Close
-python instalar.py --instalar continuidad,vigia
+python instalar.py --instalar continuidad,vigia    # installs only those modules, no window
+python instalar.py --instalar default              # what the window checks by default, without preferencias or the skills the plugin brings
 
 # The four that ship OFF by default, each with the command that turns it on.
 # None turns itself on: each one costs something, and that call belongs to whoever installs.
 python instalar.py --instalar huella      # records what the thread touches outside its folder (toll: PostToolUse on every tool)
 python instalar.py --instalar taller      # local text-to-image server (heavy)
 python instalar.py --instalar telegram    # Telegram notice when something finishes
-python instalar.py --instalar permisos    # tool permission settings    # installs only those modules, no window
+python instalar.py --instalar permisos    # tool permission settings
 python instalar.py --desinstalar vigia             # uninstalls one module
 python instalar.py --sin-ventana                   # forces CLI mode even if Tk is available
 ```

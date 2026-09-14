@@ -11,12 +11,15 @@ Instalar esto toca la configuración de Claude Code del usuario. Antes de correr
 nada, enséñale lo que hay y deja que elija:
 
 ```bash
-python instalar.py --listar
+python instalar.py --listar            # una línea por módulo: qué hace y si está instalado (⚠ = tiene aviso)
+python instalar.py --listar defecto    # qué instalaría --instalar defecto, con lo que toca cada uno
+python instalar.py --listar todos      # lo mismo de todos los módulos
 ```
 
-Sale la lista de módulos con, para cada uno, qué hace y **qué toca** — si pone un
-gancho, si escribe en `settings.json`, si resuelve proyecto, si necesita red. Léela
-con él. Hay `--idioma en` si prefiere inglés.
+Las dos últimas dicen, para cada módulo, **qué toca** — si pone un gancho, si
+escribe en `settings.json`, si resuelve proyecto, si necesita red. Lee con él la
+de lo que vaya a instalar antes de instalar nada. Hay `--idioma en` si prefiere
+inglés.
 
 ## La instalación
 
@@ -25,6 +28,7 @@ Desde aquí, sin ventana, se instala por nombre (los ids son los que imprime
 
 ```bash
 python instalar.py --instalar kinetico,kinetica,vigia,auditar
+python instalar.py --instalar defecto   # lo que la ventana marca de partida, sin preferencias ni las skills que trae el plugin
 python instalar.py --instalar kinetico --skills-dir <ruta>   # si sus skills no viven en ~/.claude/skills
 ```
 
@@ -92,7 +96,7 @@ pone `instalar.py`, módulo a módulo y diciendo qué toca cada uno.
 ## Comprobar que quedó bien
 
 ```bash
-python instalar.py --listar          # cada módulo dice si está instalado
+python instalar.py --listar          # lo que deja rastro en settings.json o en la carpeta de skills dice si está instalado; lo demás, «sin gancho propio»
 python -m pytest pruebas/ -q         # la suite entera
 ```
 
