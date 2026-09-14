@@ -1,6 +1,6 @@
 {
   "name": "abyss",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Skills and self-instrumentation for Claude Code that measure instead of decree.",
   "author": {
     "name": "Jordi Figueras Casas",
