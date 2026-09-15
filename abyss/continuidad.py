@@ -85,7 +85,11 @@ VIVO = os.path.join(mem, '.vivo')
 # entre llamadas, con la red en agujero negro el total de exterocepcion+noticias
 # crecería con el número de llamadas, por encima del timeout de 60 s del propio
 # gancho SessionStart. Overridable por env para pruebas (ABYSS_PRESUPUESTO_*).
-PRESUPUESTO_ARRANQUE_S = float(os.environ.get('ABYSS_PRESUPUESTO_ARRANQUE', 4.0))
+# 12 s en el arranque, no 4: medido el 15-sep-2026 con red sana, ipinfo + meteo +
+# portada + 5 temas + 3 candidatos sumaban entre 6 y 7 s, y con 4 s los temas de
+# noticias llevaban once días sin llegar. Cada llamada sigue cortando a los 3 s,
+# así que sin red el arranque cuesta como mucho el presupuesto, nunca minutos.
+PRESUPUESTO_ARRANQUE_S = float(os.environ.get('ABYSS_PRESUPUESTO_ARRANQUE', 12.0))
 PRESUPUESTO_DESPERTAR_S = float(os.environ.get('ABYSS_PRESUPUESTO_DESPERTAR', 2.5))
 
 try:

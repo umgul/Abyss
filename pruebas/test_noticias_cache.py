@@ -1,4 +1,5 @@
-"""noticias.recoger(): una caché de hoy solo cuenta si trae algo (portada o temas); una
+"""noticias.recoger(): una caché de hoy cuenta si trae temas (portada sola con temas que
+pedir: ver test_noticias_temas_primero.py); una
 recogida vacía (sin red, presupuesto agotado) no se escribe, para no machacar una caché
 buena ya escrita y para que el siguiente arranque vuelva a intentarlo."""
 import sys
@@ -88,8 +89,10 @@ class RecogerCacheDelDiaSoloSiTraeAlgo(unittest.TestCase):
         self.assertEqual(guardado['portada'], [['titular nuevo', 'fuente nueva']])
 
     def test_cache_buena_de_hoy_no_vuelve_a_pedir(self):
+        # «buena» = con temas: una de hoy con portada y sin temas es una recogida a
+        # medias y se reintenta (test_noticias_temas_primero.py)
         hoy = time.strftime('%Y-%m-%d')
-        buena = {'dia': hoy, 'portada': [['titular', 'fuente']], 'temas': {}}
+        buena = {'dia': hoy, 'portada': [['titular', 'fuente']], 'temas': {'tema': [['t', 'f'], ['t2', 'f2']]}}
         self.ruta_cache.write_text(json.dumps(buena), encoding='utf-8')
 
         def rss_no_debe_llamarse(url, n, timeout=3, presupuesto=None):

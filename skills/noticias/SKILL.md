@@ -26,6 +26,12 @@ titulares superan el "nulo" (parecido de frases ajenas al proyecto) — no basta
 con que exista, tiene que dar al menos 2 titulares reales. Caduca a los 14 días
 sin darlos. Todo se apunta en `temas_log.jsonl`: silencioso pero auditable.
 
+Al arrancar, dentro del presupuesto de red compartido de `continuidad.py
+--arranque`, se piden **primero los temas efectivos** y los candidatos
+automáticos solo con lo que sobra. Una caché del día con portada pero sin temas
+(el presupuesto se agotó a medias) no se da por buena: los arranques siguientes
+reintentan solo los temas, reutilizando la portada, hasta 3 veces al día.
+
 ## Cómo se ejecuta
 
 ```
@@ -56,6 +62,8 @@ que sale por esta vía.
 - El filtro de nombres propios es heurístico (mayúsculas, bigramas, frecuencia):
   puede colar jerga interna capitalizada o perderse un tema real que el usuario
   nombra en minúscula.
+- Una caché del día con al menos un tema se da por completa aunque falten otros:
+  no se vuelve a pedir hasta el día siguiente, salvo con `--refrescar`.
 
 ## Reglas SGICP de esta pieza
 

@@ -516,10 +516,14 @@ propio proyecto en cada invocación por el `transcript_path`/`cwd` que le llega
   nunca con una traza cruda.
 - La parte de red de `--arranque` (ipinfo + noticias) y de `--despertar` (lugar
   dicho + meteo) va acotada por un presupuesto de tiempo compartido (por defecto
-  4 s y 2,5 s; `ABYSS_PRESUPUESTO_ARRANQUE`/`ABYSS_PRESUPUESTO_DESPERTAR`): con la
+  12 s y 2,5 s; `ABYSS_PRESUPUESTO_ARRANQUE`/`ABYSS_PRESUPUESTO_DESPERTAR`): con la
   red caída o muy lenta, se corta antes de comerse el timeout del propio gancho —
   el precio es que un "casi lento" también se corta, no solo el que está muerto
-  del todo.
+  del todo. Dentro de ese presupuesto, `noticias.py` pide primero los temas
+  efectivos y solo con lo que sobra valida candidatos automáticos; una caché del
+  día con portada pero sin temas se reintenta (solo los temas, hasta 3 veces al
+  día) en los arranques siguientes. Con 4 s y los candidatos por delante, los
+  temas llevaban once días sin llegar (medido el 15-sep-2026).
 - **`huella.py`** APAGADO por defecto: su gancho `PostToolUse` corre tras CADA
   herramienta, y la foto de puertos/procesos cuesta (medido: ~950 ms por
   PowerShell combinado en Windows) hasta que el propio guion, midiendo su

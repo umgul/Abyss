@@ -524,10 +524,15 @@ another's.
   they fail with a clear message (`sin cuadro: ...` / `sin video: ...`), never
   a raw traceback.
 - The network part of `--arranque` (ipinfo + news) and `--despertar` (spoken
-  location + weather) is bounded by a shared time budget (4 s and 2.5 s by
+  location + weather) is bounded by a shared time budget (12 s and 2.5 s by
   default; `ABYSS_PRESUPUESTO_ARRANQUE`/`ABYSS_PRESUPUESTO_DESPERTAR`): with the
   network down or very slow, it cuts off before eating the hook's own timeout —
-  the cost is that "somewhat slow" also gets cut, not only "fully dead".
+  the cost is that "somewhat slow" also gets cut, not only "fully dead". Within
+  that budget, `noticias.py` fetches the effective topics first and validates
+  automatic candidates only with what is left; a day cache with a front page but
+  no topics is retried (topics only, up to 3 times a day) on later startups. With
+  4 s and candidates first, topics had been missing for eleven days (measured
+  2026-09-15).
 - **`huella.py`** OFF by default: its `PostToolUse` hook runs after EVERY
   tool call, and the ports/processes snapshot has a real cost (measured:
   ~950 ms for a combined PowerShell call on Windows) until the script itself,

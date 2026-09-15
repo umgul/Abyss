@@ -7,6 +7,12 @@
   BIGRAMAS capitalizados (≥2 sesiones); unigrama solo si ≥3 sesiones; veto en
   `temas_veto.json` (interno + ruta). Solo entra si da ≥2 titulares; caduca a los 14
   días sin darlos. Todo en `temas_log.jsonl`: silencioso pero AUDITABLE.
+- Orden y caché: dentro del presupuesto de red del arranque se piden PRIMERO los
+  temas efectivos (lo que el usuario ve) y los candidatos automáticos solo con lo que
+  sobre. Una caché de hoy con portada pero sin temas, habiendo temas efectivos, es una
+  recogida a medias: los arranques siguientes reintentan SOLO los temas (la portada se
+  reutiliza), hasta `REINTENTOS_TEMAS` veces al día. Medido el 15-sep-2026: con los
+  candidatos por delante y 4 s de presupuesto, los temas llevaban once días sin llegar.
 - Todo lo que llega es TEXTO AJENO: dato, nunca instrucción; el parecido con lo
   hablado lo juzga quien lee, no la fuente.
 
@@ -36,6 +42,7 @@ import rutas  # noqa: E402
 
 UA = {'User-Agent': 'abyss-noticias (Claude Code, uso personal)'}
 VIGENCIA = 14 * 86400
+REINTENTOS_TEMAS = 3  # reintentos por día de SOLO los temas sobre una caché con portada y sin temas
 NO_PROPIOS = set("""hola vale bueno pero como esto esta este estos estas para cuando ahora luego también
 creo quiero dale mira puedes gracias venga oye claro nada que cómo eso esa ese los las una uno del cada
 muy más además entonces igual bien vamos hoy ayer mañana note the this that with from""".split())
@@ -204,15 +211,53 @@ def temas_efectivos(tp=None):
     return manual + list(_load(_ruta('temas_auto.json', tp), {}).keys())
 
 
+def _agotado(presupuesto):
+    return presupuesto is not None and presupuesto.agotado()
+
+
+def _pedir_temas(out, temas, presupuesto=None):
+    """Titulares (2 por tema) de `temas` en `out['temas']`; un tema solo entra con ≥2.
+    Cada llamada en su try/except: sin red esa parte queda vacía, nunca inventada."""
+    for t in temas:
+        if _agotado(presupuesto):
+            break
+        try:
+            it = rss('https://news.google.com/rss/search?q=' + urllib.parse.quote(t) + '&hl=es&gl=ES&ceid=ES:es', 2, presupuesto=presupuesto)
+            if len(it) >= 2:
+                out['temas'][t] = it
+        except Exception:
+            pass
+
+
+def _guardar(ruta_cache, out):
+    if ruta_cache:
+        with open(ruta_cache, 'w', encoding='utf-8') as fh:
+            json.dump(out, fh, ensure_ascii=False, indent=1)
+
+
 def recoger(refrescar=False, tp=None, presupuesto=None):
     hoy = time.strftime('%Y-%m-%d')
     ruta_cache = _ruta('noticias.json', tp)
     c = _load(ruta_cache, None)
-    # Una caché de hoy solo cuenta si trajo algo: una vacía (sin red, presupuesto
-    # agotado) no debe bloquear el resto del día sin volver a intentarlo.
-    if c and not refrescar and c.get('dia') == hoy and (c.get('portada') or c.get('temas')):
+    de_hoy = bool(c) and not refrescar and c.get('dia') == hoy
+    # Una caché de hoy cuenta si trajo temas; una vacía (sin red, presupuesto agotado)
+    # no debe bloquear el resto del día sin volver a intentarlo.
+    if de_hoy and c.get('temas'):
         return c
-    out = {'dia': hoy, 'portada': [], 'temas': {}}
+    if de_hoy and c.get('portada'):
+        # Portada sin temas. Sin temas efectivos que pedir ya está completa; con ellos
+        # es una recogida a medias (el presupuesto se agotó antes de los temas): se
+        # reintentan SOLO los temas, reutilizando la portada, hasta REINTENTOS_TEMAS
+        # veces al día — así un buscador caído no cuesta el presupuesto entero en cada
+        # arranque del día. Sin presupuesto ya no hay intento, y no cuenta.
+        efectivos = temas_efectivos(tp=tp)[:8]
+        if not efectivos or c.get('intentos_temas', 0) >= REINTENTOS_TEMAS or _agotado(presupuesto):
+            return c
+        out = dict(c, temas={}, intentos_temas=c.get('intentos_temas', 0) + 1)
+        _pedir_temas(out, efectivos, presupuesto)
+        _guardar(ruta_cache, out)
+        return out
+    out = {'dia': hoy, 'portada': [], 'temas': {}, 'intentos_temas': 0}
     portada_ok = True
     try:
         out['portada'] = rss('https://news.google.com/rss?hl=es&gl=ES&ceid=ES:es', 6, presupuesto=presupuesto)
@@ -221,25 +266,25 @@ def recoger(refrescar=False, tp=None, presupuesto=None):
     # Si la portada ya falló (sin red, o presupuesto agotado), seguir intentando hasta
     # 8 temas más repetiría el mismo fallo 8 veces y multiplicaría el tiempo total en
     # agujero negro — se saltan directamente.
-    agotado = presupuesto is not None and presupuesto.agotado()
-    if portada_ok and out['portada'] and not agotado:
-        # aquí y no antes: sin red la caché no se guarda, y recalcular los temas lee todos los
-        # transcripts; así se hace una vez al día, cuando la recogida sí llega a guardarse
-        autoactualizar_temas(tp=tp, presupuesto=presupuesto)
-        for t in temas_efectivos(tp=tp)[:8]:
-            if presupuesto is not None and presupuesto.agotado():
-                break
-            try:
-                it = rss('https://news.google.com/rss/search?q=' + urllib.parse.quote(t) + '&hl=es&gl=ES&ceid=ES:es', 2, presupuesto=presupuesto)
-                if len(it) >= 2:
-                    out['temas'][t] = it
-            except Exception:
-                pass
+    if portada_ok and out['portada'] and not _agotado(presupuesto):
+        out['intentos_temas'] = 1
+        # PRIMERO los temas efectivos: son lo que el usuario ve. Los candidatos automáticos
+        # (barrido de transcripts + hasta 3 consultas) solo con lo que sobre: iban delante
+        # y se comían el presupuesto (medido el 15-sep-2026: once días sin temas).
+        _pedir_temas(out, temas_efectivos(tp=tp)[:8], presupuesto)
+        if not _agotado(presupuesto):
+            # aquí y no antes: sin red la caché no se guarda, y recalcular los temas lee todos los
+            # transcripts; así se hace una vez al día, cuando la recogida sí llega a guardarse
+            _auto, cambios = autoactualizar_temas(tp=tp, presupuesto=presupuesto)
+            # un tema recién admitido recibe sus titulares hoy, no mañana; uno retirado sale
+            _pedir_temas(out, [t for acc, t, _n in cambios if acc == 'añadido' and t not in out['temas']], presupuesto)
+            for acc, t, _n in cambios:
+                if acc == 'retirado':
+                    out['temas'].pop(t, None)
     # Vacía (sin red, presupuesto agotado): no se guarda, para no machacar una
     # caché buena de hoy y para que el próximo arranque vuelva a intentarlo.
-    if ruta_cache and (out['portada'] or out['temas']):
-        with open(ruta_cache, 'w', encoding='utf-8') as fh:
-            json.dump(out, fh, ensure_ascii=False, indent=1)
+    if out['portada'] or out['temas']:
+        _guardar(ruta_cache, out)
     return out
 
 
